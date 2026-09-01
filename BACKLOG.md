@@ -2,7 +2,10 @@
 
 Ordem recomendada para Codex/agentes após a auditoria completa da baseline em 2026-09-01. Não executar fases posteriores ignorando um gate anterior quebrado.
 
-Auditoria canônica: [`docs/audit/iot-fall-monitor-port-audit-2026-09-01.md`](docs/audit/iot-fall-monitor-port-audit-2026-09-01.md).
+Auditorias:
+
+- [`docs/audit/iot-fall-monitor-port-audit-2026-09-01.md`](docs/audit/iot-fall-monitor-port-audit-2026-09-01.md)
+- [`docs/audit/iot-fall-monitor-port-audit-addendum-2026-09-01.md`](docs/audit/iot-fall-monitor-port-audit-addendum-2026-09-01.md)
 
 ## P0 — Lineage, baseline reproduzível e CI
 
@@ -11,9 +14,12 @@ Auditoria canônica: [`docs/audit/iot-fall-monitor-port-audit-2026-09-01.md`](do
 - [ ] Criar tag/checkpoint `tcc-baseline-*` somente no SHA realmente importado/validado.
 - [ ] Reproduzir todos os testes/builds existentes antes de alterar comportamento.
 - [ ] Registrar diferenças entre resultados históricos e a nova execução.
+- [ ] Atualizar runtime canônico para **Node 24 LTS** após caracterizar a baseline; Node 20 está EOL desde 2026-03-24.
+- [ ] Fixar/alinha versão Node em raiz/backend/web e CI.
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
 - [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.
+- [ ] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
 - [ ] Criar CI remota mínima **antes de refatorações relevantes**:
   - backend check/test;
   - frontend lint/build;
@@ -25,24 +31,40 @@ Auditoria canônica: [`docs/audit/iot-fall-monitor-port-audit-2026-09-01.md`](do
 
 Não iniciar reestruturação grande enquanto a baseline não puder ser reproduzida e validada remotamente.
 
-## P1 — Contratos, migrations e segurança de identidade
+## P1 — Detector baseline, contratos, migrations e segurança de identidade
+
+### Detector baseline antes de calibrar/ML
+
+- [ ] Remover/reclassificar `confidence = 0.76` fixa; não apresentar como probabilidade/confiança calibrada.
+- [ ] Corrigir diferença angular com wrap `+180/-180`.
+- [ ] Adicionar regressões para `179/-179`, `-179/179` e fronteiras equivalentes.
+- [ ] Revisar atualização da baseline de orientação para não sofrer média linear na fronteira angular.
+- [ ] Criar replay/test harness para alimentar `FallDetector` com séries de `SensorReading` sem hardware.
+- [ ] Manter sensor fusion como spike posterior condicionado a evidência, não como rewrite imediato.
+
+### Contratos e dados
 
 - [ ] Inventariar rotas HTTP reais, tópicos MQTT e payloads reais.
 - [ ] Criar OpenAPI inicial a partir das rotas existentes.
 - [ ] Criar JSON Schemas MQTT a partir dos payloads existentes.
 - [ ] Adicionar `schema_version` nos envelopes em evolução onde necessário.
 - [ ] Definir contrato de `critical-event-ack`.
+- [ ] Definir orçamento de tamanho para critical-event envelope.
+- [ ] Separar evidence bundle grande/raw do evento crítico se a pesquisa exigir janela maior.
 - [ ] Definir `occurred_at_device`, `received_at`, `boot_id`, `device_uptime_ms` e `clock_quality`.
 - [ ] Definir autoridade de identidade: MQTT principal/ACL/tópico > payload.
 - [ ] Rejeitar/quarentenar topic/payload mismatch.
+- [ ] Tornar severidade/push policy autoridade do backend; payload do device relata fatos/evidência.
+- [ ] `fall_suspected` não deve seguir o mesmo caminho urgente de uma queda confirmada por default.
 - [ ] Planejar e executar migration segura para `event_uuid` explícito/UNIQUE após backfill/validação.
 - [ ] Introduzir `database/migrations/` + tabela/runner de histórico.
 - [ ] Testar migration em banco vazio e upgrade da baseline.
 - [ ] Definir lifecycle de telemetria/evidência/auditoria antes de staging contínuo.
+- [ ] Minimizar PII sincronizada/persistida no ESP32; não manter nome humano/peso/altura sem necessidade algorítmica explícita.
 
 ### Gate P1
 
-Contratos de evento e identidade precisam estar explícitos antes de alterar transportes ou criar cliente Android dependente deles.
+Detector baseline deve ter semântica honesta e regressões básicas; contratos de evento/identidade precisam estar explícitos antes de alterar transportes ou criar cliente Android dependente deles.
 
 ## P2 — Critical Event Reliability
 
@@ -57,11 +79,12 @@ Contratos de evento e identidade precisam estar explícitos antes de alterar tra
 - [ ] Device remove da outbox somente após ACK correspondente.
 - [ ] ACK duplicado deve ser seguro.
 - [ ] Reenvio após timeout/reboot deve preservar UUID.
-- [ ] Definir sessão MQTT persistente/reconnect no backend/broker.
+- [ ] Avaliar sessão MQTT persistente como otimização de recovery/latência; não depender dela para correção ponta a ponta.
 - [ ] Testar broker temporariamente offline.
 - [ ] Testar backend temporariamente offline/restart.
 - [ ] Testar duplicata, reorder e ACK perdido.
 - [ ] Instrumentar fila: quantidade, item mais antigo, overflow/drop.
+- [ ] Definir comportamento de overflow sem `drop oldest` silencioso para críticos.
 
 ### Offline fall evidence
 
@@ -75,7 +98,7 @@ Contratos de evento e identidade precisam estar explícitos antes de alterar tra
 
 Antes do app ser chamado de interface principal, CUJ de perda de Internet deve provar persistência e criação correta de alerta.
 
-## P3 — Hardening backend e modularização conservadora
+## P3 — Hardening backend, portal e modularização conservadora
 
 - [ ] Modularizar `deviceService`, `eventService` e ingestão MQTT por extração/characterization tests.
 - [ ] Criar módulos explícitos para critical events/device identity/notifications/sessions quando justificável.
@@ -84,11 +107,16 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Reforçar testes de tenant/object authorization.
 - [ ] JWT secret ausente/fraco deve falhar em ambiente externo.
 - [ ] Criar modelo de sessão mobile revogável com refresh rotation.
-- [ ] Rate limit em login/pairing/sync/rotas expostas.
+- [ ] Rate limit em login/register/pairing/sync/rotas expostas.
+- [ ] Decidir se staging precisa de self-registration pública; caso contrário usar bootstrap/invite/admin controlado.
+- [ ] Reforçar política/validação de senha e e-mail antes de exposição pública.
 - [ ] CORS/Socket origins allowlist em staging.
 - [ ] Adicionar `/live` e `/ready` distintos.
 - [ ] Schema incompatível deixa readiness false/falha startup conforme ambiente.
 - [ ] Métricas/logs para MQTT, outbox, push, rejects e devices offline.
+- [ ] Desabilitar `SETUP_PORTAL_ALWAYS_ON` como default operacional.
+- [ ] Recovery sensível exige presença física/janela limitada e/ou autenticação apropriada.
+- [ ] Rotas mutáveis do portal não podem permanecer abertas na LAN sem proteção.
 
 ## P4 — Bootstrap Android REST MVP
 
@@ -111,7 +139,9 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Configurar projeto Firebase sem versionar secrets indevidos.
 - [ ] Registrar/renovar/revogar FCM tokens por instalação.
 - [ ] Backend envia via notification outbox.
+- [ ] Modelar estados `queued/provider_submitted/provider_error/app_observed/opened/actioned` sem chamar provider acceptance de entrega humana.
 - [ ] Push contém somente dados mínimos; detalhes são buscados após auth.
+- [ ] Mostrar notificação urgente sem depender de round-trip de rede antes da renderização quando o payload recebido for suficiente.
 - [ ] Deep link para alerta correto.
 - [ ] Socket.IO somente foreground.
 - [ ] Ações de notificação usam action/idempotency ID único.
@@ -126,7 +156,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
   - FCM registration;
   - último teste/entrega observável.
 - [ ] Implementar `Testar alerta` end-to-end sem queda física.
-- [ ] Testar foreground/background/killed/Doze/permissão negada/reboot.
+- [ ] Testar foreground/background/process death/Doze/permissão negada/reboot e documentar `force-stop` como condição distinta.
 
 ## P6 — Provisioning e pairing seguros
 
@@ -160,6 +190,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Firewall/SSH hardening.
 - [ ] Docker Compose ou deploy equivalente reproduzível.
 - [ ] Mosquitto TLS + ACL por device.
+- [ ] Remover perfil público `broker.hivemq.com:1883` de qualquer configuração de staging; mantê-lo apenas como laboratório explícito se ainda útil.
 - [ ] MySQL persistente não público.
 - [ ] Backend HTTPS.
 - [ ] React publicado como console secundário.
@@ -185,6 +216,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 ## P10 — Pesquisa e experimento
 
 - [ ] Revisão bibliográfica validada.
+- [ ] Incluir trabalhos de real-fall/long-term/cross-dataset na revisão, não apenas datasets laboratoriais.
 - [ ] Definir protocolo experimental antes da coleta final.
 - [ ] Instrumentar t0..t5 e clock quality.
 - [ ] Executar baseline de latência/recovery.
@@ -203,6 +235,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Validar background Android no hardware real.
 - [ ] Dataset compatível com posição/taxa do sensor.
 - [ ] Split de avaliação sem participant leakage.
+- [ ] Avaliar cross-dataset/real-fall generalization quando aplicável.
 - [ ] Comparar FSM com ML/TinyML somente com hipótese/baseline/métricas.
 - [ ] Avaliar Edge Impulse/ESP-DL apenas se justificarem o experimento.
 
