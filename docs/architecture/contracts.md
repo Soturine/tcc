@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Evitar que firmware, backend, Android e Web evoluam por acordos implícitos.
+Evitar que firmware, backend, Android e Web evoluam por acordos implícitos. Contratos críticos devem expressar **identidade, versão, idempotência, tempo, evidência e confirmação**.
 
 ## HTTP
 
@@ -16,12 +16,12 @@ Princípios:
 
 - versionamento explícito quando necessário;
 - exemplos válidos;
-- erros estruturados;
+- erros estruturados com códigos estáveis;
 - autorização documentada;
 - paginação/filtros consistentes;
-- breaking changes detectados em CI após estabilização.
-
-O app Android e o frontend React são clientes pares da mesma API.
+- idempotency key quando uma ação crítica puder ser repetida por retry;
+- breaking changes detectados em CI após estabilização;
+- Android e React são clientes pares da mesma API.
 
 ## MQTT
 
@@ -30,73 +30,178 @@ Schemas alvo:
 ```text
 contracts/mqtt/
 ├── event.schema.json
+├── event-ack.schema.json
 ├── telemetry.schema.json
 ├── status.schema.json
 ├── config-command.schema.json
 └── config-ack.schema.json
 ```
 
+## Identidade MQTT
+
+Em ambiente externo:
+
+```text
+MQTT authenticated principal
++ broker ACL
++ authorized topic
+= authoritative device identity
+```
+
+O payload não escolhe outro device. `device_id`/`device_uid` dentro do JSON serve como redundância de verificação e telemetria de diagnóstico. Divergência deve gerar rejeição/quarentena e auditoria.
+
 ## Tópicos
 
-Os nomes finais devem partir dos tópicos já existentes e ser auditados antes de alteração. A semântica deve distinguir pelo menos:
+Os nomes finais devem partir da baseline e ser migrados de forma compatível. A semântica deve distinguir pelo menos:
 
 - eventos críticos;
+- ACK de evento crítico;
 - telemetria;
 - status/LWT;
 - comandos/configuração;
-- acknowledgments.
+- ACK de comando.
 
-Evitar colocar autorização apenas no payload; ACL do broker deve restringir tópicos por credencial/dispositivo.
+ACL do broker restringe tópicos por credencial/dispositivo. Autorização nunca vive apenas no payload.
 
 ## Envelope de evento crítico
 
-Conceitualmente deve conter identidade e rastreabilidade suficientes:
+Direção conceitual; campos finais precisam ser confirmados contra a baseline antes de virar schema estável:
 
 ```json
 {
   "schema_version": 1,
   "event_uuid": "...",
   "event_sequence": 123,
+  "boot_id": "...",
+  "device_uptime_ms": 123456,
   "device_id": "...",
-  "event_type": "fall",
-  "device_timestamp": "...",
+  "event_type": "fall_detected",
+  "occurred_at_device": "...",
+  "clock_quality": "synced",
   "algorithm_version": "...",
-  "data": {}
+  "config_version": 12,
+  "evidence": {
+    "decision_source": "edge",
+    "features": {},
+    "sample_bundle": null
+  }
 }
 ```
 
-O exemplo é estrutural; campos/tipos finais devem refletir a baseline real antes de virar schema oficial.
+Regras:
+
+- `event_uuid` nasce uma vez e sobrevive a retries/reboots enquanto pendente;
+- identidade não depende somente de wall clock;
+- `occurred_at_device` não é substituído por `received_at`;
+- backend adiciona seu próprio `received_at` ao persistir;
+- `clock_quality` explicita se tempo do device era confiável;
+- evidência local suficiente deve permitir replay offline sem depender exclusivamente de telemetria SQL.
+
+## ACK de evento crítico
+
+O ACK de aplicação só pode ser emitido após o backend completar a persistência necessária.
+
+Exemplo conceitual:
+
+```json
+{
+  "schema_version": 1,
+  "event_uuid": "...",
+  "status": "committed",
+  "event_id": 123,
+  "committed_at": "..."
+}
+```
+
+O device deve tolerar ACK repetido. O backend deve retornar a mesma identidade lógica em retry do mesmo `event_uuid`.
+
+**Importante:** PUBACK MQTT QoS 1 confirma o broker; `event-ack` confirma a aplicação/backend.
 
 ## Idempotência
 
+### Device event
+
 - retransmissão preserva `event_uuid`;
-- backend valida uniqueness;
-- processamento repetido retorna resultado lógico consistente;
-- ações HTTP críticas devem usar mecanismos de idempotência quando houver risco real de retry duplicado.
+- banco possui uniqueness explícita;
+- processamento repetido resolve para o mesmo evento lógico;
+- alert/notification creation não duplica.
+
+### HTTP actions
+
+Ações como acknowledge/cancel/resolve e ações vindas de notificação devem ser seguras sob double-tap/retry. Usar state transition invariants e, quando necessário, idempotency/action IDs.
+
+### Commands
+
+Comando deve carregar ID único e versão desejada. Device deve poder responder novamente a comando duplicado sem aplicar efeito cumulativo indevido.
+
+## Evidência
+
+Separar origem:
+
+```text
+device
+server_telemetry
+both
+none
+```
+
+`server_telemetry` enriquece, mas não pode ser a única condição para aceitar um `fall_detected` localmente confirmado quando o evento ficou offline.
 
 ## Configuração remota
 
-Comando deve carregar:
+Comando:
 
-- versão desejada;
-- campos alterados/configuração;
-- correlation/command id;
+- `schema_version`;
+- `command_id`;
+- desired config version;
+- campos/configuração;
 - timestamp/expiração quando aplicável.
 
-ACK deve carregar:
+ACK:
 
-- command/correlation id;
+- `command_id`;
 - versão reportada;
-- aplicado/rejeitado;
-- motivo estruturado quando rejeitado.
+- aplicado/rejeitado/duplicate;
+- motivo estruturado;
+- firmware/protocol version quando útil.
+
+## Status e health
+
+Status deve permitir compor Protection Health sem afirmar garantia clínica. Campos candidatos:
+
+- firmware/protocol version;
+- sensor state;
+- sample age;
+- Wi-Fi/MQTT state;
+- last backend application ACK;
+- critical outbox depth/oldest age;
+- desired/reported config versions;
+- battery value + source;
+- device uptime/boot ID.
 
 ## Compatibilidade
 
-Mudança em contrato deve responder:
+Toda mudança externa deve responder:
 
-1. firmware antigo continuará funcionando?
-2. app antigo continuará funcionando?
-3. backend aceita versões anteriores?
-4. migration/deprecation é necessária?
+1. firmware antigo continua funcionando?
+2. app antigo continua funcionando?
+3. backend aceita versão anterior durante migração?
+4. broker ACL precisa mudar?
+5. migration/deprecation é necessária?
+6. mudança altera significado de um evento já persistido?
 
-Não aumentar `schema_version` por toda mudança interna; somente quando o contrato externo exigir.
+Não aumentar `schema_version` por mudança interna sem impacto no contrato.
+
+## Contract tests
+
+A CI deverá validar:
+
+- payloads válidos e inválidos;
+- compatibilidade de schemas;
+- exemplos OpenAPI;
+- mismatch topic/payload;
+- duplicate event;
+- ACK perdido/repetido;
+- command duplicate/replay;
+- versão desconhecida;
+- campos obrigatórios de critical event.
