@@ -8,30 +8,115 @@ Kanban leve:
 Backlog → Ready → In Progress → Remote Validation → Done
 ```
 
-WIP baixo. Cada item deve possuir critérios de aceitação e evidência compatível com o risco.
+WIP baixo. Cada item possui critérios de aceitação e evidência proporcional ao risco.
 
-## Commits
+## Regra introduzida pela auditoria
 
-Preferir commits lógicos, pequenos e reversíveis. Após teste focado, fazer push real e usar a CI remota como checkpoint assíncrono.
+A baseline histórica `iot-fall-monitor` possui bons comandos/testes locais, mas não possui workflows GitHub Actions. O TCC **não herda essa lacuna**.
 
-## CI alvo
+CI é infraestrutura da fase de fundação:
+
+```text
+import lineage
+→ reproduce baseline locally
+→ minimal remote CI
+→ only then major refactors
+```
+
+A suíte cresce depois, mas não fica toda para uma fase tardia de QA.
+
+## Commits e push
+
+Preferir commits lógicos, pequenos e reversíveis.
+
+Fluxo:
+
+```text
+focused check
+→ commit
+→ push real
+→ remote CI checkpoint
+→ próxima tarefa enquanto CI roda quando seguro
+```
+
+Se uma CI anterior ficar vermelha, corrigir cedo. Uma CI verde antiga nunca valida um SHA novo.
+
+## CI incremental
+
+### Stage 0 — logo após o porte
+
+Backend:
+
+- install determinístico;
+- suíte existente;
+- integration/MQTT existente quando ambiente estiver preparado.
+
+Web:
+
+- install;
+- lint;
+- build.
+
+Firmware:
+
+- PlatformIO build.
+
+Security:
+
+- secret scanning/dependency checks viáveis.
+
+### Stage 1 — contratos e migrations
+
+Adicionar:
+
+- MySQL real em CI;
+- Mosquitto real;
+- migration tests;
+- OpenAPI/schema validation;
+- topic/payload identity tests;
+- event ACK/duplicate/offline contracts.
+
+### Stage 2 — Android
+
+- Gradle wrapper validation;
+- formatting/lint;
+- JVM unit tests;
+- Compose tests adequados;
+- debug build;
+- release candidate/signing checks apenas quando necessário, sem secrets em PRs não confiáveis.
+
+### Stage 3 — maturidade
+
+- web component tests;
+- firmware native tests;
+- CodeQL;
+- SCA/dependency review;
+- container scan;
+- E2E seletivo;
+- artifacts/SBOM/provenance quando proporcional à release.
+
+## CI alvo por subsistema
 
 ### Backend
 
 - install determinístico;
-- lint/check;
+- check/lint quando houver;
 - unit tests;
 - integration tests com MySQL;
-- integration MQTT com Mosquitto;
-- migrations up/down ou validação equivalente;
-- contract tests.
+- MQTT integration com Mosquitto;
+- migrations;
+- contract/security tests;
+- stress seletivo em milestone, não em todo commit se caro.
 
 ### Android
 
-- formatting/lint;
-- `./gradlew test`;
+- format/lint;
+- unit tests;
 - Compose/UI tests adequados;
-- build Android debug/release candidate.
+- build;
+- instrumented tests em pipeline/device farm somente se benefício justificar custo/complexidade.
+
+Testes de BLE/Doze/FCM continuam exigindo device físico/controlado em parte do ciclo.
 
 ### Web
 
@@ -39,85 +124,149 @@ Preferir commits lógicos, pequenos e reversíveis. Após teste focado, fazer pu
 - typecheck;
 - unit/component tests;
 - build;
-- E2E crítico em milestone.
+- poucos E2E críticos em milestone.
 
 ### Firmware
 
-- PlatformIO native tests para lógica pura;
-- compile para board ESP32 alvo;
-- static analysis quando configurada.
+- native tests para lógica pura;
+- compile para ESP32 alvo;
+- static analysis quando configurada;
+- HIL fora do runner genérico, com procedimento registrável.
 
 ### Contracts
 
-- lint OpenAPI;
-- validação de exemplos;
-- breaking-change detection quando estável;
-- JSON Schema para payloads MQTT.
+- OpenAPI lint/examples;
+- JSON Schema MQTT;
+- compatibility/breaking checks quando contratos estabilizarem;
+- payload size budget quando medido;
+- generated-client check somente se geração for adotada.
 
 ### Security
 
-- CodeQL;
-- dependency/SCA review;
+- CodeQL onde suportado;
+- SCA/dependency review;
 - secret scanning;
-- container scan quando imagens forem introduzidas;
-- Dependabot sem auto-merge cego.
+- container scan;
+- Dependabot sem auto-merge cego;
+- High/Critical tratados cedo, com false positive/risco documentado quando aplicável.
 
-## Concorrência de CI
+## Concorrência e custo
 
-Runs superseded podem ser cancelados quando seguro para reduzir desperdício. Uma CI verde antiga não valida um SHA novo.
+- cancelar runs superseded quando seguro;
+- evitar matriz redundante;
+- cache com chaves corretas;
+- não ocultar falha por `continue-on-error` em gate crítico;
+- separar checks rápidos de suites de milestone quando necessário.
 
 ## Ambientes
 
-- local: desenvolvimento/testes rápidos;
-- staging: cloud real e integração física;
-- production: somente se houver necessidade posterior ao escopo acadêmico.
+```text
+local
+ci
+staging
+production (futuro, se existir)
+```
+
+### Local
+
+Feedback rápido e HIL manual.
+
+### CI
+
+Ambiente efêmero reproduzível; MySQL/Mosquitto services quando necessário.
+
+### Staging
+
+Cloud real + ESP32/Android físicos + FCM + TLS.
+
+### Production
+
+Não existe por nomenclatura apenas; somente se o projeto sair do escopo acadêmico.
 
 ## Deployment de staging
 
-Meta futura:
+Quando chegar a hora:
 
 ```text
-merge/push em main
-→ CI completa necessária
-→ artifact/container identificado pelo SHA
-→ deploy staging
+green SHA
+→ artifact/image identificado
+→ backup/precondition quando migration exigir
+→ deploy
 → migrations controladas
-→ health/readiness
-→ smoke test
-→ marcar SHA conhecido como verde
+→ /live + /ready
+→ post-deploy smoke
+→ registrar SHA implantado
 ```
 
-Não automatizar deploy antes de haver rollback e validação básica.
+Não automatizar deploy antes de existir rollback/recovery básico.
+
+## Database delivery
+
+Migration é parte do artifact/release logicamente.
+
+Antes de aplicar migration arriscada:
+
+- compatibilidade do app/backend;
+- backup quando necessário;
+- teste de upgrade da baseline;
+- plano de rollback/forward-fix;
+- nenhum `schema.sql` destrutivo em staging como “migration”.
 
 ## Release
 
-Antes de release/tag:
+Antes de tag/release:
 
 1. `HEAD == origin/main`;
 2. CI verde no SHA exato;
 3. migrations testadas;
-4. artefatos gerados do SHA;
-5. smoke E2E relevante;
-6. changelog/documentação atualizados;
-7. vulnerabilidades High/Critical avaliadas;
-8. rollback conhecido;
-9. tag somente depois da comprovação.
+4. artifacts gerados do SHA;
+5. golden/smoke E2E relevante;
+6. changelog/docs/status atualizados;
+7. High/Critical avaliadas;
+8. backup/restore e rollback conhecidos quando aplicáveis;
+9. deployment config/secrets não estão no Git;
+10. tag somente após comprovação.
 
-Meta acadêmica eventual: `v1.0.0-tcc` ou versão SemVer equivalente definida perto da entrega.
+Versão acadêmica final pode ser `v1.0.0-tcc` ou SemVer equivalente definida perto da entrega.
 
-## Observabilidade pós-deploy
+## Post-deploy verification
 
 Verificar:
 
-- backend health/readiness;
-- conexão com MySQL;
-- conexão MQTT;
-- tamanho/idade da outbox;
-- erro de push;
-- espaço em disco;
-- CPU/memória;
-- smoke de login/API.
+- `/live` e `/ready`;
+- MySQL/schema;
+- broker auth/TLS;
+- backend MQTT subscription/session;
+- critical application ACK path;
+- notification outbox depth/age;
+- FCM test path;
+- devices offline;
+- disk/CPU/memory;
+- login/API;
+- React console;
+- Protection Health não mostra falso saudável.
 
-## Infraestrutura como código
+## IaC
 
-Introduzir IaC apenas quando a cloud estiver definida. Para uma única VM, scripts declarativos/Ansible/Terraform podem ser avaliados, mas não são obrigatórios se aumentarem mais complexidade que reprodutibilidade. Docker Compose + scripts idempotentes podem ser suficientes para o TCC.
+Uma única VM não exige Terraform/Kubernetes para ser profissional.
+
+Começar com:
+
+- Docker Compose/config declarativa;
+- scripts idempotentes;
+- backup/runbook;
+- env/secrets documentados.
+
+Avaliar Ansible/Terraform apenas se realmente reduzirem toil/reconstrução. Não transformar o TCC em exercício de cloud tooling.
+
+## Supply chain
+
+Na maturidade de release:
+
+- lockfiles;
+- actions pinning deliberado;
+- dependências revisadas;
+- secret scanning;
+- artifact checksums;
+- SBOM/provenance se proporcional;
+- release notes referenciam SHA/tag real.
