@@ -2,167 +2,267 @@
 
 ## 1. Objetivo
 
-Evoluir o sistema existente para uma plataforma IoT mobile-first para monitoramento de quedas e imobilidade, preservando autonomia no edge, confiabilidade de eventos críticos, backend como autoridade e aplicativo Android como principal interface operacional.
+Evoluir o sistema existente para uma plataforma IoT mobile-first para monitoramento experimental de quedas e imobilidade, preservando autonomia no edge, confiabilidade ponta a ponta, backend como autoridade e aplicativo Android como principal interface operacional.
+
+A arquitetura abaixo incorpora a auditoria da baseline de 2026-09-01. Ver [`../audit/iot-fall-monitor-port-audit-2026-09-01.md`](../audit/iot-fall-monitor-port-audit-2026-09-01.md).
 
 ## 2. Arquitetura lógica alvo
 
 ```text
-┌──────────────────────────────┐
-│ Dispositivo / Edge           │
-│ ESP32 + IMU hoje             │
-│ wearable futuro depois       │
-└─────────────┬────────────────┘
-              │ MQTT/TLS
-              ▼
-┌──────────────────────────────┐
-│ Broker MQTT                  │
-│ Mosquitto self-hosted        │
-│ HiveMQ como alternativa      │
-└─────────────┬────────────────┘
-              ▼
-┌──────────────────────────────┐
-│ Backend modular monolith     │
-│ Node.js + Express            │
-│                              │
-│ auth / tenants / patients    │
-│ devices / config / telemetry │
-│ events / alerts / notify     │
-│ mqtt / realtime / audit      │
-└───────┬─────────┬────────────┘
-        │         │
-        │ SQL     │ FCM / Socket.IO
-        ▼         ▼
-┌────────────┐   ┌──────────────────┐
-│ MySQL      │   │ Clientes         │
-│ autoridade │   │ Android + Web    │
-└────────────┘   └──────────────────┘
+┌──────────────────────────────────────┐
+│ Device / Edge                        │
+│ ESP32 + IMU agora                    │
+│ wearable futuro depois               │
+│                                      │
+│ detector + local evidence            │
+│ persistent critical-event outbox     │
+└─────────────────┬────────────────────┘
+                  │ MQTT/TLS QoS 1 críticos
+                  │ QoS 0 telemetria quando aceitável
+                  ▼
+┌──────────────────────────────────────┐
+│ Broker MQTT                          │
+│ Mosquitto self-hosted inicialmente   │
+│ HiveMQ/managed broker como opção     │
+│ TLS + per-device identity + ACL      │
+└─────────────────┬────────────────────┘
+                  ▼
+┌──────────────────────────────────────┐
+│ Backend modular monolith             │
+│ Node.js + Express                    │
+│                                      │
+│ auth/sessions/tenants/patients       │
+│ device identity/config/telemetry     │
+│ critical events/alerts               │
+│ MQTT/application ACK                 │
+│ notification outbox/realtime/audit   │
+└───────┬─────────────┬────────────────┘
+        │             │
+        │ SQL         │ FCM / Socket.IO
+        ▼             ▼
+┌──────────────┐   ┌────────────────────────┐
+│ MySQL        │   │ Clientes               │
+│ source of    │   │ Android principal      │
+│ truth        │   │ React admin/research   │
+└──────────────┘   └────────────────────────┘
+        ▲
+        │ application ACK after commit
+        └────────────────────────────── device
 ```
 
-## 3. Responsabilidades
+## 3. Invariantes de arquitetura
+
+1. Device detecta sem depender de app/site/cloud online.
+2. Evento crítico permanece pendente no device até confirmação da aplicação/backend.
+3. MQTT QoS/PUBACK não equivale a commit do banco.
+4. `event_uuid` torna retry idempotente e é robusto a reboot.
+5. Identidade do device em MQTT vem do principal/ACL/tópico autenticado.
+6. Backend é autoridade de domínio/persistência; clientes não acessam MySQL diretamente.
+7. Evidência local de queda sobrevive a período offline; telemetria do servidor enriquece, não apaga a decisão edge.
+8. `occurred_at_device` e `received_at` são distintos.
+9. Push e realtime são canais de apresentação; o evento já existe no backend antes deles.
+10. Falha deve produzir estado observável/degradado, não sucesso fictício.
+11. Site não é caminho crítico.
+12. Wearable e ML não são dependências do core.
+
+## 4. Responsabilidades
 
 ### Edge/device
 
 - amostrar sensores;
-- executar processamento local e FSM/algoritmo de detecção;
-- gerar identidade única para evento crítico;
-- manter buffer/retry quando a rede falhar;
-- sinalização local quando aplicável;
-- persistir configuração local validada;
-- reportar estado/firmware/sensores;
-- nunca depender do app aberto para detectar queda.
+- executar detector/FSM;
+- produzir evidência local da decisão;
+- gerar `event_uuid` robusto;
+- persistir critical-event outbox;
+- publicar/retry sem bloquear aquisição;
+- remover evento somente após application ACK válido;
+- sinalização/SOS local;
+- persistir configuração validada;
+- reportar sensor/connectivity/outbox/firmware/config health;
+- provisioning seguro.
 
 ### Broker MQTT
 
 - transporte assíncrono device↔backend;
-- tópicos segregados por dispositivo/tenant conforme política;
-- QoS e retained/LWT escolhidos semanticamente;
-- TLS e ACL em ambiente externo.
+- QoS/sessão/LWT semanticamente definidos;
+- TLS;
+- autenticação por device;
+- ACL mínima;
+- rejeição de publicação/subscription fora da identidade autorizada.
+
+Broker não decide tenant, alerta ou regra de negócio.
 
 ### Backend
 
-- autenticação/autorização;
-- multi-tenancy;
-- ingestão MQTT;
-- idempotência/deduplicação;
-- persistência;
-- estado de alertas;
-- emissão realtime;
-- fila/outbox de notificações;
-- API REST para app/web;
+- autenticação/sessões/autorização;
+- multi-tenancy/object authorization;
+- validar identidade e schemas MQTT;
+- idempotência;
+- migrations/integridade;
+- persistir eventos/evidências;
+- criar alertas por regra explícita;
+- application ACK após commit;
+- notification outbox;
+- REST;
+- Socket.IO foreground;
+- FCM;
 - auditoria;
-- comando/configuração remota.
+- desired/reported config;
+- liveness/readiness/observabilidade.
 
 ### Android
 
 - interface principal do cuidador/familiar;
-- alertas, histórico, pacientes e dispositivos;
+- sessão segura/revogável;
+- alertas/histórico/pacientes/devices;
 - provisioning/pairing;
-- diagnóstico local;
-- push FCM;
-- cache de último estado útil;
-- deep links e ações sobre alertas.
+- deep links e ações idempotentes;
+- FCM;
+- cache de último estado com staleness;
+- Protection Health;
+- Testar alerta;
+- acessibilidade.
 
 ### Web
 
-- console secundário;
-- administração;
-- visualização ampla de telemetria/evidências;
-- pesquisa e análise;
-- diagnóstico e suporte;
-- não deve ser requisito para receber/responder um alerta.
+- console secundário de administração/pesquisa/diagnóstico;
+- telemetria/evidência ampla;
+- exportação;
+- calibração/análise;
+- auditoria/suporte;
+- não necessário para receber/responder queda.
 
-## 4. Protocolos por finalidade
+## 5. Protocolos por finalidade
 
-| Necessidade | Tecnologia |
+| Necessidade | Tecnologia/direção |
 |---|---|
-| dispositivo → backend, eventos/telemetria | MQTT/TLS |
-| backend → dispositivo, comandos/config | MQTT/TLS |
-| app/web → backend, CRUD/comandos/histórico | HTTPS REST |
-| atualização com cliente ativo | Socket.IO |
-| Android em background/fechado | FCM |
-| provisioning local inicial | SoftAP + API local versionada |
-| wearable futuro | transporte abstrato; BLE se o hardware exigir |
+| telemetria device → backend | MQTT/TLS; QoS 0 quando perda ocasional é aceitável |
+| evento crítico device → backend | MQTT/TLS QoS 1 + `event_uuid` + persistent outbox |
+| confirmação de persistência backend → device | MQTT application ACK depois do commit |
+| configuração/comando backend → device | MQTT/TLS + command ID/version + ACK |
+| app/web → backend | HTTPS REST |
+| cliente ativo | Socket.IO |
+| Android background/killed | FCM |
+| provisioning ESP32 | ESP-IDF Unified Provisioning, BLE/SoftAP conforme spike |
+| recovery local | portal do ESP32 com autoridade limitada |
+| wearable futuro | transporte abstrato; BLE/Wi‑Fi/vendor SDK conforme hardware |
 
-## 5. Confiabilidade do evento crítico
+## 6. Dois outboxes, dois problemas
 
-Fluxo esperado:
+### Device critical-event outbox
+
+Protege **device → backend**.
 
 ```text
-detecção local
-→ event_uuid/event_sequence
-→ publish MQTT QoS apropriado
-→ backend valida + serializa por dispositivo quando necessário
-→ transaction: event + alert + outbox
-→ commit
-→ worker entrega FCM / realtime
-→ ação do usuário
-→ alert_action + audit
+queued
+→ publish/retry
+→ backend commit
+→ application ACK
+→ confirmed/remove
 ```
 
-A entrega de rede pode ser "at least once"; o resultado lógico deve ser idempotente.
+### Backend notification outbox
 
-## 6. Transactional Outbox
+Protege **backend commit → push/realtime**.
 
-Para evitar o erro clássico "gravou no banco mas caiu antes de notificar":
+```text
+transaction event/alert/notification_intent
+→ COMMIT
+→ worker
+→ FCM/realtime
+→ attempt/result
+```
 
-1. evento, alerta e item da outbox são gravados na mesma transação;
-2. worker busca itens pendentes;
-3. entrega para FCM/realtime;
-4. registra tentativa/resultado;
-5. retries possuem limites/backoff e idempotência.
+Não confundir os dois nem introduzir Kafka/RabbitMQ apenas para implementar esse padrão na escala atual.
 
-Não há justificativa atual para Kafka/RabbitMQ/Redis apenas para este mecanismo.
+## 7. Queda offline
 
-## 7. Device shadow simplificado
+Cenário obrigatório:
+
+```text
+Internet cai
+→ detector confirma queda
+→ evidence + event_uuid ficam persistentes no ESP32
+→ Internet volta
+→ evento reenvia
+→ backend reconhece mesma identidade
+→ evento/alerta são persistidos uma vez
+→ ACK retorna
+→ push chega ao Android
+```
+
+Telemetria periódica ausente no banco durante a queda não pode transformar automaticamente o alerta em inexistente.
+
+## 8. Device shadow simplificado
 
 Separar:
 
-- `desired_config`: configuração desejada pelo backend/app;
-- `reported_config`: configuração confirmada pelo dispositivo.
-
-Fluxo:
+- `desired_config`;
+- `reported_config`;
+- `command_id`/version.
 
 ```text
-app → REST → desired version N
+app → REST → desired N
 backend → MQTT command
 ESP32 valida/persiste/aplica
-ESP32 → ACK + reported version N
-app mostra synchronized / pending / drift
+ESP32 → ACK/reported N
+app → synchronized / pending / drift / error
 ```
 
-## 8. Estado e latência observável
+Sucesso de publicação não significa sucesso de aplicação.
 
-O pipeline deverá registrar timestamps equivalentes a:
+## 9. Protection Health
 
-- `t0`: detecção no dispositivo;
-- `t1`: recebimento pelo backend;
-- `t2`: commit no banco;
-- `t3`: submissão ao provedor push;
-- `t4`: recepção/abertura no app quando observável;
-- `t5`: acknowledgment humano.
+Estado composto, não uma flag arbitrária:
 
-Primeiro medir p50/p95/p99; só depois formalizar metas numéricas.
+```text
+Device health
++ sensor
++ connectivity/application ACK
++ pending outbox
++ config sync
++ battery source/state
++ backend health
++ Android notification permission/FCM
+= protection status apresentado ao usuário
+```
 
-## 9. Evolução sem reescrita
+O indicador é operacional/experimental, não promessa médica.
 
-A baseline já existente deve ser migrada/refatorada em pequenas etapas. Áreas grandes do firmware/backend/web devem ser modularizadas com testes de caracterização, não substituídas em um big bang.
+## 10. Observabilidade e latência
+
+Registrar estágios semanticamente distintos:
+
+- `t0`: detector confirma/gera evento;
+- `t1`: backend recebe;
+- `t2`: commit;
+- `t2a`: device recebe application ACK quando observável;
+- `t3`: push submetido ao provider;
+- `t4`: app recebe/abre quando observável;
+- `t5`: ação humana.
+
+Também registrar `received_at` e `occurred_at_device` separadamente.
+
+Medir primeiro p50/p95/p99; depois definir metas.
+
+## 11. Infraestrutura
+
+A topologia deve caber inicialmente em uma VM Linux + FCM, mas ser provider-agnostic. Oracle é candidato, não dependência. Ver [`cloud-deployment.md`](cloud-deployment.md).
+
+## 12. Evolução sem reescrita
+
+A baseline deve ser migrada/refatorada em pequenas etapas com characterization tests. Arquivos grandes são dívida de modularidade, não justificativa para big-bang rewrite.
+
+Ordem de alto nível:
+
+```text
+lineage/baseline/CI
+→ contracts/migrations
+→ critical delivery + device trust
+→ backend hardening
+→ Android
+→ push
+→ provisioning
+→ cloud/failure testing
+→ wearable/ML
+```
