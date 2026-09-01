@@ -61,16 +61,22 @@ As escolhas acima são decisões de baseline, não dogmas. Mudanças relevantes 
 
 - [Arquitetura geral](docs/architecture/overview.md)
 - [Aplicativo Android](docs/architecture/mobile-android.md)
+- [Avaliação Kotlin × Flutter/KMP/React Native](docs/architecture/mobile-technology-evaluation.md)
 - [Dispositivo, ESP32, provisioning e wearable](docs/architecture/device-connectivity.md)
 - [Cloud e deployment](docs/architecture/cloud-deployment.md)
+- [Avaliação Oracle/HiveMQ/Cloudflare/AWS/Render/Supabase/Neon](docs/architecture/cloud-options-evaluation.md)
+- [Modelo de dados](docs/architecture/data-model.md)
+- [Contratos](docs/architecture/contracts.md)
 - [Escopo e funcionalidades](docs/product/scope-and-features.md)
 - [Requisitos](docs/requirements/requirements.md)
 - [Segurança e privacidade](docs/security/threat-model.md)
 - [Estratégia de QA](docs/quality/qa-strategy.md)
 - [SDLC, Git, CI/CD e release](docs/devops/sdlc-and-ci-cd.md)
 - [Plano acadêmico do TCC](docs/research/tcc-plan.md)
+- [Fontes e evidências](docs/research/sources-and-evidence.md)
 - [Roadmap](docs/roadmap/roadmap.md)
 - [ADRs](docs/adr/README.md)
+- [Backlog](BACKLOG.md)
 - [Engineering Constitution](ENGINEERING_CONSTITUTION.md)
 - [Instruções para agentes](AGENTS.md)
 
@@ -103,6 +109,7 @@ Este é um **protótipo acadêmico experimental** de monitoramento e detecção 
 
 - [x] novo repositório criado
 - [x] decisões iniciais de arquitetura registradas
+- [x] principais alternativas e racionais de decisão preservados
 - [ ] importar/evoluir a baseline de código com rastreabilidade
 - [ ] bootstrap do Android Kotlin/Compose
 - [ ] contratos HTTP/MQTT formais
