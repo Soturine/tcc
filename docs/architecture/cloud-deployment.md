@@ -13,72 +13,106 @@ ESP32 em uma rede
 → Android em 4G/5G ou outra rede
 ```
 
-O site deve acessar o mesmo backend remotamente.
+O site acessa o mesmo backend remotamente como console secundário.
 
-## 2. Decisão de simplificação
+## 2. Decisão revisada
 
-Para o TCC, preferir **uma VM Linux principal + Firebase Cloud Messaging**, em vez de distribuir cada componente em um fornecedor diferente.
+Preferir **uma VM Linux principal + Firebase Cloud Messaging**, mas sem tornar o fornecedor da VM parte da arquitetura.
 
-Baseline proposta:
+Baseline lógica:
 
 ```text
-Oracle Cloud VM (Always Free, se disponível)
+Linux VM / VPS
 ├── reverse proxy/TLS
 ├── backend Node/Express
 ├── Mosquitto MQTT
 ├── MySQL persistente
-├── worker/outbox
+├── notification worker/outbox
 └── build estático do React
 
 Firebase Cloud Messaging
 └── entrega de notificações Android
 ```
 
-Cloudflare e HiveMQ ficam como opcionais/alternativas, não dependências obrigatórias.
+Oracle Cloud Always Free continua candidato de custo zero **se estiver disponível e adequado**, não requisito. A documentação atual da Oracle informa limitações de capacidade e possibilidade de reclaim de compute Always Free considerado idle; isso é especialmente relevante para um TCC com baixo tráfego.
 
-## 3. Função de cada serviço discutido
+A implantação deve poder migrar para outra VM/VPS sem reescrever aplicação/domínio.
+
+## 3. Por que uma VM
+
+Para o tamanho do TCC, uma VM compra simplicidade sem eliminar fronteiras lógicas:
+
+```text
+ESP32 ─MQTT/TLS─► Mosquitto
+                     │
+                     ▼
+                  Backend ─SQL─► MySQL
+                     │
+                     ├─HTTPS────► Android/Web
+                     └─FCM──────► Android notification
+```
+
+Mesmo co-localizados:
+
+- ESP32 não acessa MySQL;
+- Android/Web não acessam MySQL;
+- broker não executa regra de negócio;
+- FCM não é fonte de verdade;
+- banco não é usado como message broker.
+
+Não introduzir Kubernetes/microservices para imitar arquitetura de grande escala.
+
+## 4. Função das opções avaliadas
 
 ### Oracle Cloud Compute
 
-É a máquina Linux na Internet. Pode hospedar backend, broker MQTT, banco, site e workers. É o componente que mais reduz o número de fornecedores.
+Candidato de VM gratuita. Vantagens: compute genérico e controle. Riscos: free tier é política externa, pode haver falta de capacidade e recursos idle podem ser recuperados conforme regras vigentes. Sempre manter backup/infra portátil.
+
+### Google Cloud e outros VMs/VPS
+
+Google Cloud mantém recursos Free Tier limitados em regiões específicas; instâncias muito pequenas podem não ser confortáveis para MySQL + Node + broker juntos. Outros VPS baratos/gratuitos são alternativas operacionais, não decisões de domínio.
 
 ### HiveMQ Cloud
 
-É um broker MQTT gerenciado. Substitui um Mosquitto que nós mesmos administraríamos. Vantagem: menos operação de MQTT/TLS/ACL. Desvantagem no TCC: mais um serviço externo e menos controle direto. Mantê-lo como fallback/benchmark/opção.
+Broker MQTT gerenciado. Pode substituir Mosquitto self-hosted e reduzir administração de TLS/ACL/broker. Continua útil para spike/fallback/benchmark, mas não é dependência arquitetural.
 
-### Cloudflare Pages
+### Cloudflare Pages / Cloudflare
 
-Hospeda os arquivos estáticos do frontend React/Vite e os distribui pela rede da Cloudflare. Não é necessário se o React for servido pela própria VM. Cloudflare ainda pode ser usada futuramente apenas para DNS/proxy/proteções.
+Pages pode hospedar React estático. Cloudflare também pode ser usada só para DNS/proxy/edge. O TCC não precisa de Pages se a VM servir o build React.
 
 ### Firebase Cloud Messaging
 
-Não é hospedagem. É o canal de push do Android, necessário para alertas quando o aplicativo está em background ou com processo encerrado. Mesmo consolidando o restante em uma VM, FCM continua recomendado.
+Não é hospedagem. Continua recomendado como push Android para app em background/processo encerrado. O backend é quem decide/agenda notificação; FCM é canal de entrega.
 
-## 4. Por que não colocar literalmente tudo em um único processo
+### AWS/Azure/GCP managed stack
 
-Consolidação física não elimina separação lógica. Mesmo na mesma VM:
+Podem fornecer IoT, compute, DB, CDN, observabilidade etc. São rotas futuras válidas, mas aumentam número de serviços/configuração/custos e não compram propriedade necessária ao MVP hoje.
+
+## 5. Provider portability
+
+A infraestrutura deve evitar dependências desnecessárias do host:
 
 ```text
-ESP32 ──MQTT──► Mosquitto
-                  │
-                  ▼
-                Backend ──SQL──► MySQL
-                  │
-                  ├──HTTPS──► Android/Web
-                  └──FCM────► Android notification
+infra/
+├── compose/
+├── mqtt/
+├── proxy/
+├── cloud/
+│   ├── README.md
+│   └── provider-specific/   # apenas quando necessário
+└── backup/
 ```
 
-ESP32 e Android **não** acessam MySQL diretamente.
+Princípios:
 
-## 5. AWS
-
-AWS é uma alternativa futura válida e oferece serviços equivalentes para IoT, compute, banco, object storage, CDN, observabilidade e segurança. Ela não é baseline do TCC porque:
-
-- a gratuidade atual para novas contas é limitada por créditos/período;
-- há maior superfície operacional (IAM, VPC, billing, vários serviços);
-- não há ganho acadêmico suficiente para justificar migração da stack já existente neste momento.
-
-A arquitetura deve permitir migração futura sem reescrever domínio.
+- config por env/secret;
+- volumes/paths documentados;
+- Docker Compose ou deploy equivalente reproduzível;
+- schema/migrations independem do provider;
+- DNS/hostname configurável;
+- backup externo à VM;
+- restore testado;
+- runbook de recriação/migração.
 
 ## 6. Ambientes
 
@@ -93,26 +127,43 @@ Android debug
 React dev server
 ```
 
+Pode usar Docker Compose para dependências, sem obrigar firmware/Android a rodarem em container.
+
+### CI integration
+
+```text
+runner
+├── MySQL service/container
+├── Mosquitto service/container
+├── backend tests
+├── contract tests
+└── web/firmware builds
+```
+
+CI deve existir antes da cloud final.
+
 ### Staging/TCC
 
 ```text
 ESP32 real
-VM cloud
-MQTT/TLS
+VM/VPS
+MQTT/TLS + per-device ACL
 Backend HTTPS
 MySQL persistente
 FCM
 Android físico
 React publicado
+backup externo
+observabilidade
 ```
 
 ### Production
 
-Somente será criado se o projeto deixar de ser protótipo/TCC e houver necessidade real. Não fingir produção crítica em ambiente acadêmico.
+Só existe se o projeto sair do escopo acadêmico/protótipo. Não rotular staging gratuito como produção crítica.
 
 ## 7. Containers
 
-Docker Compose é recomendado para tornar serviços reproduzíveis, com cautela para persistência:
+Docker Compose é recomendado para reprodutibilidade:
 
 ```text
 services:
@@ -122,80 +173,177 @@ services:
   mysql
 ```
 
-O banco deve usar volume persistente fora do filesystem efêmero do container. Container não é backup.
+Podem existir containers/jobs adicionais para backup/worker se agregarem valor.
 
-## 8. TLS e exposição
+### Banco
+
+- volume persistente explícito;
+- backup fora da VM;
+- restore validado;
+- upgrade por migrations;
+- `docker compose down` não pode significar perda de dados.
+
+Container não é backup.
+
+## 8. TLS, MQTT e exposição
 
 Externamente:
 
-- `443/tcp` para HTTPS;
-- MQTT/TLS em porta apropriada se broker exposto;
-- SSH restrito por chave e origem quando possível;
-- MySQL **não** exposto publicamente;
-- portas administrativas não expostas sem necessidade.
+- HTTPS `443/tcp`;
+- MQTT/TLS em porta definida se broker público;
+- SSH somente por chave, restrito quando viável;
+- MySQL não público;
+- dashboards/admin ports não expostos sem necessidade.
 
-Usar Caddy ou Nginx como reverse proxy. A escolha pode ser feita na implantação; Caddy é candidato pela automação de TLS.
+MQTT staging:
 
-## 9. Configuração por ambiente
+- TLS verificado;
+- credential individual por device;
+- ACL por tópico;
+- LWT/session semantics explícitas;
+- rate/size limits quando úteis;
+- logs de auth/reject sem secrets.
 
-Nenhum IP/hostname/secreto deve ficar espalhado no código.
+Caddy é bom candidato a reverse proxy pela automação de TLS; Nginx continua opção. Escolha operacional, não arquitetura de domínio.
 
-Usar perfis:
+## 9. Health
+
+Separar:
+
+### Liveness
+
+Processo está vivo.
+
+```text
+/live
+```
+
+Não depende de todas as dependências externas.
+
+### Readiness
+
+Processo pode atender corretamente.
+
+```text
+/ready
+```
+
+Pode incluir:
+
+- DB acessível;
+- schema/migration compatível;
+- estado crítico de configuração;
+- dependências necessárias ao fluxo, conforme política.
+
+Não retornar “ok” geral se o banco/schema está incompatível.
+
+## 10. Configuração por ambiente
+
+Nenhum IP/hostname/secreto espalhado no código.
+
+Perfis:
 
 ```text
 local
+ci
 staging
 production (futuro)
 ```
 
-Exemplos:
-
-- Android: BuildConfig/recursos seguros;
-- backend: environment variables;
-- web: variáveis de build apropriadas;
+- Android: BuildConfig/resources;
+- backend: validated environment config;
+- web: build/runtime config apropriada;
 - firmware: provisioning/config persistida;
-- infraestrutura: `.env.example` sem segredos.
+- infra: env/secret files não versionados;
+- exemplos sem segredo funcional.
 
-## 10. Backups
+### Fail-fast
+
+Em staging:
+
+- JWT secret default/fraco → startup falha;
+- configuração TLS obrigatória ausente → falha ou readiness false, conforme componente;
+- schema incompatível → não anunciar readiness.
+
+## 11. Backup e disaster recovery proporcional
 
 Plano mínimo:
 
 ```text
 MySQL
-→ dump consistente
+→ dump/backup consistente
 → compressão
-→ criptografia quando apropriado
-→ cópia fora da VM
+→ criptografia quando necessária
+→ armazenamento fora da VM
 → retenção definida
-→ teste periódico de restore
+→ restore test
 ```
 
-Sem restore testado, backup não é considerado validado.
+Também documentar como recuperar:
 
-## 11. Observabilidade operacional
+- VM perdida;
+- banco corrompido;
+- broker config/ACL;
+- secrets/credentials;
+- frontend/backend build.
 
-- logs estruturados do backend;
-- logs do broker;
-- health/readiness;
-- espaço em disco;
-- uso de memória/CPU;
-- estado do MySQL;
-- filas pendentes da outbox;
-- falhas de push;
-- dispositivos offline.
+RPO/RTO formais só entram se houver requisito real; registrar tempos observados nos ensaios sem inventar SLO.
 
-## 12. Custo
+## 12. Observabilidade operacional
 
-Objetivo inicial: **R$ 0/mês ou próximo disso**, usando tiers gratuitos enquanto adequados. Free tiers não são SLA nem garantia permanente. Qualquer recurso pago deve ser deliberado, documentado e ter teto de custo/alerta de billing quando o provedor oferecer.
+Mínimo:
 
-## 13. Fontes oficiais consultadas em 2026-09-01
+- logs estruturados;
+- disk/memory/CPU;
+- MySQL state/storage growth;
+- broker connections/rejects;
+- MQTT reconnects;
+- critical application ACK latency/failures;
+- device outbox health report;
+- notification outbox depth/age;
+- push failures;
+- devices offline;
+- `/live`/`/ready`.
 
-- Android/Compose: https://developer.android.com/develop/ui/compose
+Evitar stack pesada antes de provar necessidade. Logs + métricas leves podem ser suficientes para TCC.
+
+## 13. Custos
+
+Objetivo: **R$ 0/mês ou próximo disso**, sem sacrificar confiabilidade do trabalho.
+
+Regras:
+
+- free tier não é SLA;
+- revalidar limites antes de provisionar;
+- configurar billing alert quando houver billing;
+- nunca gerar tráfego artificial para contornar política de reclaim;
+- manter fallback de VPS/provedor caso gratuidade deixe de servir;
+- domínio próprio é opcional e pode ser um dos poucos custos deliberados.
+
+## 14. Release e deployment
+
+Staging/release deve ser rastreável ao SHA:
+
+```text
+green SHA
+→ build artifact/image
+→ deploy
+→ migrations
+→ health/readiness
+→ post-deploy smoke
+→ registrar versão
+```
+
+Para release final, não usar código local diferente do SHA documentado no TCC.
+
+## 15. Fontes oficiais consultadas em 2026-09-01
+
 - Firebase Cloud Messaging: https://firebase.google.com/docs/cloud-messaging
 - Firebase pricing: https://firebase.google.com/pricing
-- Oracle Always Free: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
-- Cloudflare Pages pricing: https://developers.cloudflare.com/pages/functions/pricing/
+- Oracle Always Free: https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- Google Cloud Free Program: https://cloud.google.com/free
+- Cloudflare Pages: https://developers.cloudflare.com/pages/
 - HiveMQ Cloud: https://www.hivemq.com/products/mqtt-cloud-broker/
 - AWS Free Tier: https://aws.amazon.com/free/
 
-Os limites/preços desses serviços são externos ao código e devem ser revalidados antes da implantação final.
+Preços, cotas e políticas externas devem ser revalidados imediatamente antes da implantação.
