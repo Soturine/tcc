@@ -1,6 +1,6 @@
 # Índice da Documentação
 
-Este índice define quais documentos devem ser lidosos como canônicos durante a implementação. Documentos futuros em `docs/legacy/` serão evidência histórica e não substituem decisões atuais.
+Este índice define quais documentos devem ser lidos como canônicos durante a implementação. Documentos futuros em `docs/legacy/` serão evidência histórica e não substituem decisões atuais.
 
 ## Comece aqui
 
@@ -8,8 +8,9 @@ Este índice define quais documentos devem ser lidosos como canônicos durante a
 2. [`../ENGINEERING_CONSTITUTION.md`](../ENGINEERING_CONSTITUTION.md) — padrão de engenharia.
 3. [`../AGENTS.md`](../AGENTS.md) — regras para Codex/agentes.
 4. [`audit/iot-fall-monitor-port-audit-2026-09-01.md`](audit/iot-fall-monitor-port-audit-2026-09-01.md) — auditoria da baseline histórica.
-5. [`migration/port-plan.md`](migration/port-plan.md) — sequência concreta do porte.
-6. [`../BACKLOG.md`](../BACKLOG.md) — ordem/gates de implementação.
+5. [`audit/iot-fall-monitor-port-audit-addendum-2026-09-01.md`](audit/iot-fall-monitor-port-audit-addendum-2026-09-01.md) — adendo com achados de detector, runtime, portal, privacidade e semântica de entrega.
+6. [`migration/port-plan.md`](migration/port-plan.md) — sequência concreta do porte.
+7. [`../BACKLOG.md`](../BACKLOG.md) — ordem/gates de implementação.
 
 ## Arquitetura canônica
 
@@ -47,7 +48,7 @@ Quando dois documentos parecerem divergir:
 
 1. ADR mais recente que explicitamente supersede decisão anterior;
 2. arquitetura/requisitos canônicos atuais;
-3. auditoria/port plan;
+3. auditoria + adendos + port plan;
 4. README/backlog/roadmap;
 5. documentação legada/histórica.
 
