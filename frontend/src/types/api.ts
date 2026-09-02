@@ -190,6 +190,7 @@ export interface EvidenceSummary {
   decisionSource?: string | null;
   algorithmVersion?: string | null;
   confidence?: number | null;
+  confidenceStatus?: string | null;
   reason?: string | null;
   activityStateEstimate?: string | null;
   firmwareDecision?: {
@@ -200,6 +201,7 @@ export interface EvidenceSummary {
     reason?: string | null;
     activityStateEstimate?: string | null;
     confidence?: number | null;
+    confidenceStatus?: string | null;
     windowStartedAtMs?: number | null;
     windowEndedAtMs?: number | null;
     analysisWindowMs?: number | null;

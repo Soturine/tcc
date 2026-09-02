@@ -143,7 +143,8 @@ test("buildEvidenceSummaryForPayload preserva decisao e features do firmware", (
     candidate: true,
     reason: "impact_orientation_immobility",
     activity_state_estimate: "queda_confirmada",
-    confidence: 0.76,
+    confidence: null,
+    confidence_status: "not_available",
     peak_accel_g: 3.8,
     peak_gyro_dps: 180,
     features_time_domain: {
@@ -173,6 +174,8 @@ test("buildEvidenceSummaryForPayload preserva decisao e features do firmware", (
     summary.firmwareDecision.algorithmVersion,
     "threshold_fsm_v2_time_features_v1",
   );
+  assert.equal(summary.firmwareDecision.confidence, null);
+  assert.equal(summary.firmwareDecision.confidenceStatus, "not_available");
   assert.equal(summary.firmwareDecision.featuresTimeDomain.sample_count, 64);
   assert.equal(summary.firmwareDecision.featuresFrequencyDomain.available, false);
   assert.equal(summary.firmwareDecision.alertSettings.sensitivity, "demo");
