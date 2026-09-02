@@ -22,6 +22,13 @@
 - workflow de firmware ampliado com testes host/native; BACKLOG, auditoria e documentos canônicos de alerta, integração, firmware, calibração e quickstart alinhados, mantendo changelogs e documentos v0.9.0 históricos intactos
 - validação concluída com `6/6` testes native, build ESP32, backend completo/integration/MQTT/stress, frontend lint/build, audits e CI de push/PR; a FSM permanece experimental e sem alegação de acurácia, sensibilidade, precisão, falsos positivos ou validação em campo
 
+### Replay e caracterização sintética da FSM
+- harness determinístico host/native adicionado para alimentar o `FallDetector` real com `std::vector<SensorReading>` e produzir alertas/índices reproduzíveis usando somente os timestamps das leituras
+- builders de sinais sintéticos adicionados para repouso, impacto, orientação, movimento, imobilidade e amostra inválida sem espalhar thresholds ou números mágicos pelos testes
+- nove cenários caracterizados: repouso; impacto isolado; orientação sem imobilidade suficiente; queda sintética completa; timestamps não uniformes; orientação sem impacto; wrap `+180°/-180°`; leitura inválida; e duas quedas válidas separadas
+- corrigida a contagem de imobilidade após leitura inválida: intervalos sem amostra válida deixam de ser tratados como imobilidade observada
+- suite native ampliada de `6` para `15` casos; sinais e resultados são sintéticos e não representam acurácia, movimentos humanos reais, HIL ou validação física
+
 ### Pendente / Faltando
 - capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
 - ativar FFT como decisão real somente após calibração e validação com dados reais

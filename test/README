@@ -1,4 +1,26 @@
 
+This directory contains PlatformIO host/native tests for firmware logic that
+does not require ESP32 hardware.
+
+Project-specific layout:
+
+- `test_detector_baseline/`: angular/default/confidence regressions;
+- `test_fall_detector_replay/`: deterministic synthetic FSM sequences;
+- `support/`: reusable replay and `SensorReading` builders;
+- `native_stubs/`: minimal test-only Arduino surface needed to compile the
+  real `FallDetector` on the host.
+
+The replay input boundary is `std::vector<SensorReading>`. A future CSV/JSON
+parser can remain separate and produce this same input without changing the
+harness. Current sequences are synthetic and do not represent physical or
+clinical validation.
+
+Run with:
+
+```text
+platformio test -e native
+```
+
 This directory is intended for PlatformIO Test Runner and project tests.
 
 Unit Testing is a software testing method by which individual units of

@@ -44,6 +44,7 @@ Extrair gradualmente componentes puros:
 Cobrir:
 
 - FSM e thresholds;
+- replay determinístico de sequências de `SensorReading` com tempo derivado dos próprios timestamps, conforme o [harness canônico do detector](fall-detector-replay.md);
 - feature extraction;
 - UUID/boot ID uniqueness strategy;
 - queue/outbox FIFO e overflow;

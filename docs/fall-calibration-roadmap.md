@@ -12,6 +12,7 @@ Este documento prepara a evolução futura sem mudar a decisão principal atual.
 
 ## Implementado agora
 
+- O [replay host/native da FSM](quality/fall-detector-replay.md) recebe sequências sintéticas de `SensorReading` e usa somente seus timestamps; ele caracteriza a baseline sem hardware e sem alterar thresholds.
 - `FALL_FEATURE_EXTRACTOR_ENABLED=true` habilita a coleta lateral de features.
 - `FALL_FFT_EXPERIMENTAL_ENABLED=false` deixa Fourier/FFT fora da decisão principal.
 - `FALL_FFT_WINDOW_SIZE=64` prepara janela de 64 amostras.
@@ -38,7 +39,7 @@ Uma janela prática para ESP32/MPU6050 deve ficar entre 1s e 3s. Com amostragem 
 - identificar frequência dominante por eixo
 - comparar padrões de repouso, caminhada, corrida, sentado, deitado e queda
 
-Esta camada não deve substituir o detector atual até existir base coletada e replay offline. O primeiro uso recomendado é diagnóstico/calibração, não alarme automático.
+Esta camada não deve substituir o detector atual até existir base coletada e replay offline com dados capturados. O replay sintético implementado caracteriza a FSM, mas não é evidência de desempenho com movimentos humanos reais. O primeiro uso recomendado da FFT continua sendo diagnóstico/calibração, não alarme automático.
 
 Referencias técnicas consultadas indicam que abordagens embarcadas de queda costumam equilibrar features simples, janelas curtas e custo computacional. Ha exemplos de amostragem baixa em torno de `25 Hz`, janelas de `3 s` com acelerômetro + giroscópio e uso de STFT/energia em baixas frequências para diferenciar queda de atividades de vida diária. Por isso, a decisão segura aqui é coletar features e deixar FFT como diagnóstico futuro, não como classificador ativo.
 
