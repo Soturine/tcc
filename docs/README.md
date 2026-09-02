@@ -32,6 +32,7 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 
 - [`security/threat-model.md`](security/threat-model.md) — trust boundaries e mitigação.
 - [`quality/qa-strategy.md`](quality/qa-strategy.md) — testes, fault matrix e Golden E2E.
+- [`quality/fall-detector-replay.md`](quality/fall-detector-replay.md) — harness host/native e caracterização sintética da FSM de queda.
 - [`devops/sdlc-and-ci-cd.md`](devops/sdlc-and-ci-cd.md) — Git/CI/release.
 - [`roadmap/roadmap.md`](roadmap/roadmap.md) — fases do TCC.
 - [`adr/README.md`](adr/README.md) — decisões arquiteturais aceitas/superseded.

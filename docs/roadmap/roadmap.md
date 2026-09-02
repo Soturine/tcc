@@ -2,6 +2,27 @@
 
 Este roadmap organiza a evolução em fases, não em datas inventadas. As datas reais devem ser alinhadas ao calendário acadêmico e à orientação. A ordem foi revisada após a auditoria da baseline em 2026-09-01.
 
+## Estado macro
+
+Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
+
+| Estado | Marco | Dependência principal |
+|---|---|---|
+| ✓ | Porte rastreável, baseline v0.9.0 e CI fundacional | origem preservada, tag de baseline e SHA remoto verde |
+| ✓ | Correções P1 iniciais do detector | wrap angular, baseline circular, confidence indisponível, Normal default e Demo opt-in |
+| → | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
+| ○ | Contratos, banco e identidade | inventário HTTP/MQTT e invariantes explícitos |
+| ○ | Confiabilidade crítica | contratos e identidade definidos |
+| ○ | Backend hardening | fronteiras críticas caracterizadas |
+| ○ | Android | API e pipeline crítico estáveis |
+| ○ | Push e Protection Health | backend/outbox e app Android disponíveis |
+| ○ | Provisioning seguro | ameaça e fluxo mobile definidos |
+| ○ | Cloud e configuração remota | serviços reproduzíveis e contratos estáveis |
+| ○ | QA e failure testing | componentes integrados e observáveis |
+| ○ | Pesquisa experimental | protocolo e instrumentação definidos |
+| ○ | Wearable/ML | núcleo verde e hipótese/dataset compatíveis |
+| ○ | Entrega | evidência final reproduzível |
+
 ## Fase 1 — Porte rastreável, baseline e CI
 
 - importar/evoluir a baseline preservando lineage;
@@ -13,6 +34,19 @@ Este roadmap organiza a evolução em fases, não em datas inventadas. As datas 
 - Engineering Constitution/ADRs/threat model atualizados.
 
 **Saída:** baseline importada e remotamente verificável, sem reescrita.
+
+## Marco atual — Replay e caracterização da FSM
+
+- compilar o `FallDetector` real em PlatformIO native;
+- alimentar o detector com sequências de `SensorReading` sem ESP32, MPU6050, rede, NVS, `sleep` ou relógio real;
+- caracterizar positivos, negativos, timestamps não uniformes, wrap angular, leituras inválidas e eventos repetidos;
+- manter sinais desta etapa explicitamente sintéticos;
+- preservar a fronteira `parser CSV/JSON separado → SensorReading[] → replay` para dados capturados futuros, sem implementar parser complexo ou dataset nesta fase;
+- não recalibrar thresholds e não introduzir sensor fusion/ML para satisfazer testes.
+
+**Dependência:** sucede as correções P1 iniciais e antecede a formalização final dos contratos/dados e qualquer experimento de calibração, sensor fusion ou ML.
+
+**Saída:** comportamento atual da FSM reproduzível no host, com limitações e bugs objetivos registrados antes da próxima fase.
 
 ## Fase 2 — Contratos, banco e identidade
 

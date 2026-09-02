@@ -11,7 +11,7 @@ Auditorias:
 
 - [x] Importar/evoluir a baseline de `Soturine/iot-fall-monitor` preservando rastreabilidade de histórico/autoria.
 - [x] Registrar SHA exato da origem usada no porte.
-- [ ] Criar tag/checkpoint `tcc-baseline-*` somente no SHA realmente importado/validado.
+- [x] Criar tag/checkpoint `tcc-baseline-*` somente no SHA realmente importado/validado.
 - [x] Reproduzir todos os testes/builds existentes antes de alterar comportamento.
 - [x] Registrar diferenças entre resultados históricos e a nova execução.
 - [x] Atualizar runtime canônico para **Node 24 LTS** após caracterizar a baseline; Node 20 está EOL desde 2026-03-24.
@@ -40,8 +40,8 @@ Não iniciar reestruturação grande enquanto a baseline não puder ser reproduz
 - [x] Corrigir diferença angular com wrap `+180/-180`.
 - [x] Adicionar regressões para `179/-179`, `-179/179` e fronteiras equivalentes.
 - [x] Revisar atualização da baseline de orientação para não sofrer média linear na fronteira angular.
-- [ ] Criar replay/test harness para alimentar `FallDetector` com séries de `SensorReading` sem hardware.
-- [ ] Manter sensor fusion como spike posterior condicionado a evidência, não como rewrite imediato.
+- [x] Criar replay/test harness para alimentar `FallDetector` com séries de `SensorReading` sem hardware.
+- [x] Registrar sensor fusion como spike posterior condicionado a evidência (`deferred`), não como rewrite imediato.
 
 ### Contratos e dados
 
