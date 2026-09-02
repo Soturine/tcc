@@ -7,7 +7,11 @@ const char* defaultOperationModeName() {
 }
 
 bool fallConfidenceAvailable() {
-  return true;
+  return false;
+}
+
+const char* fallConfidenceStatus() {
+  return "not_available";
 }
 
 }  // namespace FirmwareBaseline

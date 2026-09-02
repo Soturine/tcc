@@ -94,7 +94,6 @@ FallAlert FallDetector::update(const SensorReading& reading) {
         alert.decisionSource = "firmware";
         alert.algorithmVersion = AppConfig::FALL_DECISION_ENGINE_VERSION;
         alert.activityStateEstimate = "queda_confirmada";
-        alert.confidence = 0.76f;
         alert.accelMagnitudeG = peakAccelMagnitudeG_;
         alert.gyroMagnitudeDegPerSec = peakGyroMagnitudeDegPerSec_;
         alert.peakAccelG = peakAccelMagnitudeG_;

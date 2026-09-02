@@ -11,6 +11,7 @@
 #include "event_buffer.h"
 #include "fall_feature_extractor.h"
 #include "fall_detector.h"
+#include "firmware_baseline.h"
 #include "models.h"
 #include "mqtt_client.h"
 #include "patient_profile_client.h"
@@ -265,7 +266,7 @@ void enrichFallAlertWithCurrentWindow(FallAlert& alert, const SensorReading& rea
   alert.decisionSource = "firmware";
   alert.algorithmVersion = AppConfig::FALL_DECISION_ENGINE_VERSION;
   alert.activityStateEstimate = "queda_confirmada";
-  alert.confidence = 0.76f;
+  alert.confidenceStatus = FirmwareBaseline::fallConfidenceStatus();
   alert.candidate = true;
   alert.pitchDeg = reading.pitchDeg;
   alert.rollDeg = reading.rollDeg;
@@ -290,16 +291,6 @@ void enrichFallAlertWithCurrentWindow(FallAlert& alert, const SensorReading& rea
   alert.linkedTelemetryWindow.windowStartedAtMs = alert.windowStartedAtMs;
   alert.linkedTelemetryWindow.windowEndedAtMs = alert.windowEndedAtMs;
   alert.linkedTelemetryWindow.sampleCount = alert.sampleCount;
-}
-
-float clampConfidence(float value) {
-  if (value < 0.0f) {
-    return 0.0f;
-  }
-  if (value > 0.95f) {
-    return 0.95f;
-  }
-  return value;
 }
 
 void addDeviceIdentityToPayload(JsonDocument& doc) {
@@ -402,14 +393,6 @@ FallAlert buildExperimentalAlertDecision(const SensorReading& reading,
   FallAlert alert;
   const auto& alertTuning = runtimeConfig().alertTuning;
   const FallTimeDomainFeatures timeFeatures = fallFeatureExtractor.timeDomainSnapshot();
-  const float accelRatio =
-      alertTuning.accelThresholdG > 0.0f
-          ? reading.accelMagnitudeG / alertTuning.accelThresholdG
-          : 0.0f;
-  const float gyroRatio =
-      alertTuning.gyroThresholdDps > 0.0f
-          ? reading.gyroMagnitudeDegPerSec / alertTuning.gyroThresholdDps
-          : 0.0f;
 
   alert.detected = false;
   alert.candidate = true;
@@ -418,9 +401,7 @@ FallAlert buildExperimentalAlertDecision(const SensorReading& reading,
   alert.algorithmVersion = AppConfig::ALERT_DECISION_ENGINE_VERSION;
   alert.activityStateEstimate =
       String(eventType) == "fall_suspected" ? "queda_suspeita" : "movimento_intenso";
-  alert.confidence = clampConfidence((accelTriggered && gyroTriggered ? 0.55f : 0.38f) +
-                                     (fminf(accelRatio, 2.0f) * 0.10f) +
-                                     (fminf(gyroRatio, 2.0f) * 0.10f));
+  alert.confidenceStatus = FirmwareBaseline::fallConfidenceStatus();
   alert.accelMagnitudeG = reading.accelMagnitudeG;
   alert.gyroMagnitudeDegPerSec = reading.gyroMagnitudeDegPerSec;
   alert.peakAccelG = timeFeatures.available
@@ -509,7 +490,8 @@ String buildEventPayload(const char* eventType,
     doc["candidate"] = fallAlert->candidate;
     doc["reason"] = fallAlert->reason;
     doc["activity_state_estimate"] = fallAlert->activityStateEstimate;
-    doc["confidence"] = fallAlert->confidence;
+    doc["confidence"] = nullptr;
+    doc["confidence_status"] = fallAlert->confidenceStatus;
     doc["fall_reason"] = fallAlert->reason;
     doc["window_started_at_ms"] = fallAlert->windowStartedAtMs;
     doc["window_ended_at_ms"] = fallAlert->windowEndedAtMs;
@@ -546,7 +528,8 @@ String buildEventPayload(const char* eventType,
     features["analysis_window_ms"] = fallAlert->analysisWindowMs;
     features["samples_considered"] = fallAlert->samplesConsidered;
     features["activity_state_estimate"] = fallAlert->activityStateEstimate;
-    features["confidence"] = fallAlert->confidence;
+    features["confidence"] = nullptr;
+    features["confidence_status"] = fallAlert->confidenceStatus;
 
     JsonObject timeFeatures = doc.createNestedObject("features_time_domain");
     addTimeDomainFeatures(timeFeatures, fallAlert->timeDomainFeatures);
@@ -780,7 +763,7 @@ void publishThresholdAlertEvent(const char* eventType,
                                            &alert);
   const bool published = publishCriticalEvent(topic, payload, eventType, eventUuid);
 
-  AppLog::warnf("[alert] %s event=%s topic=%s event_uuid=%s sample_seq=%lu published=%u reason=%s accel=%.2f gyro=%.2f confidence=%.2f cooldown_ms=%lu preset=%s\n",
+  AppLog::warnf("[alert] %s event=%s topic=%s event_uuid=%s sample_seq=%lu published=%u reason=%s accel=%.2f gyro=%.2f confidence_status=%s cooldown_ms=%lu preset=%s\n",
                 published ? "event_published" : "event_queued",
                 eventType,
                 topic.c_str(),
@@ -790,7 +773,7 @@ void publishThresholdAlertEvent(const char* eventType,
                 alert.reason,
                 alert.accelMagnitudeG,
                 alert.gyroMagnitudeDegPerSec,
-                alert.confidence,
+                alert.confidenceStatus,
                 runtimeConfig().alertTuning.cooldownMs,
                 runtimeConfig().alertTuning.sensitivityPreset.c_str());
 

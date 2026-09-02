@@ -38,6 +38,7 @@ void testOperationalDefaultIsNormalAndDemoRemainsExplicit() {
 
 void testUncalibratedFallConfidenceIsUnavailable() {
   TEST_ASSERT_FALSE(FirmwareBaseline::fallConfidenceAvailable());
+  TEST_ASSERT_EQUAL_STRING("not_available", FirmwareBaseline::fallConfidenceStatus());
 }
 
 }  // namespace

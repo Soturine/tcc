@@ -118,7 +118,7 @@ struct FallAlert {
   const char* decisionSource = "firmware";
   const char* algorithmVersion = "threshold_fsm_v2_time_features_v1";
   const char* activityStateEstimate = "queda_confirmada";
-  float confidence = 0.0f;
+  const char* confidenceStatus = "not_available";
   float accelMagnitudeG = 0.0f;
   float gyroMagnitudeDegPerSec = 0.0f;
   float peakAccelG = 0.0f;
