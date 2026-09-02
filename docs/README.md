@@ -37,6 +37,15 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 - [`roadmap/roadmap.md`](roadmap/roadmap.md) — fases do TCC.
 - [`adr/README.md`](adr/README.md) — decisões arquiteturais aceitas/superseded.
 
+## Contratos executáveis
+
+- [`contracts/README.md`](contracts/README.md) — mapa do fluxo e estados current/planned.
+- [`contracts/http-api.md`](contracts/http-api.md) — inventário das 35 operações HTTP reais.
+- [`contracts/openapi.yaml`](contracts/openapi.yaml) — OpenAPI validado.
+- [`contracts/mqtt-topics.md`](contracts/mqtt-topics.md) — tópicos, QoS, payloads e budgets medidos.
+- [`contracts/mqtt/README.md`](contracts/mqtt/README.md) — JSON Schemas e exemplos MQTT.
+- [`contracts/data-authority.md`](contracts/data-authority.md), [`contracts/event-identity.md`](contracts/event-identity.md) e [`contracts/time-semantics.md`](contracts/time-semantics.md) — autoridade, identidades, ACK futuro e tempo.
+
 ## Pesquisa/TCC
 
 - [`research/tcc-plan.md`](research/tcc-plan.md) — pergunta, objetivos e método inicial.

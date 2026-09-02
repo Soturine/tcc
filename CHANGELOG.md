@@ -29,6 +29,24 @@
 - corrigida a contagem de imobilidade após leitura inválida: intervalos sem amostra válida deixam de ser tratados como imobilidade observada
 - suite native ampliada de `6` para `15` casos; sinais e resultados são sintéticos e não representam acurácia, movimentos humanos reais, HIL ou validação física
 
+### Etapa 4 — contratos HTTP/MQTT
+- inventário derivado do código registra 35 operações HTTP implementadas, autenticação/autorização, consumidores, entradas, respostas, erros e estado, sem promover endpoints planejados a comportamento real
+- OpenAPI 3.1 canônico adicionado em `docs/contracts/openapi.yaml`, com cobertura automática exata das rotas Express registradas
+- inventário MQTT formaliza os três canais ativos `status`, `telemetry` e `events`, publishers/subscribers, retained, comportamento offline e o QoS real: firmware PubSubClient publica QoS 0 mesmo com subscription backend QoS 1
+- JSON Schemas current adicionados para status, telemetry e events, com exemplos representativos do firmware; contratos v1 de evento crítico e ACK pós-commit foram marcados explicitamente como `planned`
+- estratégia de versão definida: ausência de `schema_version` identifica o perfil current/legado implícito `0`; novos envelopes usam inteiro `1` e versões desconhecidas não podem ser reinterpretadas silenciosamente
+- identidade separada em hardware, device operacional, tópico MQTT, claim, token de sync, assignment e ownership; organização/paciente continuam resolvidos pelo backend/DB
+- mismatch entre `device_id` do tópico e do payload passou de warning para rejeição antes de transação, persistência ou realtime, com regressão automatizada
+- severidade enviada pelo device/tooling deixou de sobrescrever a classificação: o backend é autoridade da política, preservando o JSON recebido somente como evidência bruta
+- `event_uuid` atual, retry, fila RAM de 10, snapshot NVS de 4 e deduplicação por consulta no JSON foram documentados com seus limites; coluna UNIQUE/outbox confiável continuam pendentes
+- semântica atual de `timestamp`, `event_uptime_ms`, recebimento e fallback de clock foi separada da direção v1 para `occurred_at_device`, `received_at`, `persisted_at`, `boot_id`, `device_uptime_ms` e `clock_quality`
+- contrato futuro `critical-event-ack` formaliza tópico, correlação inequívoca por `event_uuid`, emissão somente após commit, duplicata idempotente e ACK perdido, sem implementar ESP-MQTT, QoS 1, publisher/subscriber ou outbox nesta etapa
+- payloads compactos representativos medidos em 591 bytes para status, 606 bytes para telemetry e 2915 bytes para evento; pacotes calculados ficaram em 627, 645 e 2951 bytes no tópico default, abaixo do buffer real de 4096 bytes
+- budgets provisórios testados em 1024 bytes para status/telemetry e 3072 bytes para evento; o teto técnico continua dependente do comprimento do tópico, e `device_id` ainda precisa de limite coerente
+- contract tests usam Swagger Parser, Ajv e formatos JSON Schema em dependências de desenvolvimento MIT fixadas; validam OpenAPI, 35/35 operações, schemas/exemplos, campos ausentes, tipos/versões incompatíveis, tópicos e payload budget
+- documentação canônica organizada em `docs/contracts/`; docs históricos em `docs/legacy` não foram alterados
+- a etapa permanece contratual e automatizada: não valida ACK, entrega crítica, hardware, campo, acurácia do detector ou segurança MQTT externa
+
 ### Pendente / Faltando
 - capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
 - ativar FFT como decisão real somente após calibração e validação com dados reais

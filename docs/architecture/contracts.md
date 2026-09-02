@@ -4,12 +4,15 @@
 
 Evitar que firmware, backend, Android e Web evoluam por acordos implícitos. Contratos críticos devem expressar **identidade, versão, idempotência, tempo, evidência e confirmação**.
 
+O comportamento `current` e os artefatos executáveis estão em [`docs/contracts`](../contracts/README.md). As seções de envelope v1, ACK, commands e configuração abaixo continuam direção `planned` até seus componentes existirem.
+
 ## HTTP
 
-OpenAPI será a fonte canônica do contrato HTTP quando formalizado:
+O inventário e o OpenAPI implementados são canônicos em:
 
 ```text
-contracts/openapi/openapi.yaml
+docs/contracts/http-api.md
+docs/contracts/openapi.yaml
 ```
 
 Princípios:
@@ -25,17 +28,18 @@ Princípios:
 
 ## MQTT
 
-Schemas alvo:
+Schemas current e planejados, com estado explícito:
 
 ```text
-contracts/mqtt/
+docs/contracts/mqtt/
 ├── event.schema.json
-├── event-ack.schema.json
+├── critical-event-v1.schema.json
+├── critical-event-ack-v1.schema.json
 ├── telemetry.schema.json
-├── status.schema.json
-├── config-command.schema.json
-└── config-ack.schema.json
+└── status.schema.json
 ```
+
+Config command/ACK permanecem planejados e ainda não possuem payload real suficiente para schema.
 
 ## Identidade MQTT
 
@@ -101,7 +105,7 @@ Regras:
 
 O ACK de aplicação só pode ser emitido após o backend completar a persistência necessária.
 
-Exemplo conceitual:
+Exemplo conceitual formalizado como contrato `planned`:
 
 ```json
 {
@@ -194,11 +198,8 @@ Não aumentar `schema_version` por mudança interna sem impacto no contrato.
 
 ## Contract tests
 
-A CI deverá validar:
+A CI já valida OpenAPI, cobertura das 35 operações registradas, schemas/exemplos MQTT, campos obrigatórios, versões incompatíveis e budget representativo. A evolução de confiabilidade deverá acrescentar:
 
-- payloads válidos e inválidos;
-- compatibilidade de schemas;
-- exemplos OpenAPI;
 - mismatch topic/payload;
 - duplicate event;
 - ACK perdido/repetido;

@@ -321,7 +321,9 @@ Na ingestão:
 
 A partir da v0.8.25, eventos críticos MQTT podem trazer `event_uuid`, `event_sequence` e `sample_seq`. Quando `event_uuid` está presente, o backend deduplica o evento antes de criar alertas ou emitir `alert:new`, preservando `raw_payload_json` e `evidence_summary_json` para auditoria.
 
-O contrato legado continua aceito: payloads antigos sem `event_uuid` seguem o fluxo anterior e ainda contam com a janela curta de deduplicação de alertas. A fila local do firmware é em RAM, então reenvios cobrem reconexões MQTT, mas não sobrevivem a perda de energia; persistência em SPIFFS/LittleFS fica como evolução futura.
+O contrato legado continua aceito: payloads antigos sem `event_uuid` seguem o fluxo anterior e ainda contam com a janela curta de deduplicação de alertas. O firmware mantém fila RAM de 10 eventos e snapshot NVS de até 4; isso reduz perda em alguns reboots, mas remove o evento após sucesso local de `publish()` e não substitui a outbox persistente + ACK pós-commit planejada.
+
+Os contratos canônicos atuais estão em [`docs/contracts`](../docs/contracts/README.md). Mismatch entre `device_id` do tópico/payload é rejeitado, e severidade é política do backend mesmo quando tooling legado envia `severity` no JSON.
 
 ### Status, Modo Demo e bateria estimada
 

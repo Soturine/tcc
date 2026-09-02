@@ -45,18 +45,16 @@ Não iniciar reestruturação grande enquanto a baseline não puder ser reproduz
 
 ### Contratos e dados
 
-- [ ] Inventariar rotas HTTP reais, tópicos MQTT e payloads reais.
-- [ ] Criar OpenAPI inicial a partir das rotas existentes.
-- [ ] Criar JSON Schemas MQTT a partir dos payloads existentes.
-- [ ] Adicionar `schema_version` nos envelopes em evolução onde necessário.
-- [ ] Definir contrato de `critical-event-ack`.
-- [ ] Definir orçamento de tamanho para critical-event envelope.
-- [ ] Separar evidence bundle grande/raw do evento crítico se a pesquisa exigir janela maior.
-- [ ] Definir `occurred_at_device`, `received_at`, `boot_id`, `device_uptime_ms` e `clock_quality`.
-- [ ] Definir autoridade de identidade: MQTT principal/ACL/tópico > payload.
-- [ ] Rejeitar/quarentenar topic/payload mismatch.
-- [ ] Tornar severidade/push policy autoridade do backend; payload do device relata fatos/evidência.
-- [ ] `fall_suspected` não deve seguir o mesmo caminho urgente de uma queda confirmada por default.
+- [x] Inventariar rotas HTTP reais, tópicos MQTT e payloads reais.
+- [x] Criar OpenAPI inicial a partir das rotas existentes.
+- [x] Criar JSON Schemas MQTT a partir dos payloads existentes.
+- [x] Definir `schema_version` simples nos envelopes em evolução: ausência = perfil current/legado implícito `0`; contratos novos usam inteiro `1`.
+- [x] Definir contrato de `critical-event-ack`, explicitamente `planned` e pós-commit.
+- [x] Definir orçamento de tamanho para critical-event envelope a partir do buffer e payloads representativos medidos.
+- [x] Definir `occurred_at_device`, `received_at`, `persisted_at`, `boot_id`, `device_uptime_ms` e `clock_quality`.
+- [x] Definir autoridade de identidade: MQTT principal/ACL/tópico > payload.
+- [x] Rejeitar topic/payload mismatch antes de persistência/realtime.
+- [x] Tornar severidade autoridade do backend; payload do device relata fatos/evidência.
 - [ ] Planejar e executar migration segura para `event_uuid` explícito/UNIQUE após backfill/validação.
 - [ ] Introduzir `database/migrations/` + tabela/runner de histórico.
 - [ ] Testar migration em banco vazio e upgrade da baseline.
@@ -89,6 +87,8 @@ Detector baseline deve ter semântica honesta e regressões básicas; contratos 
 
 ### Offline fall evidence
 
+- [ ] Separar evidence bundle grande/raw do evento crítico se a pesquisa exigir janela maior.
+- [ ] `fall_suspected` não deve seguir o mesmo caminho urgente de uma queda confirmada por default.
 - [ ] Remover dependência exclusiva de `telemetry_logs` para criar alerta de `fall_detected` confirmado pelo edge.
 - [ ] Definir evidência local versionada no evento/bundle.
 - [ ] Adicionar `evidence_source = device/server_telemetry/both/none`.
