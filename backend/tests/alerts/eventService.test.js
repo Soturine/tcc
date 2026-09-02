@@ -27,8 +27,15 @@ test("deriveSeverity classifica eventos criticos de queda, SOS e sensor", () => 
   assert.equal(deriveSeverity("unknown_event", {}), "medium");
 });
 
-test("deriveSeverity preserva severidade explicita do payload", () => {
-  assert.equal(deriveSeverity("fall_detected", { severity: "low" }), "low");
+test("deriveSeverity ignora severidade fornecida pelo device", () => {
+  assert.equal(
+    deriveSeverity("fall_detected", {
+      severity: "low",
+      immobility_confirmed: true,
+    }),
+    "critical",
+  );
+  assert.equal(deriveSeverity("movement_detected", { severity: "critical" }), "low");
 });
 
 test("shouldCreateAlert cria alerta apenas para eventos criticos", () => {
