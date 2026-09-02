@@ -136,6 +136,10 @@ function extractFirmwareDecision(event: EvidenceCarrier) {
       readString(rawPayload, "activity_state_estimate") ||
       readString(features, "activity_state_estimate"),
     confidence: readNumber(rawPayload, "confidence") ?? readNumber(features, "confidence"),
+    confidenceStatus:
+      readString(rawPayload, "confidence_status") ||
+      readString(features, "confidence_status") ||
+      "not_available",
     analysisWindowMs: readNumber(rawPayload, "analysis_window_ms"),
     sampleCount:
       readNumber(rawPayload, "sample_count") ?? readNumber(rawPayload, "samples_considered"),
@@ -221,9 +225,11 @@ function EvidenceSummary({ event }: { event: EvidenceCarrier }) {
             </span>
           </p>
           <p>
-            Confianca heuristica:{" "}
+            Confiança do detector:{" "}
             <span className="font-semibold text-surface-800">
-              {formatConfidence(firmwareDecision.confidence)}
+              {firmwareDecision.confidenceStatus === "not_available"
+                ? "Não disponível (não calibrada)"
+                : formatConfidence(firmwareDecision.confidence)}
             </span>
           </p>
           <p>

@@ -154,7 +154,8 @@ test("fall_detected com telemetria recente vincula evidencia", async () => {
         immobility_confirmed: true,
         decision_source: "firmware",
         algorithm_version: "threshold_fsm_v2_time_features_v1",
-        confidence: 0.76,
+        confidence: null,
+        confidence_status: "not_available",
         features_time_domain: {
           available: true,
           sample_count: 64,
@@ -176,6 +177,11 @@ test("fall_detected com telemetria recente vincula evidencia", async () => {
     assert.equal(
       event.evidenceSummary.firmwareDecision.algorithmVersion,
       "threshold_fsm_v2_time_features_v1",
+    );
+    assert.equal(event.evidenceSummary.firmwareDecision.confidence, null);
+    assert.equal(
+      event.evidenceSummary.firmwareDecision.confidenceStatus,
+      "not_available",
     );
     assert.equal(event.evidenceSummary.firmwareDecision.featuresTimeDomain.sample_count, 64);
     assert.equal(harness.calls.evidenceInserts.length, 2);

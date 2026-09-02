@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "firmware_baseline.h"
+
 namespace {
 
 String trimValue(const String& value) {
@@ -111,7 +113,7 @@ namespace DeviceSettings {
 DeviceConfig makeDefaultConfig() {
   DeviceConfig config;
   config.loadedFromNvs = false;
-  config.operationMode = AppConfig::OPERATION_MODE_DEMO;
+  config.operationMode = FirmwareBaseline::defaultOperationModeName();
   config.deviceId = AppConfig::DEFAULT_DEVICE_ID;
   config.mqtt.host = AppConfig::DEFAULT_MQTT_HOST;
   config.mqtt.port = AppConfig::DEFAULT_MQTT_PORT;
@@ -122,7 +124,8 @@ DeviceConfig makeDefaultConfig() {
   config.mqtt.useTls = AppConfig::DEFAULT_MQTT_USE_TLS;
   config.mqtt.tlsInsecure = AppConfig::DEFAULT_MQTT_TLS_INSECURE;
   config.mqtt.tlsCaCertificate = AppConfig::DEFAULT_MQTT_TLS_CA_CERT;
-  applyAlertSensitivityPreset(config.alertTuning, AppConfig::ALERT_SENSITIVITY_DEMO);
+  applyAlertSensitivityPreset(config.alertTuning,
+                              FirmwareBaseline::defaultAlertSensitivityName());
   config.alertTuning.buzzerEnabled = AppConfig::ALERT_BUZZER_ENABLED_DEFAULT;
   config.alertTuning.eventsEnabled = AppConfig::ALERT_EVENT_PUBLICATION_ENABLED_DEFAULT;
 

@@ -307,6 +307,8 @@ function buildFirmwareDecisionSummary(payload = {}) {
     activityStateEstimate:
       payload.activity_state_estimate || features.activity_state_estimate || null,
     confidence: toNullableNumber(payload.confidence ?? features.confidence),
+    confidenceStatus:
+      payload.confidence_status || features.confidence_status || "not_available",
     windowStartedAtMs: toNullableNumber(payload.window_started_at_ms),
     windowEndedAtMs: toNullableNumber(payload.window_ended_at_ms),
     analysisWindowMs: toNullableNumber(payload.analysis_window_ms),
@@ -361,6 +363,7 @@ function buildEvidenceSummaryForPayload(evidence, payload = {}) {
     summary.decisionSource = firmwareDecision.decisionSource;
     summary.algorithmVersion = firmwareDecision.algorithmVersion;
     summary.confidence = firmwareDecision.confidence;
+    summary.confidenceStatus = firmwareDecision.confidenceStatus;
     summary.reason = firmwareDecision.reason;
     summary.activityStateEstimate = firmwareDecision.activityStateEstimate;
   }

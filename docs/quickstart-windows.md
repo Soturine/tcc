@@ -523,7 +523,7 @@ npm run db:migrate:alert-actions --prefix backend
 npm run db:migrate:battery-estimation --prefix backend
 ```
 
-Não rode `db:init` em banco com dados que precisam ser preservados. Em configuração nova/factory, a build acadêmica inicia em `Demo apresentação`; configuração NVS existente continua respeitando a escolha salva. Abra o portal ESP32 para selecionar `Normal` quando quiser o perfil conservador ou `Demo apresentação` para a banca, e para recalibrar `Bateria atual (%)`.
+Não rode `db:init` em banco com dados que precisam ser preservados. Em configuração nova/factory, o firmware TCC inicia em `Normal`; configuração NVS existente continua respeitando a escolha salva. Abra o portal ESP32 para selecionar explicitamente `Demo apresentação` somente para bancada/banca, e para recalibrar `Bateria atual (%)`.
 
 ## 15. Erros comuns
 

@@ -89,7 +89,8 @@ Exemplo de `fall_detected`:
   "algorithm_version": "threshold_fsm_v2_time_features_v1",
   "reason": "impact_orientation_immobility",
   "activity_state_estimate": "queda_confirmada",
-  "confidence": 0.76,
+  "confidence": null,
+  "confidence_status": "not_available",
   "features_time_domain": {
     "available": true,
     "sample_count": 64,
