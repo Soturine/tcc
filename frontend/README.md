@@ -15,7 +15,7 @@ Dashboard web responsivo para autenticação, operação multi-tenant, gestao de
 
 Ambiente de desenvolvimento recomendado nesta fase:
 
-- `Node.js 20+`
+- `Node.js 24 LTS`
 
 ## Estrutura
 

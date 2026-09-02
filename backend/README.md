@@ -15,7 +15,7 @@ API REST, bridge MQTT, emissão `Socket.IO` e serviços de persistência para o 
 
 Ambiente de desenvolvimento recomendado nesta fase:
 
-- `Node.js 20+`
+- `Node.js 24 LTS`
 
 ## Baseline v0.9.0
 

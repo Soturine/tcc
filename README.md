@@ -54,7 +54,7 @@ Backend Node/Express ───── MySQL
 | Arquitetura mobile | UDF/MVVM pragmático; repositories/use cases quando agregarem valor |
 | Firmware | C++ / PlatformIO no ESP32; avaliar ESP-MQTT para entrega crítica |
 | Provisioning | ESP-IDF Unified Provisioning como primeira opção; BLE/SoftAP conforme spike |
-| Backend | Node.js + Express, modular monolith |
+| Backend | Node.js 24 LTS + Express, modular monolith |
 | Banco | MySQL + migrations versionadas |
 | IoT | MQTT/TLS; Mosquitto inicialmente |
 | Evento crítico | QoS 1 + `event_uuid` + device outbox + application ACK após commit |

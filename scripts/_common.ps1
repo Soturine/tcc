@@ -112,7 +112,7 @@ function Get-NodeVersionInfo {
 }
 
 function Get-MinimumSupportedNodeMajor {
-  return 20
+  return 24
 }
 
 function Get-PlatformIoCommand {

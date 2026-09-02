@@ -29,7 +29,7 @@ if ($nodePath) {
   if ($nodeVersion -and $nodeVersion.Major -ge $minimumNodeMajor) {
     Add-Result "Node.js" "OK" "Encontrado em $nodePath ($($nodeVersion.Raw))." "Nenhuma acao necessaria."
   } else {
-    Add-Result "Node.js" "WARN" "Encontrado em $nodePath, mas a versao atual ($($nodeVersion.Raw)) pode ficar abaixo do minimo recomendado (Node $minimumNodeMajor+)." "Atualize para Node.js 20+ para reduzir falhas de build com Vite, lint e scripts locais."
+    Add-Result "Node.js" "WARN" "Encontrado em $nodePath, mas a versao atual ($($nodeVersion.Raw)) pode ficar abaixo do minimo recomendado (Node $minimumNodeMajor+)." "Atualize para Node.js 24 LTS para executar os checks do TCC."
   }
 } else {
   Add-Result "Node.js" "FAIL" "Node.js nao foi encontrado no PATH." "Instale o Node.js LTS e abra um novo terminal antes de rodar os scripts."

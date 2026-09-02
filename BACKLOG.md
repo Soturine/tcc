@@ -14,8 +14,9 @@ Auditorias:
 - [ ] Criar tag/checkpoint `tcc-baseline-*` somente no SHA realmente importado/validado.
 - [ ] Reproduzir todos os testes/builds existentes antes de alterar comportamento.
 - [ ] Registrar diferenças entre resultados históricos e a nova execução.
-- [ ] Atualizar runtime canônico para **Node 24 LTS** após caracterizar a baseline; Node 20 está EOL desde 2026-03-24.
-- [ ] Fixar/alinha versão Node em raiz/backend/web e CI.
+- [x] Atualizar runtime canônico para **Node 24 LTS** após caracterizar a baseline; Node 20 está EOL desde 2026-03-24.
+- [x] Fixar/alinhar versão Node em raiz/backend/web.
+- [ ] Alinhar CI a Node 24 LTS.
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
 - [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.

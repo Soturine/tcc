@@ -13,7 +13,7 @@ Antes de continuar, vale ter em mão também:
 
 Instale antes:
 
-- `Node.js 20+` com `npm`
+- `Node.js 24 LTS` com `npm`
 - `MySQL Server` ou acesso a um servidor MySQL existente
 - opcionalmente `mysql CLI` ou `MySQL Workbench`
 - `PlatformIO Core` ou a extensão PlatformIO do VS Code, se você for compilar o firmware

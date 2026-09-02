@@ -43,7 +43,7 @@ cd C:\Queda
 npm run dev:check
 ```
 
-- [ ] Node.js `20+` disponível.
+- [ ] Node.js `24 LTS` disponível.
 - [ ] Dependências de backend e frontend instaladas.
 - [ ] `backend/.env` e `frontend/.env` existem localmente e não estão versionados.
 - [ ] MySQL acessível.
