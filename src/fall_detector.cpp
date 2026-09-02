@@ -9,6 +9,11 @@ FallAlert FallDetector::update(const SensorReading& reading) {
   FallAlert alert;
 
   if (!reading.valid) {
+    // Uma lacuna sem amostras validas nao comprova imobilidade. A proxima
+    // leitura valida reinicia a contagem temporal observada em vez de incluir
+    // todo o intervalo desconhecido.
+    lastSampleAtMs_ = 0;
+    immobileAccumulatedMs_ = 0;
     return alert;
   }
 
