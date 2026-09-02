@@ -104,7 +104,11 @@ function createMqttBridge({ io }) {
     }).catch((error) => {
       logger.error("Falha ao processar mensagem MQTT.", {
         topic,
+        code: error.code || "MQTT_MESSAGE_PROCESSING_FAILED",
         message: error.message,
+        eventUuid: error.details?.eventUuid || null,
+        existingEventId: error.details?.existingEventId || null,
+        conflictingFields: error.details?.conflictingFields || null,
       });
     });
   });
