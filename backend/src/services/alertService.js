@@ -361,9 +361,9 @@ async function listAlerts(filters = {}, accessContext) {
         END,
         e.event_time DESC,
         a.id DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${pagination.limit} OFFSET ${pagination.offset}
     `,
-    [...params, pagination.limit, pagination.offset],
+    params,
   );
 
   return {
@@ -441,9 +441,9 @@ async function exportAlertsReport(filters = {}, accessContext) {
       LEFT JOIN users resolve_user ON resolve_user.id = a.resolved_by
       WHERE ${whereSql}
       ORDER BY e.event_time DESC, a.id DESC
-      LIMIT ?
+      LIMIT ${ALERT_EXPORT_MAX_RECORDS}
     `,
-    [...params, ALERT_EXPORT_MAX_RECORDS],
+    params,
   );
 
   const reportFilters = {

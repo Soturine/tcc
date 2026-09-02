@@ -322,6 +322,10 @@ async function fetchRecentBehaviorEventsByDeviceIds(deviceIds, executor = null) 
 }
 
 async function fetchTelemetryWindowByDeviceId(deviceId, sampleLimit = 6, executor = null) {
+  const safeSampleLimit = Math.min(
+    Math.max(Number.parseInt(sampleLimit, 10) || 6, 1),
+    100,
+  );
   const rows = await execute(
     executor,
     `
@@ -329,9 +333,9 @@ async function fetchTelemetryWindowByDeviceId(deviceId, sampleLimit = 6, executo
       FROM telemetry_logs
       WHERE device_id = ?
       ORDER BY created_at DESC, id DESC
-      LIMIT ?
+      LIMIT ${safeSampleLimit}
     `,
-    [deviceId, sampleLimit],
+    [deviceId],
   );
 
   return rows.map(mapTelemetryRow);
@@ -1496,9 +1500,9 @@ async function listDevices(filters = {}, accessContext) {
         COALESCE(ds.online, 0) DESC,
         ds.last_seen_at DESC,
         d.updated_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${pagination.limit} OFFSET ${pagination.offset}
     `,
-    [...params, pagination.limit, pagination.offset],
+    params,
   );
 
   return {

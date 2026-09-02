@@ -392,7 +392,7 @@ async function resolveFallTelemetryEvidence({ device, eventTime, immobility }, e
         AND device_assignment_history_id <=> ?
         AND created_at BETWEEN ? AND ?
       ORDER BY ABS(TIMESTAMPDIFF(MICROSECOND, created_at, ?)), id
-      LIMIT ?
+      LIMIT ${FALL_EVIDENCE_MAX_SAMPLES}
     `,
     [
       device.id,
@@ -402,7 +402,6 @@ async function resolveFallTelemetryEvidence({ device, eventTime, immobility }, e
       windowStart,
       windowEnd,
       eventAt,
-      FALL_EVIDENCE_MAX_SAMPLES,
     ],
   );
 
@@ -905,9 +904,9 @@ async function listEvents(filters = {}, accessContext) {
       LEFT JOIN alerts a ON a.event_id = e.id
       WHERE ${whereSql}
       ORDER BY e.event_time DESC, e.id DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${pagination.limit} OFFSET ${pagination.offset}
     `,
-    [...params, pagination.limit, pagination.offset],
+    params,
   );
 
   return {

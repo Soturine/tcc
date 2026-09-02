@@ -6,6 +6,7 @@ const backendRoot = path.resolve(__dirname, "..");
 const envPath = path.join(backendRoot, ".env");
 const mysqlModulePath = path.join(backendRoot, "node_modules", "mysql2", "promise");
 const dotenvModulePath = path.join(backendRoot, "node_modules", "dotenv");
+const { removeDatabaseStatements } = require("./sqlUtils");
 
 if (!fs.existsSync(envPath)) {
   console.error("[initDb] backend/.env nao foi encontrado.");
@@ -29,13 +30,6 @@ function toPort(value, fallback) {
 
 function quoteIdentifier(identifier) {
   return `\`${String(identifier).replace(/`/g, "``")}\``;
-}
-
-function removeDatabaseStatements(sql) {
-  return String(sql)
-    .replace(/^\s*CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS[\s\S]*?;\s*/im, "")
-    .replace(/^\s*USE\s+.+?;\s*/gim, "")
-    .trim();
 }
 
 async function main() {

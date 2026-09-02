@@ -366,8 +366,7 @@ test("exportAlertsReport respeita filtros, escopo e limite maximo", async () => 
     assert.match(calls[0].sql, /e\.severity = \?/);
     assert.match(calls[0].sql, /e\.event_time >= \?/);
     assert.match(calls[0].sql, /e\.event_time <= \?/);
-    assert.match(calls[0].sql, /LIMIT \?/);
-    assert.equal(calls[0].params.at(-1), 500);
+    assert.match(calls[0].sql, /LIMIT 500/);
     assert.deepEqual(calls[0].params.slice(0, 4), [
       1,
       "acknowledged",
@@ -417,7 +416,7 @@ test("exportAlertsReport respeita pacientes atribuidos no escopo restrito", asyn
 
     assert.match(calls[0].sql, /a\.organization_id = \?/);
     assert.match(calls[0].sql, /a\.patient_id IN \(\?, \?\)/);
-    assert.deepEqual(calls[0].params, [1, 2, 9, 500]);
+    assert.deepEqual(calls[0].params, [1, 2, 9]);
     assert.equal(report.total, 0);
   } finally {
     restore();

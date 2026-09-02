@@ -411,11 +411,25 @@ async function main() {
     });
 
     await new Promise((resolve) => setTimeout(resolve, config.settleMs));
-    const dbMetrics = await collectDatabaseMetrics(startedAt);
+    const persistenceWindowStart = new Date(
+      Math.floor(startedAt.getTime() / 1000) * 1000,
+    );
+    const dbMetrics = await collectDatabaseMetrics(persistenceWindowStart);
     Object.assign(totals, dbMetrics);
     totals.processed = dbMetrics.telemetryPersisted + dbMetrics.eventsPersisted;
     totals.persisted = totals.processed;
     totals.alertsBlocked = Math.max(0, totals.fallEvents - totals.alertsWithEvidence);
+
+    if (totals.persisted !== totals.published) {
+      failures.push(buildFailure(
+        "database",
+        `Foram publicadas ${totals.published} mensagens validas, mas ${totals.persisted} foram persistidas.`,
+        {
+          scenario: "real_persistence_count",
+          recommendation: "Inspecione os logs do backend e nao aceite o resumo do broker como prova de persistencia.",
+        },
+      ));
+    }
   } catch (error) {
     totals.failed += 1;
     failures.push(buildFailure(error.phase || "stress_real", error.message, {

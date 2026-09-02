@@ -26,20 +26,32 @@ async function one(executor, sql, params = []) {
   return rows[0] || null;
 }
 
-async function transaction(work) {
-  const connection = await pool.getConnection();
+async function transaction(work, options = {}) {
+  const maxAttempts = Math.min(
+    Math.max(Number.parseInt(options.maxAttempts, 10) || 3, 1),
+    5,
+  );
 
-  try {
-    await connection.beginTransaction();
-    const result = await work(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const result = await work(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+
+      if (error.code !== "ER_LOCK_DEADLOCK" || attempt === maxAttempts) {
+        throw error;
+      }
+    } finally {
+      connection.release();
+    }
   }
+
+  throw new Error("Transacao esgotou as tentativas sem resultado.");
 }
 
 async function testConnection() {
