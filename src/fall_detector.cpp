@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "angle_math.h"
 #include "app_logging.h"
 
 FallAlert FallDetector::update(const SensorReading& reading) {
@@ -192,8 +193,8 @@ void FallDetector::refreshBaseline(const SensorReading& reading) {
   }
 
   // Media exponencial lenta evita que pequenos movimentos desloquem a referencia abruptamente.
-  baselinePitchDeg_ = 0.85f * baselinePitchDeg_ + 0.15f * reading.pitchDeg;
-  baselineRollDeg_ = 0.85f * baselineRollDeg_ + 0.15f * reading.rollDeg;
+  baselinePitchDeg_ = AngleMath::blendDegrees(baselinePitchDeg_, reading.pitchDeg, 0.15f);
+  baselineRollDeg_ = AngleMath::blendDegrees(baselineRollDeg_, reading.rollDeg, 0.15f);
 }
 
 bool FallDetector::isImpact(const SensorReading& reading) const {
@@ -209,7 +210,9 @@ bool FallDetector::isImmobile(const SensorReading& reading) const {
 }
 
 float FallDetector::orientationDeltaDeg(const SensorReading& reading) const {
-  const float pitchDelta = fabsf(reading.pitchDeg - referencePitchDeg_);
-  const float rollDelta = fabsf(reading.rollDeg - referenceRollDeg_);
+  const float pitchDelta =
+      AngleMath::shortestDeltaDegrees(referencePitchDeg_, reading.pitchDeg);
+  const float rollDelta =
+      AngleMath::shortestDeltaDegrees(referenceRollDeg_, reading.rollDeg);
   return fmaxf(pitchDelta, rollDelta);
 }

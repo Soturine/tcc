@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "firmware_baseline.h"
+
 namespace {
 
 String trimValue(const String& value) {
@@ -111,7 +113,7 @@ namespace DeviceSettings {
 DeviceConfig makeDefaultConfig() {
   DeviceConfig config;
   config.loadedFromNvs = false;
-  config.operationMode = AppConfig::OPERATION_MODE_DEMO;
+  config.operationMode = FirmwareBaseline::defaultOperationModeName();
   config.deviceId = AppConfig::DEFAULT_DEVICE_ID;
   config.mqtt.host = AppConfig::DEFAULT_MQTT_HOST;
   config.mqtt.port = AppConfig::DEFAULT_MQTT_PORT;
