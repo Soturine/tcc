@@ -177,6 +177,7 @@ INSERT INTO events (
   patient_id,
   device_id,
   device_assignment_history_id,
+  event_uuid,
   event_type,
   severity,
   intensity,
@@ -188,6 +189,11 @@ INSERT INTO events (
   evidence_window_seconds,
   evidence_summary_json,
   event_time,
+  occurred_at_device,
+  received_at,
+  boot_id,
+  device_uptime_ms,
+  clock_quality,
   raw_payload_json
 )
 VALUES (
@@ -195,6 +201,7 @@ VALUES (
   @demo_patient_id,
   @demo_device_id,
   @demo_assignment_id,
+  'seed-demo-fall-001',
   'fall_detected',
   'critical',
   3.74,
@@ -239,10 +246,19 @@ VALUES (
     )
   ),
   UTC_TIMESTAMP(),
+  UTC_TIMESTAMP(3),
+  UTC_TIMESTAMP(3),
+  'seed-demo-boot-001',
+  3600,
+  'unknown',
   JSON_OBJECT(
     'device_uid', 'legacy:esp32_01',
     'device_id', 'esp32_01',
     'event_type', 'fall_detected',
+    'event_uuid', 'seed-demo-fall-001',
+    'boot_id', 'seed-demo-boot-001',
+    'event_uptime_ms', 3600,
+    'clock_quality', 'unknown',
     'timestamp', UNIX_TIMESTAMP(UTC_TIMESTAMP()),
     'accel_magnitude', 3.74,
     'gyro_magnitude', 182.5,
