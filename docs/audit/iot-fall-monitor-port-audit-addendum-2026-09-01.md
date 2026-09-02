@@ -378,10 +378,12 @@ somente depois
 
 Antes de chamar o detector/firmware portado de baseline TCC:
 
-- [ ] `confidence=0.76` removida/reclassificada;
-- [ ] wrap angular tem regressão automatizada;
-- [ ] default novo é Normal;
-- [ ] Demo explicitamente marcado nos dados/UI;
+Estado em 2026-09-02: as correções de `confidence`, wrap angular e default Normal estão **implemented** e **validated** por testes host/native e build do firmware. O detector permanece **experimental**; desempenho em campo, acurácia, sensibilidade, precisão e falsos positivos não foram validados nesta etapa.
+
+- [x] `confidence=0.76` removida/reclassificada;
+- [x] wrap angular tem regressão automatizada;
+- [x] default novo é Normal;
+- [x] Demo explicitamente marcado nos dados/UI;
 - [ ] portal mutável não fica aberto/always-on sem proteção fora da bancada;
 - [ ] PII não necessária deixa de ser sincronizada ao ESP32;
 - [ ] critical-event payload tem budget e teste de tamanho;

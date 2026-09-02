@@ -16,7 +16,7 @@ Este documento prepara a evolução futura sem mudar a decisão principal atual.
 - `FALL_FFT_EXPERIMENTAL_ENABLED=false` deixa Fourier/FFT fora da decisão principal.
 - `FALL_FFT_WINDOW_SIZE=64` prepara janela de 64 amostras.
 - Com `SENSOR_SAMPLE_INTERVAL_MS=50`, a taxa esperada fica em cerca de `20 Hz` e a janela de 64 amostras cobre cerca de `3,2 s`.
-- O payload `fall_detected` inclui `decision_source`, `algorithm_version`, `confidence`, picos, janela, imobilidade, `features_time_domain`, `features_frequency_domain` e `linked_telemetry_window`.
+- O payload `fall_detected` inclui `decision_source`, `algorithm_version`, picos, janela, imobilidade, `features_time_domain`, `features_frequency_domain` e `linked_telemetry_window`. Por compatibilidade transitória, `confidence` permanece `null` com `confidence_status = not_available`; a FSM experimental não produz probabilidade calibrada.
 - Desde a `v0.8.25`, o payload crítico também inclui `event_uuid`, `event_sequence` e `sample_seq`, permitindo replay/deduplicação sem mudar a decisão principal.
 - `features_frequency_domain` nasce com `available=false`, `experimental=true` e motivo `fft_experimental_disabled`.
 

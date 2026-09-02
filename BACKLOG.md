@@ -20,7 +20,7 @@ Auditorias:
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
 - [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.
-- [ ] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
+- [x] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
 - [x] Implementar CI remota mínima **antes de refatorações relevantes**:
   - backend check/test;
   - frontend lint/build;
@@ -36,10 +36,10 @@ Não iniciar reestruturação grande enquanto a baseline não puder ser reproduz
 
 ### Detector baseline antes de calibrar/ML
 
-- [ ] Remover/reclassificar `confidence = 0.76` fixa; não apresentar como probabilidade/confiança calibrada.
-- [ ] Corrigir diferença angular com wrap `+180/-180`.
-- [ ] Adicionar regressões para `179/-179`, `-179/179` e fronteiras equivalentes.
-- [ ] Revisar atualização da baseline de orientação para não sofrer média linear na fronteira angular.
+- [x] Remover/reclassificar `confidence = 0.76` fixa; não apresentar como probabilidade/confiança calibrada.
+- [x] Corrigir diferença angular com wrap `+180/-180`.
+- [x] Adicionar regressões para `179/-179`, `-179/179` e fronteiras equivalentes.
+- [x] Revisar atualização da baseline de orientação para não sofrer média linear na fronteira angular.
 - [ ] Criar replay/test harness para alimentar `FallDetector` com séries de `SensorReading` sem hardware.
 - [ ] Manter sensor fusion como spike posterior condicionado a evidência, não como rewrite imediato.
 
