@@ -82,7 +82,7 @@ Principais gaps encontrados na baseline histórica:
 5. mismatch entre tópico/payload é apenas warning;
 6. `event_uuid` atual pode ter risco de colisão após reboot antes de NTP;
 7. não há workflows de CI na baseline;
-8. JWT default `change-me`, CORS amplo, rate limiting/lifecycle de sessão ainda precisam de hardening;
+8. JWT default `change-me` e lifecycle de sessão ainda precisam de hardening; CORS e rate limiting possuem baseline local, mas exigem configuração/armazenamento distribuído antes de escala horizontal;
 9. provisioning SoftAP atual é aberto e deve deixar de ser caminho normal para secrets;
 10. frontend/firmware ainda têm gaps de testes e alguns arquivos muito grandes.
 

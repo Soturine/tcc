@@ -52,6 +52,8 @@ O checkpoint `aed3a266e384da7874a1c76376a1bfb25340976e` passou nos quatro workfl
 
 No primeiro run de pull request, `dependency-review` falhou porque o Dependency Graph do repositório estava desabilitado. O recurso foi habilitado e somente o job falho foi reexecutado; auditorias npm, scan de padrões de secrets, CodeQL e dependency review então passaram. Commits posteriores ao checkpoint devem ter seus próprios checks remotos concluídos antes do merge.
 
+O check de CodeQL do pull request também apontou gaps herdados de rate limiting, CORS aberto e viés por módulo na geração do pairing code. A correção usa allowlist explícita, `crypto.randomInt` e `express-rate-limit` 8.7.0. Essa dependência é MIT, suporta o Node 24 adotado e ficou centralizada em um middleware para permitir troca de store ou remoção sem espalhar a implementação. O store em memória é somente uma baseline de processo único; escala horizontal permanece condicionada a store compartilhado e validação de proxy/IP.
+
 ## Segurança do porte
 
 - nenhum `.env` real foi adicionado;

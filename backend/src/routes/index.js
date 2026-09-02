@@ -11,9 +11,11 @@ const pairingRoutes = require("./pairingRoutes");
 const systemRoutes = require("./systemRoutes");
 const { me } = require("../controllers/meController");
 const { requireAccessContext } = require("../middlewares/auth");
+const { apiRateLimit } = require("../middlewares/rateLimit");
 
 const router = express.Router();
 
+router.use(apiRateLimit);
 router.use("/auth", authRoutes);
 router.use("/pairing", pairingRoutes);
 router.get("/me", requireAccessContext, me);

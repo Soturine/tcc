@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 
+const { env } = require("../config/env");
 const { verifyToken } = require("../utils/auth");
 const { logger } = require("../utils/logger");
 const { loadAccessContext } = require("../services/scopeService");
@@ -16,7 +17,7 @@ function buildSocketAuthError(message, code) {
 function createSocketServer(httpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: true,
+      origin: env.corsAllowedOrigins,
       credentials: true,
     },
   });

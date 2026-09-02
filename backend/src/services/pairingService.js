@@ -22,11 +22,10 @@ function hashDeviceSyncToken(token) {
 
 function generatePairingCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.randomBytes(6);
   let code = "";
 
-  for (let index = 0; index < bytes.length; index += 1) {
-    code += alphabet[bytes[index] % alphabet.length];
+  for (let index = 0; index < 6; index += 1) {
+    code += alphabet[crypto.randomInt(alphabet.length)];
   }
 
   return code;
@@ -496,5 +495,6 @@ async function syncDevicePatientProfile({
 module.exports = {
   claimDeviceWithPairingCode,
   createPairingSession,
+  generatePairingCode,
   syncDevicePatientProfile,
 };

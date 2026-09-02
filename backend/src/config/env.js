@@ -40,12 +40,29 @@ function toLogLevel(value, fallback = "info") {
     : fallback;
 }
 
+function toCsv(value, fallback = []) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const entries = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return entries.length > 0 ? entries : fallback;
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   isProduction: process.env.NODE_ENV === "production",
   port: toNumber(process.env.PORT, 4000),
   jwtSecret: toTrimmed(process.env.JWT_SECRET, "change-me"),
   logLevel: toLogLevel(process.env.LOG_LEVEL, "info"),
+  corsAllowedOrigins: toCsv(process.env.CORS_ALLOWED_ORIGINS, [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]),
   mysql: {
     host: toTrimmed(process.env.MYSQL_HOST, "localhost"),
     port: toNumber(process.env.MYSQL_PORT, 3306),
