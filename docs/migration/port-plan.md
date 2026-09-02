@@ -9,6 +9,17 @@ Transformar a auditoria em uma sequência executável sem big-bang rewrite.
 
 O SHA acima é o observado na auditoria; no momento do porte deve ser confirmado novamente e registrado como origem efetiva.
 
+## Registro da execução de 2026-09-01
+
+- **Origem efetivamente importada:** `Soturine/iot-fall-monitor` @ `09ad767b5e1615331d0da5c25fa469423759dc39`;
+- **Base do destino:** `Soturine/tcc` @ `3057b78d263133f1335b9f2aaf0b0158e6143b09`;
+- **Merge de histórias não relacionadas:** `9daa8ec`;
+- **Commits posteriores ao SHA auditado:** nenhum;
+- **Estratégia:** merge com histórias não relacionadas, `README.md` e `AGENTS.md` resolvidos em favor das versões canônicas do TCC;
+- **Evidência de reprodução:** [`baseline-validation-2026-09-01.md`](baseline-validation-2026-09-01.md).
+
+A CI mínima foi implementada em workflows independentes. A validação remota permanece pendente até o push da branch e a conclusão dos runs no SHA exato.
+
 ## Princípio
 
 Não fazer:

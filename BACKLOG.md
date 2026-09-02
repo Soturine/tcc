@@ -9,19 +9,19 @@ Auditorias:
 
 ## P0 — Lineage, baseline reproduzível e CI
 
-- [ ] Importar/evoluir a baseline de `Soturine/iot-fall-monitor` preservando rastreabilidade de histórico/autoria.
-- [ ] Registrar SHA exato da origem usada no porte.
+- [x] Importar/evoluir a baseline de `Soturine/iot-fall-monitor` preservando rastreabilidade de histórico/autoria.
+- [x] Registrar SHA exato da origem usada no porte.
 - [ ] Criar tag/checkpoint `tcc-baseline-*` somente no SHA realmente importado/validado.
-- [ ] Reproduzir todos os testes/builds existentes antes de alterar comportamento.
-- [ ] Registrar diferenças entre resultados históricos e a nova execução.
+- [x] Reproduzir todos os testes/builds existentes antes de alterar comportamento.
+- [x] Registrar diferenças entre resultados históricos e a nova execução.
 - [x] Atualizar runtime canônico para **Node 24 LTS** após caracterizar a baseline; Node 20 está EOL desde 2026-03-24.
 - [x] Fixar/alinhar versão Node em raiz/backend/web.
-- [ ] Alinhar CI a Node 24 LTS.
+- [x] Alinhar CI a Node 24 LTS.
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
 - [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.
 - [ ] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
-- [ ] Criar CI remota mínima **antes de refatorações relevantes**:
+- [x] Implementar CI remota mínima **antes de refatorações relevantes**:
   - backend check/test;
   - frontend lint/build;
   - firmware build;

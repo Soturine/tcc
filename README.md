@@ -204,8 +204,10 @@ Ensaios de queda devem priorizar objeto/manequim/cenários seguros e protocolo i
 - [x] alternativas/racionais registrados;
 - [x] auditoria técnica da baseline realizada;
 - [x] roadmap/backlog/ADRs atualizados após auditoria;
-- [ ] importar lineage/código da baseline;
-- [ ] reproduzir baseline e criar CI;
+- [x] importar lineage/código da baseline;
+- [x] reproduzir baseline localmente;
+- [x] implementar CI mínima;
+- [ ] validar CI remota no SHA exato da branch;
 - [ ] fechar critical-event reliability;
 - [ ] contratos/migrations concretos;
 - [ ] Android MVP;
