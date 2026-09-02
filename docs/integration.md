@@ -126,7 +126,7 @@ Na `v0.8.30`, a bateria deixa de ser placeholder. Quando o portal ESP32 tem uma 
 - `event_uuid`: identifica o evento crítico de forma estável durante reenvios
 - `event_sequence`: contador monotônico local de eventos críticos no firmware
 - `sample_seq`: contador da amostra de sensor mais recente associada ao evento
-- fila circular em RAM no firmware para reenviar eventos quando o MQTT voltar
+- fila circular RAM de 10 eventos e snapshot NVS de até 4 para reenviar quando o MQTT voltar; isso ainda não é a outbox persistente/ACK alvo
 - deduplicação no backend por `event_uuid`, sem exigir migration de schema
 
 ```mermaid

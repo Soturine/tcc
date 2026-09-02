@@ -298,6 +298,31 @@ test("payload sem device_id/topico sem device e canal invalido sao rejeitados", 
   });
 });
 
+test("device_id divergente entre topico e payload e rejeitado antes da persistencia", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events", "esp32_authorized"),
+      payloadText: JSON.stringify({
+        device_id: "esp32_spoofed",
+        event_type: "sos_pressed",
+        timestamp: Math.floor(Date.now() / 1000),
+      }),
+      io: {},
+    });
+
+    assert.equal(calls.transactions, 0);
+    assert.equal(calls.events.length, 0);
+    assert.equal(calls.alerts.length, 0);
+    assert.equal(calls.emits.length, 0);
+    assert.ok(
+      calls.logs.some(
+        (entry) => entry.level === "warn" &&
+          entry.metadata?.reason === "topic_payload_device_mismatch",
+      ),
+    );
+  });
+});
+
 test("status atualiza device_status e emite device:status no escopo correto", async () => {
   await withHarness({}, async ({ calls, handleMqttMessage }) => {
     await handleMqttMessage({
@@ -518,7 +543,7 @@ test("timestamp plausivel mas stale nao derruba status realtime para offline", a
 test("device sem organizacao nao vaza realtime tenant indevido", async () => {
   await withHarness({ organization: null, patient: null }, async ({ calls, handleMqttMessage }) => {
     await handleMqttMessage({
-      topicInfo: topicInfo("telemetry"),
+      topicInfo: topicInfo("telemetry", "stress_orphan"),
       payloadText: JSON.stringify({
         device_id: "stress_orphan",
         timestamp: Math.floor(Date.now() / 1000),

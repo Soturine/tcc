@@ -71,10 +71,6 @@ function resolveMqttPersistenceTime(payload, receivedAt, override = null) {
 }
 
 function deriveSeverity(eventType, payload) {
-  if (payload.severity) {
-    return String(payload.severity);
-  }
-
   switch (eventType) {
     case "fall_detected":
       return toBoolean(payload.immobility_confirmed ?? payload.immobility)

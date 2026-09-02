@@ -2,7 +2,7 @@
 
 Repositório oficial da evolução para Trabalho de Conclusão de Curso do projeto [`Soturine/iot-fall-monitor`](https://github.com/Soturine/iot-fall-monitor).
 
-> **Estado atual:** arquitetura/requisitos/auditoria do porte. O aplicativo Android e a nova infraestrutura ainda não são considerados implementados. A baseline histórica precisa ser importada e revalidada neste repositório antes das refatorações.
+> **Estado atual:** baseline portada e validada, saneamento P1 e replay sintético concluídos, contratos HTTP/MQTT formalizados. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
 
 ## Visão do projeto
 
@@ -79,7 +79,7 @@ Principais gaps encontrados na baseline histórica:
 2. buffer do device remove evento cedo demais;
 3. backend MQTT usa sessão limpa;
 4. queda replayada após offline pode perder alerta por depender de telemetria SQL da janela;
-5. mismatch entre tópico/payload é apenas warning;
+5. mismatch entre tópico/payload era apenas warning na baseline e foi corrigido para rejeição antes da persistência;
 6. `event_uuid` atual pode ter risco de colisão após reboot antes de NTP;
 7. não há workflows de CI na baseline;
 8. JWT default `change-me` e lifecycle de sessão ainda precisam de hardening; CORS e rate limiting possuem baseline local, mas exigem configuração/armazenamento distribuído antes de escala horizontal;
@@ -116,6 +116,7 @@ Isso reduz uma falha de UX comum em sistemas de segurança: o usuário acreditar
 - [Opções de cloud avaliadas](docs/architecture/cloud-options-evaluation.md)
 - [Modelo de dados](docs/architecture/data-model.md)
 - [Contratos](docs/architecture/contracts.md)
+- [Contratos executáveis HTTP/MQTT](docs/contracts/README.md)
 
 ### Produto e requisitos
 
@@ -209,7 +210,8 @@ Ensaios de queda devem priorizar objeto/manequim/cenários seguros e protocolo i
 - [x] implementar CI mínima;
 - [x] validar CI remota no SHA exato da branch;
 - [ ] fechar critical-event reliability;
-- [ ] contratos/migrations concretos;
+- [x] inventário e contratos HTTP/MQTT concretos;
+- [ ] migrations e identidade temporal concretas;
 - [ ] Android MVP;
 - [ ] FCM/Protection Health;
 - [ ] provisioning seguro;

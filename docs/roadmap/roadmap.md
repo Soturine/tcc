@@ -11,7 +11,8 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 | ✓ | Porte rastreável, baseline v0.9.0 e CI fundacional | origem preservada, tag de baseline e SHA remoto verde |
 | ✓ | Correções P1 iniciais do detector | wrap angular, baseline circular, confidence indisponível, Normal default e Demo opt-in |
 | ✓ | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
-| → | Contratos, banco e identidade | inventário HTTP/MQTT e invariantes explícitos |
+| ✓ | Contratos HTTP/MQTT | inventário real, OpenAPI, JSON Schemas, autoridade, identidade e tempo explícitos |
+| → | Banco, migrations e identidade temporal | contratos formalizados e gaps de persistência conhecidos |
 | ○ | Confiabilidade crítica | contratos e identidade definidos |
 | ○ | Backend hardening | fronteiras críticas caracterizadas |
 | ○ | Android | API e pipeline crítico estáveis |
@@ -50,16 +51,22 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Estado:** **implemented** e **validated** por testes host/native, build ESP32 e CI remota. Os sinais continuam sintéticos; não houve validação física ou de acurácia.
 
-## Fase 2 — Contratos, banco e identidade (etapa atual)
+## Marco concluído — Contratos HTTP/MQTT (Etapa prática 4)
 
-- inventário HTTP/MQTT real;
-- OpenAPI;
-- JSON Schemas MQTT;
+- inventário das 35 operações HTTP registradas e seus consumidores;
+- inventário dos três tópicos MQTT ativos, QoS real e tooling divergente;
+- OpenAPI e JSON Schemas current/planned validados por contract tests;
+- autoridade de identidade/severidade, identidade de device/evento e semântica temporal explícitas;
+- mismatch topic/payload rejeitado e severidade mantida como política do backend;
+- schema versioning simples, budget medido e ACK pós-commit formalizado sem implementação prematura.
+
+**Estado:** **implemented** e **validated** por validação sintática/contratual e suites locais. ACK, QoS 1 no ESP32, outbox final, identidade MQTT autenticada e migrations temporais continuam **planned**; nada nesta etapa foi validado em hardware/campo.
+
+## Fase 2 — Banco, migrations e identidade temporal (etapa atual)
+
 - migrations versionadas;
 - `event_uuid` explícito/UNIQUE;
 - timestamps separados (`occurred`/`received`);
-- device principal/tópico como identidade autoritativa;
-- rejeição de mismatch;
 - lifecycle de telemetria/evidência.
 
 **Saída:** contratos e invariantes de dados explícitos antes de novos clientes.

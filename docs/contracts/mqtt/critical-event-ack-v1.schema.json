@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soturine.local/contracts/mqtt/critical-event-ack-v1.schema.json",
+  "title": "Planned post-commit critical event ACK v1",
+  "$comment": "PLANNED: no backend publisher or firmware subscriber exists yet.",
+  "type": "object",
+  "required": ["schema_version", "event_uuid", "event_id", "status", "committed_at"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_uuid": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "event_id": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["committed", "duplicate"] },
+    "committed_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

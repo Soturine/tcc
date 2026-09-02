@@ -1,0 +1,1275 @@
+openapi: 3.1.0
+info:
+  title: Soturine TCC HTTP API
+  version: 0.9.0-current
+  description: >-
+    Contract inventory of the HTTP behavior implemented on 2026-09-02.
+    The version is a contract label, not a Git release tag.
+servers:
+  - url: http://localhost:4000
+    description: Local development default
+tags:
+  - name: Operational
+  - name: Auth
+  - name: Pairing
+  - name: Devices
+  - name: Events
+  - name: Alerts
+  - name: Dashboard
+  - name: Organization
+  - name: Patients
+  - name: System
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [Operational]
+      summary: Check backend process health
+      security: []
+      x-contract-state: active
+      x-known-consumers: [ci, smoke, operations]
+      responses:
+        '200':
+          description: Process is responding
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/register:
+    post:
+      operationId: register
+      tags: [Auth]
+      summary: Create user, organization and initial admin membership
+      security: []
+      x-contract-state: active
+      x-known-consumers: [web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Registration completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Authenticate a human user
+      security: []
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/pairing/claim:
+    post:
+      operationId: claimDevice
+      tags: [Pairing]
+      summary: Claim a device with a temporary pairing code
+      security: []
+      x-contract-state: active
+      x-known-consumers: [esp32]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PairingClaimRequest' }
+      responses:
+        '200':
+          description: Device claimed; contains a secret sync token returned once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PairingClaimResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/pairing/device-profile-sync:
+    post:
+      operationId: syncDevicePatientProfile
+      tags: [Pairing]
+      summary: Fetch the current compact patient profile using a device sync token
+      security: []
+      x-contract-state: active
+      x-known-consumers: [esp32]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceProfileSyncRequest' }
+      responses:
+        '200':
+          description: Profile snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceProfileSyncResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/me:
+    get:
+      operationId: getMe
+      tags: [Auth]
+      summary: Return the current scoped user
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices:
+    get:
+      operationId: listDevices
+      tags: [Devices]
+      summary: List scoped devices
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [online, offline] } }
+        - { name: claimStatus, in: query, schema: { type: string, enum: [unclaimed, claimed, disabled] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Device page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DevicePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: createDevice
+      tags: [Devices]
+      summary: Manually create and claim a device
+      x-contract-state: active
+      x-known-consumers: []
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceCreateRequest' }
+      responses:
+        '201':
+          description: Device created/claimed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices/pairing-sessions:
+    post:
+      operationId: createPairingSession
+      tags: [Pairing, Devices]
+      summary: Generate a temporary pairing code
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PairingSessionRequest' }
+      responses:
+        '201':
+          description: Pairing session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session]
+                properties:
+                  session: { $ref: '#/components/schemas/PairingSession' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/OptionalOrganizationHeader'
+    get:
+      operationId: getDevice
+      tags: [Devices]
+      summary: Get device with recent telemetry, events, alerts and assignments
+      x-contract-state: active
+      x-known-consumers: [web]
+      responses:
+        '200':
+          description: Device detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    put:
+      operationId: updateDevice
+      tags: [Devices]
+      summary: Update administrative device fields
+      x-contract-state: active
+      x-known-consumers: [web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceUpdateRequest' }
+      responses:
+        '200':
+          description: Updated device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    delete:
+      operationId: deleteDevice
+      tags: [Devices]
+      summary: Delete a device and return its last snapshot
+      x-contract-state: active
+      x-known-consumers: []
+      responses:
+        '200':
+          description: Deleted device snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices/{id}/assign-patient:
+    post:
+      operationId: assignDevicePatient
+      tags: [Devices]
+      summary: Assign or unassign the current patient
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceAssignmentRequest' }
+      responses:
+        '200':
+          description: Updated device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices/{id}/reset-claim:
+    post:
+      operationId: resetDeviceClaim
+      tags: [Devices]
+      summary: Reset claim while preserving history
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Unclaimed device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/devices/{id}/events:
+    get:
+      operationId: listDeviceEvents
+      tags: [Devices, Events]
+      summary: List events for one scoped device
+      x-contract-state: active
+      x-known-consumers: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - $ref: '#/components/parameters/EventType'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Event page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/events:
+    get:
+      operationId: listEvents
+      tags: [Events]
+      summary: List scoped events
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - { name: deviceId, in: query, schema: { type: integer } }
+        - $ref: '#/components/parameters/EventType'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Event page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/events/{id}:
+    get:
+      operationId: getEvent
+      tags: [Events]
+      summary: Get one scoped event
+      x-contract-state: active
+      x-known-consumers: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event]
+                properties:
+                  event: { $ref: '#/components/schemas/Event' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts:
+    get:
+      operationId: listAlerts
+      tags: [Alerts]
+      summary: List scoped alerts
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - { name: status, in: query, schema: { type: string } }
+        - { name: deviceId, in: query, schema: { type: integer } }
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Alert page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts/export:
+    get:
+      operationId: exportAlerts
+      tags: [Alerts]
+      summary: Build an alert report as JSON
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - { name: status, in: query, schema: { type: string } }
+        - { name: deviceId, in: query, schema: { type: integer } }
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+      responses:
+        '200':
+          description: JSON report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts/{id}:
+    get:
+      operationId: getAlert
+      tags: [Alerts]
+      summary: Get one scoped alert including action history
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Alert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts/{id}/acknowledge:
+    post:
+      operationId: acknowledgeAlert
+      tags: [Alerts]
+      summary: Transition an open alert to acknowledged
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody: { $ref: '#/components/requestBodies/AlertAction' }
+      responses:
+        '200': { $ref: '#/components/responses/AlertActionSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts/{id}/cancel:
+    post:
+      operationId: cancelAlert
+      tags: [Alerts]
+      summary: Transition an open/acknowledged alert to canceled
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody: { $ref: '#/components/requestBodies/AlertAction' }
+      responses:
+        '200': { $ref: '#/components/responses/AlertActionSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/alerts/{id}/resolve:
+    post:
+      operationId: resolveAlert
+      tags: [Alerts]
+      summary: Transition an open/acknowledged alert to resolved
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody: { $ref: '#/components/requestBodies/AlertAction' }
+      responses:
+        '200': { $ref: '#/components/responses/AlertActionSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [Dashboard]
+      summary: Get scoped operational metrics and recent events
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/dashboard/recent-alerts:
+    get:
+      operationId: getRecentAlerts
+      tags: [Dashboard]
+      summary: Get recent scoped alerts
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Recent alerts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertItems' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/dashboard/device-status:
+    get:
+      operationId: getDashboardDeviceStatus
+      tags: [Dashboard]
+      summary: Get scoped device status snapshots
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Device snapshots
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceItems' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/organization:
+    get:
+      operationId: getCurrentOrganization
+      tags: [Organization]
+      summary: Get active organization and scoped user
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Current organization context
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationContext' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/organization/members:
+    get:
+      operationId: listOrganizationMembers
+      tags: [Organization]
+      summary: List members of the active organization
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Members
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberItems' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: createOrganizationMember
+      tags: [Organization]
+      summary: Add a member to the active organization
+      description: Password is conditionally required when no user exists for the email.
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberCreateRequest' }
+      responses:
+        '201':
+          description: Created membership
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member]
+                properties:
+                  member: { $ref: '#/components/schemas/Member' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/patients:
+    get:
+      operationId: listPatients
+      tags: [Patients]
+      summary: List scoped patients
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+        - { name: includeArchived, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Patients
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientItems' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: createPatient
+      tags: [Patients]
+      summary: Create a patient in the active organization
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientCreateRequest' }
+      responses:
+        '201':
+          description: Created patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/patients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/OptionalOrganizationHeader'
+    get:
+      operationId: getPatient
+      tags: [Patients]
+      summary: Get one scoped patient
+      x-contract-state: active
+      x-known-consumers: []
+      responses:
+        '200':
+          description: Patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    put:
+      operationId: updatePatient
+      tags: [Patients]
+      summary: Update a patient
+      x-contract-state: active
+      x-known-consumers: [web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientUpdateRequest' }
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/patients/{id}/archive:
+    post:
+      operationId: archivePatient
+      tags: [Patients]
+      summary: Archive a patient after device unassignment
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Archived patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/system/network-info:
+    get:
+      operationId: getNetworkInfo
+      tags: [System]
+      summary: Discover candidate local backend URLs for pairing
+      x-contract-state: active
+      x-known-consumers: [web]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      responses:
+        '200':
+          description: Candidate URLs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkInfoResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OptionalOrganizationHeader:
+      name: X-Organization-Id
+      in: header
+      required: false
+      description: Selects one organization already authorized by the user's memberships.
+      schema: { type: integer, minimum: 1 }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100 }
+    EventType:
+      name: eventType
+      in: query
+      schema: { type: string }
+    Severity:
+      name: severity
+      in: query
+      schema: { type: string }
+    StartDate:
+      name: startDate
+      in: query
+      schema: { type: string, format: date }
+    EndDate:
+      name: endDate
+      in: query
+      schema: { type: string, format: date }
+  requestBodies:
+    AlertAction:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              note: { type: [string, 'null'] }
+  responses:
+    BadRequest:
+      description: Invalid request or missing active organization
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Missing/invalid human token or invalid device sync token
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Authenticated principal is not allowed
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Resource does not exist or is outside the authorized scope
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: State, uniqueness or transition conflict
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    RateLimited:
+      description: In-memory rate limit exceeded
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    InternalError:
+      description: Unexpected server error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    AlertActionSuccess:
+      description: Alert transition completed
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [alert, action]
+            properties:
+              alert: { $ref: '#/components/schemas/Alert' }
+              action: { type: string, enum: [acknowledge, cancel, resolve] }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        details: { type: [object, 'null'], additionalProperties: true }
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status: { const: ok }
+        timestamp: { type: string, format: date-time }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: string, enum: [family, clinic, hospital] }
+        status: { type: string }
+      additionalProperties: true
+    User:
+      type: object
+      required: [id, name, email, globalRole, memberships]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        globalRole: { type: string, enum: [platform_admin, user] }
+        activeRole: { type: [string, 'null'] }
+        activeOrganizationId: { type: [integer, 'null'] }
+        activeOrganization:
+          oneOf:
+            - $ref: '#/components/schemas/Organization'
+            - type: 'null'
+        memberships: { type: array, items: { type: object, additionalProperties: true } }
+      additionalProperties: true
+    RegisterRequest:
+      type: object
+      required: [name, email, password, organizationName, organizationType]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6 }
+        organizationName: { type: string, minLength: 1 }
+        organizationType: { type: string, enum: [family, clinic, hospital] }
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        organizationId: { type: [integer, 'null'] }
+      additionalProperties: false
+    AuthResponse:
+      type: object
+      required: [user, token]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        token: { type: string }
+    Device:
+      type: object
+      required: [id, deviceUid, deviceIdentifier, name, claimStatus, status]
+      properties:
+        id: { type: integer }
+        deviceUid: { type: string }
+        deviceIdentifier: { type: string }
+        name: { type: string }
+        location: { type: string }
+        isActive: { type: boolean }
+        claimStatus: { type: string, enum: [unclaimed, claimed, disabled] }
+        organization:
+          oneOf:
+            - $ref: '#/components/schemas/Organization'
+            - type: 'null'
+        currentPatient: { type: [object, 'null'], additionalProperties: true }
+        status: { type: object, additionalProperties: true }
+        behavior: { type: object, additionalProperties: true }
+      additionalProperties: true
+    DeviceEnvelope:
+      type: object
+      required: [device]
+      properties:
+        device: { $ref: '#/components/schemas/Device' }
+    DevicePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Device' } }
+    DeviceItems:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Device' } }
+    DeviceDetailResponse:
+      type: object
+      required: [device, recentTelemetry, recentEvents, recentAlerts, assignmentHistory]
+      properties:
+        device: { $ref: '#/components/schemas/Device' }
+        recentTelemetry: { type: array, items: { type: object, additionalProperties: true } }
+        recentEvents: { type: array, items: { $ref: '#/components/schemas/Event' } }
+        recentAlerts: { type: array, items: { $ref: '#/components/schemas/Alert' } }
+        assignmentHistory: { type: array, items: { type: object, additionalProperties: true } }
+    DeviceCreateRequest:
+      type: object
+      anyOf:
+        - required: [deviceUid]
+        - required: [deviceIdentifier]
+      properties:
+        deviceUid: { type: string, minLength: 1 }
+        deviceIdentifier: { type: string, minLength: 1 }
+        name: { type: string }
+        location: { type: string }
+        patientId: { type: [integer, 'null'] }
+      additionalProperties: false
+    DeviceUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        location: { type: string }
+        isActive: { type: boolean }
+      additionalProperties: false
+    DeviceAssignmentRequest:
+      type: object
+      required: [patientId]
+      properties:
+        patientId: { type: [integer, 'null'] }
+        reason: { type: string }
+        notes: { type: [string, 'null'] }
+      additionalProperties: false
+    PairingSessionRequest:
+      type: object
+      properties:
+        patientId: { type: [integer, 'null'] }
+        expiresInMinutes:
+          type: integer
+          default: 10
+          description: The implementation clamps numeric values to the 1..30 minute range.
+      additionalProperties: false
+    PairingSession:
+      type: object
+      required: [id, pairingCode, organizationId, organizationName]
+      properties:
+        id: { type: integer }
+        pairingCode: { type: string }
+        organizationId: { type: integer }
+        organizationName: { type: string }
+        patientId: { type: [integer, 'null'] }
+        patientName: { type: [string, 'null'] }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: [string, 'null'], format: date-time }
+      additionalProperties: true
+    PairingClaimRequest:
+      type: object
+      anyOf:
+        - required: [device_uid]
+        - required: [device_id]
+        - required: [deviceUid]
+        - required: [deviceIdentifier]
+        - required: [deviceId]
+      allOf:
+        - anyOf:
+            - required: [pairing_code]
+            - required: [pairingCode]
+      properties:
+        device_uid: { type: string, minLength: 1 }
+        device_id: { type: string, minLength: 1 }
+        device_name: { type: string }
+        pairing_code: { type: string, minLength: 1 }
+        deviceUid: { type: string, minLength: 1 }
+        deviceIdentifier: { type: string, minLength: 1 }
+        deviceId: { type: string, minLength: 1 }
+        deviceName: { type: string }
+        pairingCode: { type: string, minLength: 1 }
+        location: { type: string }
+      additionalProperties: true
+    PairingClaimResponse:
+      type: object
+      required: [pairingSessionId, device, organization, deviceSyncToken, patientProfile]
+      properties:
+        pairingSessionId: { type: integer }
+        device: { $ref: '#/components/schemas/Device' }
+        organization: { $ref: '#/components/schemas/Organization' }
+        patientId: { type: [integer, 'null'] }
+        deviceSyncToken: { type: string }
+        patientProfile: { $ref: '#/components/schemas/PatientProfile' }
+      additionalProperties: true
+    DeviceProfileSyncRequest:
+      type: object
+      anyOf:
+        - required: [device_uid]
+        - required: [device_id]
+        - required: [deviceUid]
+        - required: [deviceIdentifier]
+        - required: [deviceId]
+      allOf:
+        - anyOf:
+            - required: [device_sync_token]
+            - required: [deviceSyncToken]
+      properties:
+        device_uid: { type: string, minLength: 1 }
+        device_id: { type: string, minLength: 1 }
+        device_sync_token: { type: string, minLength: 1 }
+        deviceUid: { type: string, minLength: 1 }
+        deviceIdentifier: { type: string, minLength: 1 }
+        deviceId: { type: string, minLength: 1 }
+        deviceSyncToken: { type: string, minLength: 1 }
+      additionalProperties: true
+    DeviceProfileSyncResponse:
+      type: object
+      required: [device, patientProfile]
+      properties:
+        device: { type: object, additionalProperties: true }
+        patientProfile: { $ref: '#/components/schemas/PatientProfile' }
+    PatientProfile:
+      type: object
+      required: [patientName, weightKg, heightCm, fallSensitivityPreset, syncedAt]
+      properties:
+        patientName: { type: [string, 'null'] }
+        weightKg: { type: [number, 'null'] }
+        heightCm: { type: [number, 'null'] }
+        fallSensitivityPreset: { type: [string, 'null'] }
+        syncedAt: { type: string, format: date-time }
+      additionalProperties: false
+    Event:
+      type: object
+      required: [id, eventType, severity, immobility, evidenceStatus]
+      properties:
+        id: { type: integer }
+        eventType: { type: string }
+        severity: { type: string }
+        intensity: { type: [number, 'null'] }
+        immobility: { type: boolean }
+        message: { type: string }
+        evidenceStatus: { type: string, enum: [none, partial, linked] }
+        eventUuid: { type: [string, 'null'] }
+        eventTime: { type: [string, 'null'], format: date-time }
+        rawPayloadJson: {}
+        device: { type: object, additionalProperties: true }
+      additionalProperties: true
+    EventPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Event' } }
+    Alert:
+      type: object
+      required: [id, status, device, event]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        device: { type: object, additionalProperties: true }
+        patient: { type: [object, 'null'], additionalProperties: true }
+        event: { $ref: '#/components/schemas/Event' }
+        actions: { type: [array, 'null'], items: { type: [object, 'null'], additionalProperties: true } }
+      additionalProperties: true
+    AlertEnvelope:
+      type: object
+      required: [alert]
+      properties:
+        alert: { $ref: '#/components/schemas/Alert' }
+    AlertPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Alert' } }
+    AlertItems:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Alert' } }
+    AlertReport:
+      type: object
+      required: [generatedAt, organization, filters, total, items]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        organization:
+          oneOf:
+            - $ref: '#/components/schemas/Organization'
+            - type: 'null'
+        filters: { type: object, additionalProperties: true }
+        total: { type: integer }
+        items: { type: array, items: { type: object, additionalProperties: true } }
+    DashboardSummary:
+      type: object
+      required: [organization, metrics, systemStatus, recentEvents]
+      properties:
+        organization:
+          oneOf:
+            - $ref: '#/components/schemas/Organization'
+            - type: 'null'
+        metrics: { type: object, additionalProperties: true }
+        systemStatus: { type: object, additionalProperties: true }
+        recentEvents: { type: array, items: { $ref: '#/components/schemas/Event' } }
+    OrganizationContext:
+      type: object
+      required: [organization, activeRole, user]
+      properties:
+        organization: { $ref: '#/components/schemas/Organization' }
+        activeRole: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    Member:
+      type: object
+      required: [id, role, status, user]
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [organization_admin, caregiver, operator, viewer] }
+        status: { type: string }
+        user: { type: object, additionalProperties: true }
+      additionalProperties: true
+    MemberItems:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Member' } }
+    MemberCreateRequest:
+      type: object
+      required: [name, email, role]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        role: { type: string, enum: [organization_admin, caregiver, operator, viewer] }
+        password: { type: string, minLength: 6 }
+      additionalProperties: false
+    Patient:
+      type: object
+      required: [id, organizationId, fullName, status, assignedCaregivers]
+      properties:
+        id: { type: integer }
+        organizationId: { type: integer }
+        fullName: { type: string }
+        birthDate: { type: [string, 'null'], format: date }
+        weightKg: { type: [number, 'null'] }
+        heightCm: { type: [number, 'null'] }
+        notes: { type: string }
+        status: { type: string }
+        currentDevice: { type: [object, 'null'], additionalProperties: true }
+        assignedCaregivers: { type: array, items: { type: object, additionalProperties: true } }
+      additionalProperties: true
+    PatientItems:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Patient' } }
+    PatientEnvelope:
+      type: object
+      required: [patient]
+      properties:
+        patient: { $ref: '#/components/schemas/Patient' }
+    PatientCreateRequest:
+      type: object
+      required: [fullName]
+      properties:
+        fullName: { type: string, minLength: 1 }
+        birthDate: { type: [string, 'null'], format: date }
+        weightKg: { type: [number, 'null'], minimum: 15, maximum: 350 }
+        heightCm: { type: [number, 'null'], minimum: 40, maximum: 260 }
+        notes: { type: string }
+        status: { type: string }
+        caregiverMemberIds: { type: array, items: { type: integer } }
+      additionalProperties: false
+    PatientUpdateRequest:
+      type: object
+      properties:
+        fullName: { type: string, minLength: 1 }
+        birthDate: { type: [string, 'null'], format: date }
+        weightKg: { type: [number, 'null'], minimum: 15, maximum: 350 }
+        heightCm: { type: [number, 'null'], minimum: 40, maximum: 260 }
+        notes: { type: string }
+        status: { type: string }
+        caregiverMemberIds: { type: array, items: { type: integer } }
+      additionalProperties: false
+    NetworkInfoResponse:
+      type: object
+      required: [suggestedBackendApiBaseUrl, primaryBackendApiBaseUrl, fallbackBackendApiBaseUrls, candidateBackendApiBaseUrls]
+      properties:
+        suggestedBackendApiBaseUrl: { type: [string, 'null'] }
+        primaryBackendApiBaseUrl: { type: [string, 'null'] }
+        fallbackBackendApiBaseUrls: { type: array, items: { type: string } }
+        candidateBackendApiBaseUrls: { type: array, items: { type: string } }
+      additionalProperties: true
+    PageMeta:
+      type: object
+      required: [page, limit, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+security:
+  - bearerAuth: []
