@@ -143,7 +143,7 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
     payload.device_id &&
     String(topicInfo.deviceIdentifier) !== String(payload.device_id)
   ) {
-    logger.warn("MQTT device_id do payload diverge do device no topico.", {
+    logger.warn("Mensagem MQTT rejeitada: device_id do payload diverge do device no topico.", {
       topic: topicInfo.topic,
       channel: topicInfo.channel,
       topicDeviceIdentifier: topicInfo.deviceIdentifier,
@@ -153,6 +153,7 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
       payloadBytes,
       reason: "topic_payload_device_mismatch",
     });
+    return;
   }
 
   const timestampResolution = resolveRealtimeMqttTimestamp(payload.timestamp, receivedAt);
