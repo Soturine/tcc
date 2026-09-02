@@ -33,6 +33,7 @@ void testCircularBlendStaysNearWrapBoundary() {
 
 void testOperationalDefaultIsNormalAndDemoRemainsExplicit() {
   TEST_ASSERT_EQUAL_STRING("normal", FirmwareBaseline::defaultOperationModeName());
+  TEST_ASSERT_EQUAL_STRING("normal", FirmwareBaseline::defaultAlertSensitivityName());
   TEST_ASSERT_NOT_EQUAL(0, std::strcmp("demo", FirmwareBaseline::defaultOperationModeName()));
 }
 

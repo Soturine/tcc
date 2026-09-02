@@ -124,7 +124,8 @@ DeviceConfig makeDefaultConfig() {
   config.mqtt.useTls = AppConfig::DEFAULT_MQTT_USE_TLS;
   config.mqtt.tlsInsecure = AppConfig::DEFAULT_MQTT_TLS_INSECURE;
   config.mqtt.tlsCaCertificate = AppConfig::DEFAULT_MQTT_TLS_CA_CERT;
-  applyAlertSensitivityPreset(config.alertTuning, AppConfig::ALERT_SENSITIVITY_NORMAL);
+  applyAlertSensitivityPreset(config.alertTuning,
+                              FirmwareBaseline::defaultAlertSensitivityName());
   config.alertTuning.buzzerEnabled = AppConfig::ALERT_BUZZER_ENABLED_DEFAULT;
   config.alertTuning.eventsEnabled = AppConfig::ALERT_EVENT_PUBLICATION_ENABLED_DEFAULT;
 

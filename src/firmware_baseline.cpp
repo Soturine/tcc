@@ -6,6 +6,10 @@ const char* defaultOperationModeName() {
   return "normal";
 }
 
+const char* defaultAlertSensitivityName() {
+  return "normal";
+}
+
 bool fallConfidenceAvailable() {
   return false;
 }
