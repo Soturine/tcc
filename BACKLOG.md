@@ -26,7 +26,7 @@ Auditorias:
   - frontend lint/build;
   - firmware build;
   - secret/dependency checks básicos.
-- [ ] Fazer HEAD remoto passar nos checks básicos antes de seguir.
+- [x] Fazer HEAD remoto passar nos checks básicos antes de seguir.
 
 ### Gate P0
 

@@ -18,7 +18,7 @@ O SHA acima é o observado na auditoria; no momento do porte deve ser confirmado
 - **Estratégia:** merge com histórias não relacionadas, `README.md` e `AGENTS.md` resolvidos em favor das versões canônicas do TCC;
 - **Evidência de reprodução:** [`baseline-validation-2026-09-01.md`](baseline-validation-2026-09-01.md).
 
-A CI mínima foi implementada em workflows independentes. A validação remota permanece pendente até o push da branch e a conclusão dos runs no SHA exato.
+A CI mínima foi implementada em workflows independentes. O checkpoint `aed3a266e384da7874a1c76376a1bfb25340976e` passou nos workflows de push e pull request para backend, web, firmware e segurança. O primeiro `dependency-review` identificou corretamente que o Dependency Graph estava desabilitado; o recurso foi habilitado e somente o job falho foi reexecutado com sucesso.
 
 ## Princípio
 

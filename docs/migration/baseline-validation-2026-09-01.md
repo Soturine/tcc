@@ -41,6 +41,17 @@ As correções foram separadas do merge de lineage e cobertas por testes em `184
 
 Os números acima são saídas das ferramentas nesta execução; não são SLA, benchmark ou validação física.
 
+## Validação remota
+
+O checkpoint `aed3a266e384da7874a1c76376a1bfb25340976e` passou nos quatro workflows em eventos de push e pull request:
+
+- backend: runs `33581618098` e `33581625648`;
+- web: runs `33581617994` e `33581625730`;
+- firmware: runs `33581618014` e `33581625661`;
+- segurança: runs `33581618115` e `33581625636`.
+
+No primeiro run de pull request, `dependency-review` falhou porque o Dependency Graph do repositório estava desabilitado. O recurso foi habilitado e somente o job falho foi reexecutado; auditorias npm, scan de padrões de secrets, CodeQL e dependency review então passaram. Commits posteriores ao checkpoint devem ter seus próprios checks remotos concluídos antes do merge.
+
 ## Segurança do porte
 
 - nenhum `.env` real foi adicionado;
@@ -56,6 +67,5 @@ Os números acima são saídas das ferramentas nesta execução; não são SLA, 
 - backup/restore e migrations versionadas;
 - Android, FCM, background/killed e Protection Health;
 - garantia final de evento crítico com QoS 1 + application ACK;
-- CI remota no SHA final da branch, até o push e conclusão dos runs.
 
 Esses itens permanecem nos gates P0–P12 e não são implicitamente validados pelos checks acima.
