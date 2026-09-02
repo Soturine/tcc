@@ -1,6 +1,15 @@
 # Changelog
 
 ## [Unreleased]
+
+### Baseline v0.9.0 importada no TCC
+- baseline do Projeto II importada com histórico e proveniência preservados, validada pelas suites de backend, firmware, frontend e segurança e marcada pela tag `tcc-baseline-v0.9.0`
+
+### P1 do detector de quedas
+- diferença angular de pitch/roll normalizada na fronteira `+180°/-180°`, incluindo atualização circular da baseline e regressões host/native
+- `confidence` numérica não calibrada removida da decisão; compatibilidade transitória usa `null` com `confidence_status = not_available`
+- modo `Normal` passa a ser o default de fábrica; `Demo apresentação` permanece experimental, identificável e disponível apenas por seleção explícita
+
 ### Pendente / Faltando
 - capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
 - ativar FFT como decisão real somente após calibração e validação com dados reais
