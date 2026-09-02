@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "event_uuid": "018f-example-event-0001",
+  "event_id": 123,
+  "status": "committed",
+  "committed_at": "2026-09-02T00:00:00.250Z"
+}

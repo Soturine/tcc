@@ -10,6 +10,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "check": "node scripts/check.js",
+    "test:contracts": "node --test \"tests/contracts/*.test.js\"",
     "test": "node --test \"tests/**/*.test.js\"",
     "test:smoke": "node --test \"tests/alerts/eventService.test.js\" \"tests/mqtt/scopedEmitter.test.js\"",
     "test:integration": "node --test \"tests/alerts/*.test.js\" \"tests/mqtt/*.test.js\"",
@@ -53,5 +54,10 @@
     "mqtt": "^5.15.1",
     "mysql2": "^3.20.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "13.0.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   }
 }

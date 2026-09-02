@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soturine.local/contracts/mqtt/critical-event-v1.schema.json",
+  "title": "Planned critical event envelope v1",
+  "$comment": "PLANNED: not emitted or accepted as a strict v1 contract yet.",
+  "type": "object",
+  "required": [
+    "schema_version", "event_uuid", "device_id", "boot_id", "device_uptime_ms",
+    "event_type", "occurred_at_device", "clock_quality", "detector_version",
+    "mode", "confidence_status", "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_uuid": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "device_id": { "type": "string", "minLength": 1 },
+    "boot_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "device_uptime_ms": { "type": "integer", "minimum": 0 },
+    "event_sequence": { "type": "integer", "minimum": 1 },
+    "event_type": { "enum": ["fall_detected", "sos_pressed", "sensor_fault"] },
+    "occurred_at_device": { "type": ["string", "null"], "format": "date-time" },
+    "clock_quality": { "enum": ["synced", "unsynced", "unknown"] },
+    "detector_version": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["normal", "demo"] },
+    "confidence_status": { "const": "not_available" },
+    "evidence": {
+      "type": "object",
+      "required": ["decision_source", "features"],
+      "properties": {
+        "decision_source": { "const": "edge" },
+        "features": { "type": "object", "additionalProperties": true },
+        "sample_bundle": { "type": ["object", "null"], "additionalProperties": true }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
