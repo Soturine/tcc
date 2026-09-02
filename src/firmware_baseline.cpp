@@ -3,7 +3,7 @@
 namespace FirmwareBaseline {
 
 const char* defaultOperationModeName() {
-  return "demo";
+  return "normal";
 }
 
 bool fallConfidenceAvailable() {
