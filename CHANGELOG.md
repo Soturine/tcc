@@ -3,12 +3,24 @@
 ## [Unreleased]
 
 ### Baseline v0.9.0 importada no TCC
-- baseline do Projeto II importada com histórico e proveniência preservados, validada pelas suites de backend, firmware, frontend e segurança e marcada pela tag `tcc-baseline-v0.9.0`
+- histórico não relacionado do `Soturine/iot-fall-monitor` importado até a origem auditada `09ad767`, preservando a proveniência, o histórico do TCC e os arquivos canônicos `README.md` e `AGENTS.md`
+- árvore v0.9.0 incorporada como baseline incremental de firmware ESP32, backend Node/Express/MySQL, frontend React/Vite, banco, scripts, assets e documentação; material do Projeto II classificado como evidência legada sem substituir a documentação canônica do TCC
+- inicialização do MySQL tornada reproduzível para SQL com CRLF; consultas com `LIMIT`, retry de deadlock e asserções do stress real corrigidos e cobertos por testes
+- lockfile do frontend sincronizado, resoluções de dependências remediadas sem troca gratuita de bibliotecas e Node 24 LTS adotado como runtime canônico de desenvolvimento e CI
+- gates fundacionais separados para Backend, Web, Firmware e Security, incluindo integração descartável com MySQL/Mosquitto, audits npm, busca de padrões de secrets, dependency review e CodeQL
+- baseline HTTP endurecida com rate limiting, allowlist explícita de CORS e geração uniforme de pairing code com `crypto.randomInt`
+- validação local concluída para backend (`71/71`, integração `42/42`, MQTT `16/16` e stress dry), integração real descartável (`25/25` persistidas), lint/build web e build PlatformIO `esp32dev`
+- merge commit da PR #2 validado novamente pelos quatro workflows em `main` e marcado pela tag anotada `tcc-baseline-v0.9.0`; flash/HIL, ensaio físico, staging TLS/ACL, Android/FCM e application ACK permaneceram fora do escopo
 
 ### P1 do detector de quedas
-- diferença angular de pitch/roll normalizada na fronteira `+180°/-180°`, incluindo atualização circular da baseline e regressões host/native
-- `confidence` numérica não calibrada removida da decisão; compatibilidade transitória usa `null` com `confidence_status = not_available`
-- modo `Normal` passa a ser o default de fábrica; `Demo apresentação` permanece experimental, identificável e disponível apenas por seleção explícita
+- ambiente PlatformIO `native` e helpers puros mínimos de matemática angular e semântica da baseline extraídos para testes sem hardware, sem refatoração ampla de `main.cpp`
+- regressões adicionadas para `+179° -> -179°`, `-179° -> +179°`, ângulos equivalentes em `+180°/-180°`, média circular da baseline, modo operacional default e confidence indisponível
+- diferença de pitch/roll alterada para o menor delta angular normalizado e atualização da baseline corrigida para interpolar pelo menor arco na fronteira `+180°/-180°`
+- `confidence` numérica não calibrada removida de `FallAlert` e da decisão baseline; compatibilidade transitória do payload preservada como `confidence: null` e `confidence_status: not_available`, sem chamar score heurístico de probabilidade
+- backend, frontend, mocks MQTT, publisher de teste, seed SQL e testes de evidência atualizados para aceitar/exibir confidence indisponível em vez de percentual fictício
+- configuração de fábrica alterada para modo e sensibilidade `Normal`; `Demo apresentação` continua disponível apenas por seleção explícita, persiste em NVS quando escolhido e permanece identificável por modo/perfil nos eventos e na UI
+- workflow de firmware ampliado com testes host/native; BACKLOG, auditoria e documentos canônicos de alerta, integração, firmware, calibração e quickstart alinhados, mantendo changelogs e documentos v0.9.0 históricos intactos
+- validação concluída com `6/6` testes native, build ESP32, backend completo/integration/MQTT/stress, frontend lint/build, audits e CI de push/PR; a FSM permanece experimental e sem alegação de acurácia, sensibilidade, precisão, falsos positivos ou validação em campo
 
 ### Pendente / Faltando
 - capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
