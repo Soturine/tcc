@@ -10,8 +10,8 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 |---|---|---|
 | ✓ | Porte rastreável, baseline v0.9.0 e CI fundacional | origem preservada, tag de baseline e SHA remoto verde |
 | ✓ | Correções P1 iniciais do detector | wrap angular, baseline circular, confidence indisponível, Normal default e Demo opt-in |
-| → | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
-| ○ | Contratos, banco e identidade | inventário HTTP/MQTT e invariantes explícitos |
+| ✓ | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
+| → | Contratos, banco e identidade | inventário HTTP/MQTT e invariantes explícitos |
 | ○ | Confiabilidade crítica | contratos e identidade definidos |
 | ○ | Backend hardening | fronteiras críticas caracterizadas |
 | ○ | Android | API e pipeline crítico estáveis |
@@ -35,7 +35,7 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Saída:** baseline importada e remotamente verificável, sem reescrita.
 
-## Marco atual — Replay e caracterização da FSM
+## Marco concluído — Replay e caracterização da FSM
 
 - compilar o `FallDetector` real em PlatformIO native;
 - alimentar o detector com sequências de `SensorReading` sem ESP32, MPU6050, rede, NVS, `sleep` ou relógio real;
@@ -48,7 +48,9 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Saída:** comportamento atual da FSM reproduzível no host, com limitações e bugs objetivos registrados antes da próxima fase.
 
-## Fase 2 — Contratos, banco e identidade
+**Estado:** **implemented** e **validated** por testes host/native, build ESP32 e CI remota. Os sinais continuam sintéticos; não houve validação física ou de acurácia.
+
+## Fase 2 — Contratos, banco e identidade (etapa atual)
 
 - inventário HTTP/MQTT real;
 - OpenAPI;

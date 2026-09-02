@@ -136,6 +136,8 @@ inspect
 
 At milestones, run the full relevant suite. For releases, verify the exact SHA is green before tagging.
 
+For tasks developed on a branch/pull request, when the PR targets `main`, is mergeable and conflict-free, and all required checks are green, the agent must complete the task with a **merge commit** into `main` unless the task explicitly requests human review before merge. Do not use squash or rebase merge unless the task explicitly requires a different merge strategy.
+
 ## Porting inherited code
 
 Classify every inherited component as one of:
