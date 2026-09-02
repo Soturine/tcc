@@ -1,0 +1,498 @@
+# Backend do Sistema Queda
+
+API REST, bridge MQTT, emissão `Socket.IO` e serviços de persistência para o sistema multi-tenant de monitoramento de quedas.
+
+## Stack
+
+- `Node.js`
+- `Express`
+- `MySQL` com `mysql2/promise`
+- `MQTT.js`
+- `Socket.IO`
+- `JWT`
+- `bcrypt`
+- `dotenv`
+
+Ambiente de desenvolvimento recomendado nesta fase:
+
+- `Node.js 24 LTS`
+
+## Baseline v0.9.0
+
+O backend da `v0.9.0` preserva JWT, escopo multi-tenant, contratos MQTT e emissões Socket.IO, e acrescenta suporte ao Modo Demo e à estimativa experimental de bateria:
+
+- aceita `detector_mode`, `sample_interval_ms` e `telemetry_interval_ms` no snapshot do device
+- processa payloads MQTT antigos ou sem bateria sem deixar o device offline
+- normaliza `battery_calibration_count` ausente para `0`, compatível com a coluna `NOT NULL`
+- registra calibrações manuais e calcula bateria estimada por tempo com taxa inicial de `33.5 min/%`
+- aprende gradualmente a taxa com suavização `70/30`, descartando calibrações inconsistentes
+- mantém telemetria, evento crítico, alerta e realtime como responsabilidades separadas
+
+A bateria exibida é uma estimativa operacional, não uma medição elétrica real.
+
+## Estrutura
+
+```text
+backend/
+  scripts/
+    check.js
+    devBroker.js
+    initDb.js
+    migrateEvidenceSchema.js
+    mockPublisher.js
+    mqttPublishTest.js
+    mqttWatch.js
+  src/
+    config/
+    controllers/
+    db/
+    jobs/
+    middlewares/
+    mqtt/
+    routes/
+    services/
+    socket/
+    utils/
+  .env.example
+  package.json
+```
+
+## Arquitetura em camadas / MVC-like
+
+O backend usa uma organização em camadas inspirada em MVC, mas não é um MVC clássico monolítico: ele expõe uma API REST e não renderiza views no servidor.
+
+- **`src/routes`:** declara endpoints, métodos HTTP e middlewares aplicáveis
+- **`src/controllers`:** adapta HTTP para chamadas de serviço, normaliza parâmetros básicos e monta respostas
+- **`src/services`:** concentra regras de negócio, autorização contextual, transações, persistência e orquestração
+- **`src/middlewares`:** valida autenticação JWT, carrega o escopo multi-tenant e trata erros
+- **`src/db`:** fornece o pool MySQL, helpers de consulta e transações; não existe hoje uma pasta formal de repositories, e as consultas permanecem concentradas nos services
+- **`src/mqtt`:** mantém o cliente e os tópicos da bridge MQTT; a ingestão de eventos/status/telemetria é orquestrada separadamente da API HTTP
+- **`src/socket`:** emite eventos realtime para rooms autorizadas
+
+Esse desenho mantém controllers finos e permite que regras de alertas, devices, escopo, bateria e ingestão sejam testadas sem depender diretamente da camada HTTP.
+
+### JWT, organização ativa e papéis
+
+1. `POST /api/auth/login` valida as credenciais e gera um token JWT.
+2. O frontend envia `Authorization: Bearer <token>` nas chamadas protegidas.
+3. `requireAccessContext` valida o token, lê `X-Organization-Id` e carrega usuário, membership, papel e pacientes permitidos em `req.access`.
+4. Routes/controllers encaminham `req.access` aos services.
+5. Services aplicam o escopo antes de consultar ou alterar o MySQL.
+6. Socket.IO usa token e organização ativa para colocar o navegador apenas nas rooms autorizadas.
+
+Os papéis atuais são `platform_admin`, `organization_admin`, `caregiver`, `operator` e `viewer`. A sessão web JWT é separada da comunicação MQTT do ESP32: mensagens do device são resolvidas por identidade técnica, claim e escopo persistido, não pelo token do navegador.
+
+## Variáveis de ambiente
+
+Copie `.env.example` para `.env` e ajuste:
+
+```env
+PORT=4000
+JWT_SECRET=change-me
+LOG_LEVEL=info
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_DATABASE=queda_monitor
+MQTT_BROKER_URL=mqtt://127.0.0.1:1883
+MQTT_BIND_HOST=0.0.0.0
+MQTT_PORT=1883
+MQTT_USERNAME=
+MQTT_PASSWORD=
+MQTT_CLIENT_ID=queda-backend
+MQTT_TOPIC_BASE=queda/devices
+MQTT_RECONNECT_PERIOD_MS=4000
+MQTT_CONNECT_TIMEOUT_MS=30000
+MQTT_KEEPALIVE_SECONDS=60
+MQTT_TLS_REJECT_UNAUTHORIZED=true
+MQTT_TLS_CA_FILE=
+DEVICE_OFFLINE_THRESHOLD_SECONDS=120
+```
+
+O ambiente local atual do projeto usa `MYSQL_PASSWORD=` vazio. Se o seu MySQL exigir senha, ajuste `backend/.env` e rode novamente os scripts de banco e start.
+
+### Logs e MQTT/TLS
+
+- `LOG_LEVEL` aceita `error`, `warn`, `info` e `debug`
+- `MQTT_BROKER_URL` continua aceitando `mqtt://...` como fluxo padrão atual
+- `mqtts://...` agora também pode ser usado de forma opt-in
+- `MQTT_TLS_CA_FILE` permite apontar para um arquivo PEM local quando você quiser validar uma CA customizada
+- `MQTT_TLS_REJECT_UNAUTHORIZED=true` mantém verificação de certificado quando TLS estiver habilitado
+
+### Broker local de desenvolvimento
+
+`npm run dev:broker` inicia `scripts/devBroker.js` com `Aedes`.
+
+- `MQTT_BIND_HOST=0.0.0.0` faz o broker escutar no IPv4 da LAN do notebook
+- `MQTT_PORT=1883` define a porta TCP do broker dev
+- `MQTT_BROKER_URL=mqtt://127.0.0.1:1883` evita ambiguidade de `localhost`/IPv6 para o backend local
+- no ESP32, use o IPv4 real do notebook como `MQTT_HOST`; nunca use `localhost`
+
+Para validar que o broker respondeu ao protocolo MQTT, e não apenas abriu TCP:
+
+```powershell
+npm run mqtt:test -- 127.0.0.1 1883
+npm run mqtt:test -- IP_DO_NOTEBOOK 1883
+```
+
+O esperado é `MQTT handshake OK`.
+
+Para separar broker, ESP32 e backend durante bancada:
+
+```powershell
+npm run mqtt:watch --prefix backend
+npm run mqtt:publish:test --prefix backend
+```
+
+`mqtt:watch` assina os tópicos reais `queda/devices/+/status`, `queda/devices/+/telemetry` e `queda/devices/+/events`, mostrando timestamp, tópico, tamanho, resumo do payload e erro de JSON quando houver. `mqtt:publish:test` publica um status e uma sequência curta de telemetria válida; use `-- --device esp32_01 --count 10 --interval-ms 1000` para testar o dashboard sem ESP32 real.
+
+Quando o teste simulado funcionar, mas o ESP32 real não alimentar o gráfico, use o Serial Monitor do firmware junto com `mqtt:watch`: o watcher precisa mostrar mensagens novas vindas do `clientId` real do ESP32. Se apenas o publisher de teste aparece, o problema está antes do backend.
+
+### Identidade MQTT e devices legados
+
+O backend aceita mensagens MQTT com `device_id` e, quando disponível, `device_uid`. Em ambientes antigos ou seeds de demo, o device pode estar cadastrado como `device_uid = legacy:{device_id}` enquanto o firmware real já publica um UID físico do ESP32.
+
+Na ingestão atual, se chegar um `device_uid` real para um `device_id` que já possui um cadastro legado `claimed` com organização, o backend reconcilia esse cadastro para o UID real antes de gravar `status`, `telemetry` ou `events`. Se uma tentativa anterior criou um duplicado técnico sem organização para esse mesmo UID, as telemetrias/eventos/alertas desse duplicado são movidos para o device pareado e o duplicado é removido.
+
+Quando a mensagem chega sem `device_uid`, o backend ainda preserva o fallback legado. Depois da reconciliação, ele tenta resolver pelo `device_id` apenas se existir exatamente um device pareado com esse identificador, evitando associação ambígua.
+
+### Concorrência e idempotência
+
+A ingestão MQTT usa um lock leve em memória por `device_id` para serializar mensagens simultâneas do mesmo ESP32 dentro de uma instância Node. Isso reduz corrida entre reconciliação de identidade, atualização de `device_status`, persistência de telemetria/eventos e emissão realtime. Em uma topologia com múltiplas instâncias de backend, ainda será necessário trocar esse lock por coordenação distribuída ou garantir particionamento por device no consumidor MQTT.
+
+A criação de alertas para eventos de queda/SOS é idempotente sobre o índice único `alerts.event_id`: se duas rotas tentarem criar o mesmo alerta, o backend reaproveita o registro existente por `LAST_INSERT_ID(id)`.
+
+O Socket.IO usa rooms por escopo (`organization`, `patient` e plataforma global), evitando varrer todos os sockets a cada telemetria. Usuários com escopo restrito por paciente entram apenas nas rooms de seus pacientes atribuídos.
+
+O schema também possui índices de apoio para leituras recentes de telemetria, eventos por device/tipo, status online stale e filas de alertas por organização/status.
+
+## O que mudou no modelo do backend
+
+O backend deixou de ser global/single-tenant.
+
+Agora ele trabalha com:
+
+- `organizations`
+- `organization_members`
+- `patients`
+- `caregiver_assignments`
+- `devices` com `claim_status`, `organization_id` e `current_patient_id`
+- `device_assignment_history`
+- `device_pairing_sessions`
+
+No cadastro de paciente, o backend agora também persiste:
+
+- `full_name`
+- `birth_date`
+- `weight_kg`
+- `height_cm`
+
+Tambem passaram a carregar escopo:
+
+- `device_status`
+- `telemetry_logs`
+- `events`
+- `alerts`
+- `audit_logs`
+
+## Autenticação e escopo
+
+### Register e login
+
+- `POST /api/auth/register` cria um novo usuário, uma nova organização e a membership inicial como `organization_admin`
+- `POST /api/auth/login` autentica e devolve usuário com memberships e organização ativa
+- `GET /api/me` devolve o contexto autenticado atual
+
+O frontend usa `GET /api/me` no boot para reidratar a sessão salva no navegador e atualizar o shape do usuário quando houve evolução de contrato entre versões. Se o `X-Organization-Id` salvo no navegador não existir mais para o usuário, o frontend descarta apenas essa organização local, tenta `/me` novamente e deixa o backend escolher a primeira membership válida.
+
+Nao existe mais a regra antiga de "primeiro usuário do sistema vira admin global".
+
+### Header de organização ativa
+
+As rotas protegidas usam:
+
+- `Authorization: Bearer <token>`
+- `X-Organization-Id: <id>`
+
+O frontend envia `X-Organization-Id` automaticamente a partir da organização selecionada na sidebar.
+
+### Regras de autorizacao
+
+- `platform_admin` pode operar globalmente ou selecionar uma organização especifica
+- `organization_admin` gerencia tudo dentro da própria organização
+- `caregiver`, `operator` e `viewer` nunca enxergam outra organização
+- quando o membro possui caregiver assignments, o backend restringe também ao subconjunto de pacientes atribuidos
+
+Esse filtro acontece no backend, não apenas no frontend.
+
+## Pairing e claim seguro
+
+O backend continua aceitando descoberta técnica por MQTT, mas isso não significa vinculo final.
+
+Fluxo atual:
+
+1. `organization_admin` gera um código temporário em `POST /api/devices/pairing-sessions`
+2. o frontend pode consultar `GET /api/system/network-info` para sugerir a URL do backend acessível pelo ESP32
+3. o ESP32 envia `device_uid`, `device_id` e `pairing_code` para `POST /api/pairing/claim`
+4. o backend valida:
+   - código válido
+   - não expirado
+   - uso único
+   - organização correta
+5. o claim é transacional
+6. o backend devolve `deviceSyncToken` e um `patientProfile` resumido para o ESP32
+7. o device passa para `claimed`
+8. o device fica locked na organização
+9. se o pairing session tiver `patient_id`, o backend cria o vínculo inicial com paciente
+
+O ESP32 pode usar esse `deviceSyncToken` depois em `POST /api/pairing/device-profile-sync` para sincronizar novamente o perfil resumido do paciente atual sem transformar o portal local em cadastro clínico.
+
+Devices desconhecidos que chegam via MQTT continuam podendo ser auto-provisionados, mas entram como `unclaimed`.
+
+## Histórico de assignment
+
+O backend preserva rastreabilidade com:
+
+- `devices.current_patient_id`
+- `devices.current_assignment_history_id`
+- `device_assignment_history`
+
+Ao trocar o paciente:
+
+- o assignment anterior é encerrado
+- um novo assignment e aberto
+- eventos futuros passam a gravar o novo escopo
+- eventos antigos continuam pertencendo ao assignment antigo
+
+## Concorrencia e integridade
+
+### Alertas
+
+As acoes `acknowledge`, `cancel` e `resolve` agora usam transacao e lock do alerta para evitar corrida. Quando o estado já mudou, o backend responde com conflito coerente.
+
+### Claim de device
+
+O claim usa transacao e protege:
+
+- código expirado
+- código já utilizado
+- tentativa de claim em device já locked por outra organização
+
+### Auto-provisionamento
+
+O device técnico é deduplicado por `device_uid` com `UNIQUE KEY`, evitando duplicidade por mensagens MQTT quase simultâneas.
+
+## MQTT e ingestão
+
+Topicos assinados:
+
+- `queda/devices/+/events`
+- `queda/devices/+/status`
+- `queda/devices/+/telemetry`
+
+Contrato preservado:
+
+- o backend continua ouvindo os mesmos tópicos
+- o firmware continua publicando por `device_id`
+- o payload agora pode trazer `device_uid` para reforcar a identidade técnica
+
+Nesta rodada, a bridge MQTT também ficou preparada para:
+
+- `mqtt://` sem TLS, como hoje
+- `mqtts://` com configuração opt-in por ambiente
+- niveis de log mais previsiveis sem introduzir framework de logging pesado
+- logs de ingestão para `status` e `telemetry` com tópico recebido, device resolvido, escopo e motivo de descarte quando a mensagem e rejeitada
+- `correlationId` por mensagem MQTT, com `durationMs`, `eventId`, `alertId` e motivo de descarte quando aplicavel
+
+Na ingestão:
+
+- devices desconhecidos podem ser criados tecnicamente como `unclaimed`
+- `status`, `telemetry` e `events` recebem snapshot do escopo atual do device
+- alertas abertos herdam `organization_id` e `patient_id`
+- `Socket.IO` também emite em escopo filtrado
+- `device_status.last_seen_at` agora usa a hora de recebimento do MQTT no backend, porque receber status/telemetria já prova presença recente do ESP32
+- timestamps MQTT em telemetria/eventos só são usados quando parecem Unix time plausível e próximos do recebimento; se o ESP32 estiver sem NTP ou com clock stale, o backend persiste a hora de recebimento para evitar device falsamente stale/offline
+- `fall_detected` busca telemetria recente do mesmo device em uma janela de `-10s/+3s`; sem evidência, o evento fica auditável, mas não cria alerta automático de queda
+- `sos_pressed` e `manual_sos` seguem criando alerta sem telemetria, porque são acionamentos manuais
+- `sensor_fault`, quando publicado pelo firmware, é tratado como evento crítico auditável
+
+### Confiabilidade de eventos críticos
+
+A partir da v0.8.25, eventos críticos MQTT podem trazer `event_uuid`, `event_sequence` e `sample_seq`. Quando `event_uuid` está presente, o backend deduplica o evento antes de criar alertas ou emitir `alert:new`, preservando `raw_payload_json` e `evidence_summary_json` para auditoria.
+
+O contrato legado continua aceito: payloads antigos sem `event_uuid` seguem o fluxo anterior e ainda contam com a janela curta de deduplicação de alertas. A fila local do firmware é em RAM, então reenvios cobrem reconexões MQTT, mas não sobrevivem a perda de energia; persistência em SPIFFS/LittleFS fica como evolução futura.
+
+### Status, Modo Demo e bateria estimada
+
+O `device_status` separa presença recente, saúde do sensor, perfil do detector e contexto de bateria. Status/telemetria sem campos de bateria continuam válidos; o backend mantém os campos opcionais como `NULL` e usa `0` somente para `battery_calibration_count`.
+
+Quando o portal informa uma nova porcentagem manual, o backend pode registrar uma linha em `battery_calibrations`, calcular a autonomia restante e expor `battery_percent`, origem, última calibração, taxa em `min/%`, minutos restantes e quantidade de calibrações.
+
+O modo do detector e os intervalos efetivos também ficam no snapshot por meio de `detector_mode`, `sample_interval_ms` e `telemetry_interval_ms`.
+
+## Rotas REST principais
+
+Autenticação:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/me`
+
+Organizacao:
+
+- `GET /api/organization`
+- `GET /api/organization/members`
+- `POST /api/organization/members`
+
+Pacientes:
+
+- `GET /api/patients`
+- `POST /api/patients`
+- `GET /api/patients/:id`
+- `PUT /api/patients/:id`
+
+Sistema:
+
+- `GET /api/system/network-info`
+
+Devices:
+
+- `GET /api/devices`
+- `POST /api/devices`
+- `GET /api/devices/:id`
+- `PUT /api/devices/:id`
+- `DELETE /api/devices/:id`
+- `POST /api/devices/pairing-sessions`
+- `POST /api/devices/:id/assign-patient`
+- `GET /api/devices/:id/events`
+
+Pairing publico para o firmware:
+
+- `POST /api/pairing/claim`
+- `POST /api/pairing/device-profile-sync`
+
+Eventos:
+
+- `GET /api/events`
+- `GET /api/events/:id`
+
+Alertas:
+
+- `GET /api/alerts`
+- `GET /api/alerts/export`
+- `GET /api/alerts/:id`
+- `POST /api/alerts/:id/acknowledge`
+- `POST /api/alerts/:id/cancel`
+- `POST /api/alerts/:id/resolve`
+
+Dashboard:
+
+- `GET /api/dashboard/summary`
+- `GET /api/dashboard/recent-alerts`
+- `GET /api/dashboard/device-status`
+
+O resumo do dashboard voltou a expor `recentEvents` com contexto de paciente e device no formato esperado pelo frontend atual, preservando o snapshot do escopo gravado no momento da ingestão.
+
+## Banco e seed
+
+O backend espera:
+
+- [database/schema.sql](../database/schema.sql)
+- [database/seed.sql](../database/seed.sql)
+
+O seed atual cria:
+
+- organização `Familia Demo`
+- `organization_admin` demo `admin@queda.local / Admin@123`
+- paciente `Paciente Demo`
+- device claimed demo `legacy:esp32_01`
+- assignment inicial coerente
+
+Importante:
+
+- a versão atual do schema recria as tabelas do projeto
+- `npm run db:init` e `.\scripts\init-db.ps1` devem ser tratados como reset de ambiente nesta migração
+- se o backend logar schema desatualizado para evidência, rode `npm run db:migrate:evidence --prefix backend`; esse script e idempotente e não apaga dados
+- para aplicar bateria estimada em banco existente, rode `npm run db:migrate:battery-estimation --prefix backend`; a migração é idempotente e não reseta dados
+
+O diagrama das principais relações está em [docs/database-model.md](../docs/database-model.md).
+
+## Scripts do backend
+
+- `npm run dev`: inicia o backend em modo watch
+- `npm start`: inicia o backend em modo normal
+- `npm run check`: valida sintaxe dos arquivos JS
+- `npm test`: roda toda a suite `node:test`
+- `npm run test:smoke`: roda checks rapidos e sem dependencias externas
+- `npm run test:integration`: roda testes de alertas e MQTT com mocks controlados
+- `npm run test:alerts`: valida regras de eventos, criação/transição/escopo de alertas
+- `npm run test:mqtt`: valida ingestão MQTT, lock por device e realtime escopado
+- `npm run stress:dry`: roda stress dry-run para telemetria, queda/SOS, payloads ruins e concorrência
+- `npm run stress:real`: valida backend, broker e MySQL reais antes de publicar MQTT real e consultar persistência
+- `npm run stress:alerts`: alias compatível para `stress:dry`
+- `npm run stress:cleanup`: lista/remover logs locais de stress quando chamado com `-- --yes`
+- `npm run mock:publisher`: publica dados simulados no broker MQTT configurado
+- `npm run dev:broker`: sobe um broker MQTT local leve com `Aedes`
+- `npm run mqtt:watch`: assina os tópicos reais e imprime mensagens MQTT recebidas no broker
+- `npm run mqtt:publish:test`: publica status/telemetria de teste no contrato esperado pelo backend
+- `npm run db:init`: aplica schema e seed usando `mysql2` e o `backend/.env`
+- `npm run db:migrate:alert-actions`: garante ações de alerta sem resetar dados existentes
+- `npm run db:migrate:evidence`: aplica colunas/tabela de evidência sem resetar dados existentes
+- `npm run db:migrate:sensor-diagnostics`: aplica colunas de diagnóstico do sensor em `device_status` sem resetar dados existentes
+- `npm run db:migrate:battery-estimation`: aplica snapshot e histórico de calibração de bateria sem resetar dados existentes
+
+O smoke test da raiz passou a validar também `GET /api/organization` e `GET /api/patients`, usando o `activeOrganizationId` retornado no login para montar o header `X-Organization-Id`.
+
+Os relatórios de stress ficam em:
+
+```text
+backend/logs/stress/stress-<runId>.jsonl
+backend/logs/stress/summary-<runId>.json
+backend/logs/stress/failures-<runId>.json
+backend/logs/stress/report-<runId>.md
+```
+
+O JSONL é voltado a máquina; o Markdown `report-*.md` resume resultado, MQTT, telemetria, quedas/alertas, falhas e recomendações para leitura humana. Eles são artefatos locais e ficam ignorados pelo Git. O fluxo detalhado de alertas está em [docs/alerting-architecture.md](../docs/alerting-architecture.md).
+
+## Tempo real
+
+Eventos emitidos:
+
+- `alert:new`
+- `alert:updated`
+- `device:status`
+- `telemetry:new`
+
+O socket também recebe contexto de organização no handshake, e o backend filtra emissão por organização e paciente.
+
+## Validação auditada da v0.9.0
+
+Em 9 de junho de 2026:
+
+- `npm run check --prefix backend`: passou, `87` arquivos JavaScript validados
+- `npm test --prefix backend`: passou, `64/64`
+- `npm run test:integration --prefix backend`: passou, `42/42`
+- `npm run test:mqtt --prefix backend`: passou, `16/16`
+
+As suítes cobrem, entre outros pontos, status sem bateria, normalização de `battery_calibration_count`, cálculo/aprendizado da estimativa, telemetria válida, eventos, alertas, deduplicação e realtime escopado.
+
+## Observações e limitações
+
+- o broker dev serve apenas para desenvolvimento e demonstração local
+- o fluxo de pairing depende de o backend estar acessível ao ESP32 pela rede
+- o portal local/AP do ESP32 continua sendo um fluxo do firmware; nesta rodada o backend não precisou de alteração de contrato para os testes de bancada
+- quando a depuração embarcada no Windows prender a serial, prefira liberar a porta com `.\scripts\free-serial-port.ps1 -Port COM4` antes de atribuir o problema ao backend
+- o ambiente atual continua operando por padrão com `mqtt://` sem TLS, embora `mqtts://` já esteja preparado de forma opt-in
+- ainda não existe fluxo completo de unpair cross-tenant pela UI
+- a restricao por caregiver assignment hoje entra em acao quando existem assignments explícitos para aquele membro; sem eles, o membro continua vendo a organização ativa inteira
+
+## Como rodar isoladamente
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Para o fluxo completo no Windows, prefira os scripts da raiz e o guia [docs/quickstart-windows.md](../docs/quickstart-windows.md).

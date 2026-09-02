@@ -1,0 +1,55 @@
+const { asyncHandler } = require("../utils/asyncHandler");
+const { emitScopedEvent } = require("../socket/scopedEmitter");
+const {
+  exportAlertsReport,
+  getAlertById,
+  listAlerts,
+  updateAlertStatus,
+} = require("../services/alertService");
+
+const list = asyncHandler(async (req, res) => {
+  const result = await listAlerts(req.query, req.access);
+  res.json(result);
+});
+
+const exportReport = asyncHandler(async (req, res) => {
+  const report = await exportAlertsReport(req.query, req.access);
+  res.json(report);
+});
+
+const getById = asyncHandler(async (req, res) => {
+  const alert = await getAlertById(Number(req.params.id), req.access);
+  res.json({ alert });
+});
+
+function createActionHandler(actionType) {
+  return asyncHandler(async (req, res) => {
+    const note = req.body?.note ?? null;
+    const alert = await updateAlertStatus(
+      Number(req.params.id),
+      actionType,
+      req.user.id,
+      note,
+      req.access,
+    );
+
+    emitScopedEvent(req.app.get("io"), "alert:updated", alert, {
+      organizationId: alert.organizationId || null,
+      patientId: alert.patientId || null,
+    });
+
+    res.json({
+      alert,
+      action: actionType,
+    });
+  });
+}
+
+module.exports = {
+  acknowledge: createActionHandler("acknowledge"),
+  cancel: createActionHandler("cancel"),
+  exportReport,
+  getById,
+  list,
+  resolve: createActionHandler("resolve"),
+};

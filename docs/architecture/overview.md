@@ -29,7 +29,7 @@ A arquitetura abaixo incorpora a auditoria da baseline de 2026-09-01. Ver [`../a
                   ▼
 ┌──────────────────────────────────────┐
 │ Backend modular monolith             │
-│ Node.js + Express                    │
+│ Node.js 24 LTS + Express             │
 │                                      │
 │ auth/sessions/tenants/patients       │
 │ device identity/config/telemetry     │

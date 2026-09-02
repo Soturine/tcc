@@ -1,0 +1,114 @@
+name: Backend
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: queda_monitor
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping --host=127.0.0.1 --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend checks
+        working-directory: backend
+        run: |
+          npm run check
+          npm test
+          npm run test:integration
+          npm run test:mqtt
+          npm run stress:dry
+
+      - name: Initialize disposable MySQL database
+        working-directory: backend
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ""
+          MYSQL_DATABASE: queda_monitor
+        run: |
+          cp .env.example .env
+          npm run db:init
+
+      - name: Start Mosquitto integration broker
+        run: >-
+          docker run --detach --name mosquitto-ci --publish 1883:1883
+          --volume "${GITHUB_WORKSPACE}/infra/mqtt/mosquitto-ci.conf:/mosquitto/config/mosquitto.conf:ro"
+          eclipse-mosquitto:2
+
+      - name: Run real MySQL and Mosquitto smoke
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          PORT: 4000
+          JWT_SECRET: ci-local-only-not-for-staging
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ""
+          MYSQL_DATABASE: queda_monitor
+          MQTT_BROKER_URL: mqtt://127.0.0.1:1883
+          MQTT_CLIENT_ID: queda-backend-ci
+          MQTT_TOPIC_BASE: queda/devices
+          ALERT_DELIVERY_DRY_RUN: "true"
+        run: |
+          npm start > backend-ci.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4000/health > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat backend-ci.log
+            exit 1
+          fi
+
+          npm run mqtt:test -- 127.0.0.1 1883
+          npm run stress:real
+
+          if grep --quiet '"level":"error"' backend-ci.log; then
+            cat backend-ci.log
+            exit 1
+          fi

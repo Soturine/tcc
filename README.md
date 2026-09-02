@@ -54,7 +54,7 @@ Backend Node/Express ───── MySQL
 | Arquitetura mobile | UDF/MVVM pragmático; repositories/use cases quando agregarem valor |
 | Firmware | C++ / PlatformIO no ESP32; avaliar ESP-MQTT para entrega crítica |
 | Provisioning | ESP-IDF Unified Provisioning como primeira opção; BLE/SoftAP conforme spike |
-| Backend | Node.js + Express, modular monolith |
+| Backend | Node.js 24 LTS + Express, modular monolith |
 | Banco | MySQL + migrations versionadas |
 | IoT | MQTT/TLS; Mosquitto inicialmente |
 | Evento crítico | QoS 1 + `event_uuid` + device outbox + application ACK após commit |
@@ -82,7 +82,7 @@ Principais gaps encontrados na baseline histórica:
 5. mismatch entre tópico/payload é apenas warning;
 6. `event_uuid` atual pode ter risco de colisão após reboot antes de NTP;
 7. não há workflows de CI na baseline;
-8. JWT default `change-me`, CORS amplo, rate limiting/lifecycle de sessão ainda precisam de hardening;
+8. JWT default `change-me` e lifecycle de sessão ainda precisam de hardening; CORS e rate limiting possuem baseline local, mas exigem configuração/armazenamento distribuído antes de escala horizontal;
 9. provisioning SoftAP atual é aberto e deve deixar de ser caminho normal para secrets;
 10. frontend/firmware ainda têm gaps de testes e alguns arquivos muito grandes.
 
@@ -204,8 +204,10 @@ Ensaios de queda devem priorizar objeto/manequim/cenários seguros e protocolo i
 - [x] alternativas/racionais registrados;
 - [x] auditoria técnica da baseline realizada;
 - [x] roadmap/backlog/ADRs atualizados após auditoria;
-- [ ] importar lineage/código da baseline;
-- [ ] reproduzir baseline e criar CI;
+- [x] importar lineage/código da baseline;
+- [x] reproduzir baseline localmente;
+- [x] implementar CI mínima;
+- [x] validar CI remota no SHA exato da branch;
 - [ ] fechar critical-event reliability;
 - [ ] contratos/migrations concretos;
 - [ ] Android MVP;

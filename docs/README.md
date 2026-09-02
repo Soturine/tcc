@@ -65,3 +65,7 @@ Use estes termos de forma consistente:
 - **partial** — parte do comportamento/ambiente está pronta;
 - **deferred** — conscientemente adiado;
 - **legacy** — histórico, não autoridade atual.
+
+## Legado importado
+
+A documentação de Projetos II integrada com o código da v0.9.0 está classificada no [índice legado](legacy/project-ii/README.md). Os caminhos históricos foram preservados no primeiro merge; seu conteúdo não substitui este índice nem os documentos canônicos atuais.

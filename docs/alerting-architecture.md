@@ -1,0 +1,413 @@
+# Arquitetura de alertas de queda
+
+Este documento descreve o fluxo real atual de alertas internos do projeto Queda. Ele cobre firmware, MQTT, backend, banco, Socket.IO e frontend. A calibração fina do MPU6050 segue fora deste escopo porque depende do protótipo físico.
+
+## Fluxo ponta a ponta
+
+```text
+ESP32 detecta queda, queda suspeita, movimento intenso ou SOS
+-> publica evento MQTT
+-> backend recebe no mqttIngestionService
+-> backend valida JSON, canal e device
+-> backend resolve device_id/device_uid
+-> backend busca telemetria do mesmo device em janela curta quando for fall_detected/fall_suspected
+-> backend grava evento com status/resumo de evidência
+-> backend vincula amostras em event_telemetry_evidence quando existirem
+-> backend decide se cria alerta
+-> backend garante alerta open idempotente por event_id
+-> backend emite alert:new por Socket.IO no escopo correto
+-> frontend atualiza dashboard/devices/alerts em tempo real
+-> usuário reconhece, cancela ou resolve
+-> backend grava alert_actions e audit log
+```
+
+O alerta atual e interno ao sistema: ele persiste em MySQL e aparece em realtime no painel. Ainda não existe envio externo de SMS, WhatsApp, e-mail, push ou webhook.
+
+O buzzer é hardware local do ESP32. Ele toca quando o firmware detecta localmente `movement_detected`, `fall_suspected`, `fall_detected` ou SOS e a pré-calibração do portal está com `Habilitar buzzer local para alerta` ligada. Se o backend criar um alerta a partir de uma regra futura sem evento local equivalente, o ESP32 não tem como tocar sem um comando MQTT de retorno. A evolução prevista é publicar em `queda/devices/{deviceId}/commands` um payload como `{ "type": "buzzer_alert", "reason": "fall_detected" }`.
+
+## Registro visual do fluxo
+
+Screenshots e GIFs reais do fluxo de alertas devem ser armazenados em [assets](assets/README.md). A `v0.8.26` adicionou a captura real [alerts-v0.8.26.png](assets/screenshots/alerts-v0.8.26.png), feita com o frontend rodando localmente.
+
+O GIF ponta a ponta `gifs/realtime-alert-flow-v0.8.26.gif` ainda não foi capturado. Ele só deve ser adicionado quando mostrar um fluxo real de evento, backend e dashboard atualizando.
+
+## Topicos MQTT
+
+Base padrão:
+
+```text
+MQTT_TOPIC_BASE=queda/devices
+```
+
+Topicos assinados pelo backend:
+
+```text
+queda/devices/+/status
+queda/devices/+/telemetry
+queda/devices/+/events
+```
+
+Topicos publicados pelo firmware:
+
+```text
+queda/devices/{deviceId}/status
+queda/devices/{deviceId}/telemetry
+queda/devices/{deviceId}/events
+```
+
+O `{deviceId}` do tópico deve bater com o `device_id` operacional do payload sempre que possível. Se o payload não tiver `device_id`, o backend tenta usar o identificador do tópico. Se ambos estiverem ausentes, a mensagem e descartada com log.
+
+## Payloads minimos
+
+### Status
+
+```json
+{
+  "device_uid": "esp32-chip-077000",
+  "device_id": "esp32_01",
+  "timestamp": 1760000000,
+  "online": true,
+  "wifi_rssi": -58,
+  "battery_level": 78,
+  "battery_percent": 78,
+  "battery_percent_source": "manual"
+}
+```
+
+Campos usados:
+
+- `device_id`: identificador operacional do device.
+- `device_uid`: identidade técnica estável quando disponível.
+- `timestamp`: Unix time em segundos; se for implausivel, o backend usa a hora de recebimento.
+- `wifi_rssi`, `battery_level` ou `battery_percent`: atualizam `device_status`.
+- `battery_percent_source`: informa se a bateria veio de valor `manual`, leitura futura `automatic`/`adc`/`fuel_gauge` ou se está `not_configured`.
+
+### Telemetry
+
+```json
+{
+  "device_uid": "esp32-chip-077000",
+  "device_id": "esp32_01",
+  "timestamp": 1760000000,
+  "ax": 0.04,
+  "ay": -0.02,
+  "az": 0.98,
+  "gx": 5.2,
+  "gy": -1.1,
+  "gz": 3.6,
+  "accel_magnitude": 0.98,
+  "gyro_magnitude": 6.4,
+  "pitch_deg": -3.1,
+  "roll_deg": 2.7
+}
+```
+
+Telemetria válida atualiza `device_status`, grava `telemetry_logs` e emite `telemetry:new`. Para ser considerada amostra real, o payload precisa trazer `ax`, `ay`, `az`, `gx`, `gy` e `gz` numericos e não pode vir com `sensor_valid=false`. Payload diagnóstico sem amostra real atualiza apenas a saúde do device e não cria linha em `telemetry_logs`.
+Para queda, essas amostras também viram evidência técnica consultavel quando o evento `fall_detected` ou `fall_suspected` chega perto no tempo.
+
+### Events
+
+```json
+{
+  "device_uid": "esp32-chip-077000",
+  "device_id": "esp32_01",
+  "event_type": "fall_detected",
+  "timestamp": 1760000000,
+  "accel_magnitude": 3.74,
+  "gyro_magnitude": 182.5,
+  "immobility_confirmed": true,
+  "decision_source": "firmware",
+  "algorithm_version": "threshold_fsm_v2_time_features_v1",
+  "detected": true,
+  "candidate": true,
+  "reason": "impact_orientation_immobility",
+  "activity_state_estimate": "queda_confirmada",
+  "confidence": 0.76,
+  "fall_reason": "impact_orientation_immobility",
+  "window_started_at_ms": 123456,
+  "window_ended_at_ms": 127056,
+  "sample_count": 72,
+  "peak_accel_g": 3.74,
+  "peak_gyro_dps": 182.5,
+  "features": {
+    "peak_accel_magnitude_g": 3.74,
+    "peak_gyro_magnitude_dps": 182.5,
+    "orientation_delta_deg": 58.2,
+    "immobility_confirmed": true,
+    "immobility_duration_ms": 2100,
+    "analysis_window_ms": 3600,
+    "samples_considered": 72
+  },
+  "features_time_domain": {
+    "available": true,
+    "sample_count": 64,
+    "window_duration_ms": 3200,
+    "peak_accel_magnitude": 3.74,
+    "peak_gyro_magnitude": 182.5,
+    "peak_jerk": 8.4
+  },
+  "features_frequency_domain": {
+    "available": false,
+    "experimental": true,
+    "reason": "fft_experimental_disabled",
+    "window_size": 64,
+    "sample_interval_ms": 50
+  },
+  "linked_telemetry_window": {
+    "available": false,
+    "reason": "backend_links_persisted_telemetry"
+  },
+  "battery_level": 78,
+  "battery_percent": 78,
+  "battery_percent_source": "manual"
+}
+```
+
+Campos obrigatorios para evento útil:
+
+- `device_id` no payload ou no tópico.
+- `event_type`, com fallback interno para `device_event`.
+
+Campos que enriquecem severidade e mensagem:
+
+- `immobility_confirmed` ou `immobility`
+- `accel_magnitude`
+- `gyro_magnitude`
+- `message`
+- `severity`, quando explicitamente enviada
+
+## Resolucao de device
+
+O backend usa `getOrCreateDeviceByIdentity`:
+
+1. normaliza `device_id` como `device_identifier`;
+2. prefere `device_uid` quando ele existe;
+3. se não houver UID, usa fallback `legacy:{device_id}`;
+4. reconcilia cadastro legado claimed quando um UID físico novo chega para o mesmo `device_id`;
+5. cria device técnico `unclaimed` se a identidade ainda não existir.
+
+O escopo vigente do device no momento da ingestão e copiado para:
+
+- `device_status`
+- `telemetry_logs`
+- `events`
+- `alerts`
+
+Campos de escopo:
+
+- `organization_id`
+- `patient_id`
+- `device_assignment_history_id`
+
+Se o device não estiver pareado a uma organização, o backend persiste quando aplicavel, mas registra warning e não entrega evento realtime para tenant de familia/clínica/hospital.
+
+## Diferenca entre status, telemetry e events
+
+- `status`: presença operacional do device, bateria, RSSI, firmware e último contato.
+- `telemetry`: amostras do sensor usadas no gráfico e na heurística experimental de postura/movimento.
+- `events`: fatos discretos, como queda detectada, queda suspeita, movimento intenso ou SOS manual.
+
+## Eventos que geram alerta
+
+Hoje `shouldCreateAlert` continua retornando `true` para tipos candidatos a alerta:
+
+- `fall_detected`
+- `fall_suspected`
+- `movement_detected`
+- `sos_pressed`
+- `manual_sos`
+- `sensor_fault`
+
+Regra de produto atual:
+
+- `fall_detected` com evidência `linked` ou `partial`: grava evento e cria alerta interno.
+- `fall_detected` sem telemetria recente suficiente: grava evento técnico com `evidenceStatus=none`, loga warning e não cria alerta automático.
+- `fall_suspected`: grava evento, preserva evidência/thresholds do firmware e cria alerta interno como heurística experimental.
+- `movement_detected`: grava evento e cria alerta interno de movimento intenso para teste operacional em bancada.
+- `sos_pressed`/`manual_sos`: cria alerta mesmo sem telemetria, porque e acionamento manual.
+- `sensor_fault`: cria alerta técnico de alta prioridade quando o firmware ou integração futura publicar esse evento.
+- payload inválido ou sem device: não cria evento nem alerta.
+
+Severidade atual:
+
+- `fall_detected` com evidência e `immobility_confirmed=true`: `critical`
+- `fall_detected` sem imobilidade: `high`
+- `fall_detected` sem evidência: `medium`
+- `fall_suspected`: `high`
+- `movement_detected`: `medium`
+- `sos_pressed`: `high`
+- `manual_sos`: `high`
+- `sensor_fault`: `high`
+- evento desconhecido: `medium`
+
+Eventos comuns como `device_status`, `heartbeat` ou qualquer outro tipo desconhecido são gravados como evento quando chegam no canal `events`, mas não criam alerta.
+
+## Evidencia de telemetria
+
+O backend não trata mais `fall_detected` como alerta confiável sem rastro de sensor. Quando recebe `fall_detected` ou `fall_suspected`, ele procura amostras em `telemetry_logs` para o mesmo:
+
+- `device_id`
+- `organization_id`
+- `patient_id`
+- `device_assignment_history_id`
+
+A janela atual e conservadora:
+
+```text
+event_time - 10s até event_time + 3s
+```
+
+O evento recebe:
+
+- `evidenceStatus`: `none`, `partial` ou `linked`
+- `evidenceTelemetryId`: amostra mais próxima do evento
+- `evidenceSampleCount`: quantidade de amostras relacionadas
+- `evidenceWindowSeconds`: intervalo entre primeira e última amostra vinculada
+- `evidenceSummary`: pico de aceleração, pico de giro, imobilidade confirmada, primeira e última amostra
+
+O payload bruto do firmware também fica preservado em `raw_payload_json`, incluindo `event_uuid`, `event_sequence`, `sample_seq`, `decision_source`, `algorithm_version`, `fall_reason`, `alert_settings`, `features`, `features_time_domain`, `features_frequency_domain`, thresholds e demais campos enviados.
+
+O `evidenceSummary` do backend continua sendo o resumo das amostras realmente persistidas em `telemetry_logs`, mas agora também incorpora um bloco `firmwareDecision` com a decisão local e as features enviadas. Isso evita duplicar a decisão: o firmware decide o alarme local/buzzer, enquanto o backend audita a decisão e relaciona as amostras persistidas.
+
+Na `v0.8.28`, o firmware também registra o motivo do buzzer (`reason=movement_detected`, `fall_suspected`, `fall_detected`, `sos_pressed`, `portal_test` ou `boot_autotest`) e quando ele foi pulado por `disabled` ou `no_alert_event`. Esses logs são a primeira evidência para separar falha de regra, configuração desligada e problema físico do buzzer.
+
+Na `v0.8.29`, a arquitetura de alerta não mudou. A alteração foi de manutenção: campos comuns de evento/status/telemetria foram centralizados no firmware e normalizadores repetidos foram centralizados no backend, preservando a decisão local de buzzer e a emissão `alert:new`.
+
+Na `v0.8.30`, alertas e telemetria preservam o mesmo fluxo, mas a bateria deixa de ser placeholder fixo. Eventos críticos podem carregar `battery_percent_source="manual"` quando o valor foi informado no portal ESP32 ou `not_configured` quando não há medição confiável; o backend preserva o payload bruto para auditoria, mas não deve tratar bateria manual como evidência clínica ou leitura automática.
+
+Responsabilidades atuais:
+
+- firmware: decide queda confirmada em tempo real, publica suspeita/movimento experimental quando configurado no portal e aciona buzzer local quando a regra local permitir
+- backend: registra evento, preserva payload bruto, relaciona evidência de telemetria, cria alerta interno quando a regra permitir e evita duplicata curta de alerta aberto/em atendimento para o mesmo tipo crítico no mesmo device
+- frontend: exibe estado, evidência, alertas e diagnóstico, sem decidir queda real
+
+A tabela `event_telemetry_evidence` guarda as amostras relacionadas com `relative_ms` e `role` (`nearest`, `peak`, `before_peak`, `after_peak`). Isso mantém compatibilidade com eventos antigos: se não houver evidência, os campos ficam nulos/default e a API devolve `evidenceStatus=none`.
+
+## Persistencia do alerta
+
+`recordEventFromMqtt` grava em `events`. Depois, `createAlertForEvent` executa:
+
+```sql
+INSERT INTO alerts (...)
+VALUES (...)
+ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+```
+
+O indice unico `alerts.event_id` impede alerta duplicado para o mesmo evento persistido. Alem disso, na ingestão MQTT, `createAlertForEvent` pode reaproveitar um alerta crítico aberto/em atendimento para o mesmo device e tipo de evento em uma janela curta de `20s`, reduzindo duplicidade quando o mesmo movimento gera pacotes próximos.
+
+Na `v0.8.25`, eventos críticos reenviados com o mesmo `event_uuid` são deduplicados antes de inserir uma nova linha em `events`. Quando o backend encontra um evento existente para o mesmo `device_id` e `event_uuid`, ele registra log de duplicata e não chama `alertService`; assim não há novo alerta nem novo `alert:new`.
+
+Payloads antigos sem `event_uuid` continuam aceitos pelo fluxo legado. Nesses casos, a deduplicação curta de alertas ainda reduz duplicidade, mas eventos MQTT sem identificador externo podem continuar virando eventos distintos e auditáveis.
+
+Para `fall_detected`, a criação de alerta agora acontece somente depois de `recordEventFromMqtt` preencher a evidência. Eventos sem evidência permanecem auditaveis em `events`, mas não entram automaticamente na fila crítica. Para `fall_suspected` e `movement_detected`, a decisão do firmware e os thresholds do portal são preservados no payload e o alerta e criado como heurística experimental de bancada.
+
+## Realtime
+
+Eventos emitidos:
+
+- `device:status`
+- `telemetry:new`
+- `alert:new`
+- `alert:updated`
+
+`emitScopedEvent` publica em rooms Socket.IO:
+
+- `scope:platform:global`
+- `scope:org:{organizationId}`
+- `scope:patient:{patientId}`
+
+Um evento sem organização fica restrito ao escopo global de plataforma e não entra em room de tenant.
+
+## Concorrência e locks
+
+A ingestão MQTT usa `runWithKeyedLock("mqtt:{deviceIdentifier}")` para serializar mensagens simultâneas do mesmo device dentro de uma instância Node. Isso protege reconciliação de identidade, atualização de status, persistência e emissão realtime contra corrida local.
+
+Limitação: o lock é em memória. Se o backend rodar em múltiplas instâncias, será necessário usar fila particionada por device, lock distribuído ou consumidor MQTT com afinidade por chave.
+
+As ações de alerta usam transação e `SELECT ... FOR UPDATE`, impedindo transições conflitantes entre operadores.
+
+## Observabilidade
+
+Cada mensagem MQTT processada recebe `correlationId`. Os logs do backend incluem, quando disponível:
+
+- `correlationId`
+- tópico
+- canal
+- `deviceIdentifier`
+- `deviceUid`
+- `organizationId`
+- `patientId`
+- `eventId`
+- `alertId`
+- `durationMs`
+- motivo de descarte
+
+O backend não loga senha, token ou segredo. Payload completo fica restrito a banco/auditoria existente e aos logs de stress dry-run.
+
+## Testes e stress
+
+Scripts principais:
+
+```powershell
+npm test --prefix backend
+npm run test:smoke --prefix backend
+npm run test:integration --prefix backend
+npm run test:alerts --prefix backend
+npm run test:mqtt --prefix backend
+npm run stress:dry --prefix backend
+npm run stress:real --prefix backend
+```
+
+`stress:dry` usa mocks do banco, broker e Socket.IO. Ele é útil para regressão rápida e smoke de carga em processo local, mas não mede MySQL/broker/backend reais.
+
+`stress:real` valida pré-requisitos e aborta se backend `/health`, broker MQTT ou MySQL local/dev não estiverem disponíveis. Ele publica MQTT real, consulta o banco depois do teste e mede perda estimada entre mensagens publicadas, aceitas no broker e persistidas.
+
+Variáveis uteis:
+
+```text
+STRESS_MODE=real
+STRESS_DEVICE_COUNT=10
+STRESS_DURATION_SECONDS=30
+STRESS_TELEMETRY_RATE_HZ=10
+STRESS_FALL_EVENTS=50
+STRESS_REQUIRE_DEV_DB=true
+```
+
+O script bloqueia execução em `NODE_ENV=production` e, por padrão, exige banco com nome de desenvolvimento/teste/local.
+
+As suites cobrem:
+
+- rajada de telemetria;
+- rajada de quedas/SOS;
+- payloads ruins;
+- concorrência do mesmo device;
+- emissão realtime escopada.
+
+Logs:
+
+```text
+backend/logs/stress/stress-<runId>.jsonl
+backend/logs/stress/summary-<runId>.json
+backend/logs/stress/failures-<runId>.json
+backend/logs/stress/report-<runId>.md
+```
+
+O JSONL preserva detalhes por máquina. O Markdown `report-*.md` resume resultado geral, fluxo MQTT, telemetria, quedas/alertas, falhas, gargalos e recomendações para leitura humana. Esses arquivos são artefatos locais e ficam ignorados pelo Git.
+
+## Camada futura de notificação externa
+
+Quando houver SMS, WhatsApp, e-mail, push ou webhook, a criação do alerta não deve depender diretamente desses canais. O desenho sugerido e uma camada separada:
+
+```js
+async function dispatchAlertNotification(alert, options = { dryRun: true }) {}
+```
+
+Requisitos futuros:
+
+- idempotência por `alertId` e canal;
+- retry com backoff;
+- fila ou worker separado;
+- status de entrega por canal;
+- logs com `correlationId`;
+- `ALERT_DELIVERY_DRY_RUN=true` em dev/stress;
+- falha de notificação externa não pode bloquear a criação do alerta interno.

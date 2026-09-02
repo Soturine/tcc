@@ -120,6 +120,8 @@ Os tempos exatos serão definidos posteriormente.
 - backoff/lockout proporcional quando necessário;
 - monitorar tentativas anormais.
 
+**Baseline implementada no porte:** limite geral da API e limites menores para autenticação e pairing. O armazenamento em memória é deliberadamente local ao processo e não deve ser apresentado como limite distribuído; antes de escala horizontal, adotar store compartilhado e validar a configuração de proxy/IP.
+
 ### Device sync token sem lifecycle
 
 **Risco:** token de sync emitido no pairing permanece válido indefinidamente.
@@ -156,6 +158,8 @@ Os tempos exatos serão definidos posteriormente.
 **Risco:** clientes web não esperados originam requests/conexões.
 
 **Mitigação:** allowlist explícita em staging/prod experimental; headers de segurança; CSP quando apropriado ao web; limitar payloads.
+
+**Baseline implementada no porte:** REST e Socket.IO usam `CORS_ALLOWED_ORIGINS`; na ausência da variável, somente as origens locais de desenvolvimento documentadas são expostas por CORS.
 
 ### Exposição do banco
 
