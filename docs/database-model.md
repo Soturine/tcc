@@ -81,11 +81,18 @@ erDiagram
 
     EVENTS {
         bigint id PK
+        varchar event_uuid UK
         bigint organization_id FK
         bigint patient_id FK
         bigint device_id FK
         varchar event_type
         enum severity
+        datetime occurred_at_device
+        datetime received_at
+        datetime persisted_at
+        varchar boot_id
+        bigint device_uptime_ms
+        enum clock_quality
         json evidence_summary_json
         json raw_payload_json
     }
@@ -149,8 +156,8 @@ erDiagram
 1. Organização, usuários e memberships definem o escopo multi-tenant.
 2. O device pode ser vinculado a um paciente, preservando mudanças em `device_assignment_history`.
 3. `device_status` mantém o snapshot operacional; `telemetry_logs` mantém amostras válidas.
-4. Eventos relacionam evidências de telemetria e podem originar um único alerta.
+4. Eventos materializam identidade global e tempos distintos; retries com o mesmo `event_uuid` podem originar apenas um evento lógico e um alerta.
 5. Ações humanas e operações administrativas permanecem rastreáveis em `alert_actions` e `audit_logs`.
 6. Calibrações manuais de bateria ficam em `battery_calibrations` e alimentam a estimativa exibida no snapshot.
 
-O `schema.sql` é voltado à criação/reset consciente de ambiente. Em bancos existentes, use somente as migrações idempotentes documentadas no projeto.
+O `schema.sql` é voltado à criação/reset consciente de ambiente. Em bancos existentes, use o runner versionado e o procedimento em [`database/migrations/README.md`](../database/migrations/README.md).

@@ -1,6 +1,6 @@
 # Evolução do Modelo de Dados
 
-Este documento descreve direção arquitetural, não uma migration pronta. A baseline MySQL existente deve ser preservada e evoluída por migrations verificadas.
+Este documento descreve a evolução arquitetural do banco. A baseline MySQL é preservada e evoluída pelo runner versionado; partes posteriores continuam planejadas.
 
 Auditoria relacionada: [`../audit/iot-fall-monitor-port-audit-2026-09-01.md`](../audit/iot-fall-monitor-port-audit-2026-09-01.md).
 
@@ -24,9 +24,9 @@ Auditoria relacionada: [`../audit/iot-fall-monitor-port-audit-2026-09-01.md`](..
 
 ## Evento crítico
 
-`event_uuid` deve sair de `raw_payload_json` como único mecanismo de dedupe e virar campo explícito com constraint/index adequado após backfill/validação.
+`event_uuid` está materializado em campo nullable com índice global `UNIQUE` pela migration `001_event_identity`. O JSON bruto permanece evidência, não autoridade de deduplicação.
 
-Direção conceitual:
+Modelo implementado nesta etapa e extensões planejadas:
 
 ```text
 events
@@ -39,9 +39,9 @@ events
 - event_type
 - severity
 - occurred_at_device NULL
-- received_at NOT NULL
+- received_at NULL para compatibilidade histórica; preenchido em novas ingestões
 - persisted_at NOT NULL
-- clock_quality/source
+- clock_quality
 - boot_id NULL
 - device_uptime_ms NULL
 - event_sequence NULL
@@ -54,6 +54,8 @@ events
 - evidence_summary_json
 ```
 
+`event_sequence`, `schema_version`, `algorithm_version`, `config_version`, `evidence_source` e `evidence_status` permanecem extensões planejadas quando não já representadas nos JSONs existentes.
+
 ### Regra temporal
 
 Não substituir `occurred_at_device` por `received_at` quando o relógio do device for incerto. Guardar ambos e registrar qualidade/origem do tempo. Isso é essencial para replay após longos períodos offline.
@@ -64,7 +66,7 @@ O `event_uuid` deve ser robusto a reboot e não depender somente do wall clock.
 
 ### Conflito de duplicata
 
-Se o mesmo `event_uuid` chegar novamente:
+Se o mesmo `event_uuid` chegar novamente, o comportamento implementado é:
 
 - mesmo conteúdo lógico → retorno idempotente do evento existente;
 - conteúdo materialmente incompatível → registrar conflito de integridade/security, não sobrescrever silenciosamente.
@@ -265,17 +267,18 @@ Antes de staging contínuo, medir taxa de crescimento e definir política. Prazo
 
 ## Migrations
 
-Alvo:
+Estrutura implementada:
 
 ```text
 database/
 ├── migrations/
-│   ├── 0001_...
-│   └── 0002_...
-└── seeds/               # se útil
+│   ├── README.md
+│   └── 001_event_identity.js
+├── schema.sql
+└── seed.sql
 ```
 
-O runner deve manter tabela de histórico/checksum ou mecanismo equivalente.
+O runner mantém `schema_migrations`, checksum por arquivo e advisory lock MySQL. O procedimento operacional está em [`database/migrations/README.md`](../../database/migrations/README.md).
 
 Cada migration relevante deve ser validada contra:
 

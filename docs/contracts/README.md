@@ -36,9 +36,9 @@ As dependências de desenvolvimento usadas para validação são `@apidevtools/s
 
 ## Versionamento do repositório
 
-- tag existente `tcc-baseline-v0.9.0`: baseline importada/validada;
-- o fechamento correto de `v0.9.1` seria `dfffbac28f3f9465a1b7c2cd511b185bf2db64f1` (P1 já integrado e CHANGELOG detalhado, antes do replay);
-- o fechamento correto de `v0.9.2` seria `35905f3aaf9fd2c6a6c259017eaba9cd482c3ed0` (replay integrado e documentação/SDLC fechados);
-- após esta etapa, `v0.9.3` é a próxima versão candidata coerente, mas só deve ser criada por decisão explícita depois do merge e CI verde.
+- `tcc-baseline-v0.9.0`: baseline importada/validada;
+- `v0.9.1` em `dfffbac28f3f9465a1b7c2cd511b185bf2db64f1`: correções P1 do detector;
+- `v0.9.2` em `35905f3aaf9fd2c6a6c259017eaba9cd482c3ed0`: replay sintético e fechamento da Etapa 3;
+- `v0.9.3` em `ec42eafbbae7bd65bbb361cff2a585b91579b105`: contratos HTTP/MQTT e fechamento da Etapa 4.
 
-Nenhuma tag retroativa ou nova foi criada nesta etapa.
+As três tags SemVer são anotadas e não alteram commits ou documentação histórica.

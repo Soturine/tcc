@@ -45,6 +45,7 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 - [`contracts/mqtt-topics.md`](contracts/mqtt-topics.md) — tópicos, QoS, payloads e budgets medidos.
 - [`contracts/mqtt/README.md`](contracts/mqtt/README.md) — JSON Schemas e exemplos MQTT.
 - [`contracts/data-authority.md`](contracts/data-authority.md), [`contracts/event-identity.md`](contracts/event-identity.md) e [`contracts/time-semantics.md`](contracts/time-semantics.md) — autoridade, identidades, ACK futuro e tempo.
+- [`../database/migrations/README.md`](../database/migrations/README.md) — auditoria, upgrade versionado, histórico/checksum e rollback controlado do MySQL.
 
 ## Pesquisa/TCC
 

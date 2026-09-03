@@ -55,9 +55,9 @@ Não iniciar reestruturação grande enquanto a baseline não puder ser reproduz
 - [x] Definir autoridade de identidade: MQTT principal/ACL/tópico > payload.
 - [x] Rejeitar topic/payload mismatch antes de persistência/realtime.
 - [x] Tornar severidade autoridade do backend; payload do device relata fatos/evidência.
-- [ ] Planejar e executar migration segura para `event_uuid` explícito/UNIQUE após backfill/validação.
-- [ ] Introduzir `database/migrations/` + tabela/runner de histórico.
-- [ ] Testar migration em banco vazio e upgrade da baseline.
+- [x] Planejar e executar migration segura para `event_uuid` explícito/UNIQUE após backfill/validação.
+- [x] Introduzir `database/migrations/` + tabela/runner de histórico.
+- [x] Testar migration em banco vazio e upgrade da baseline.
 - [ ] Definir lifecycle de telemetria/evidência/auditoria antes de staging contínuo.
 - [ ] Minimizar PII sincronizada/persistida no ESP32; não manter nome humano/peso/altura sem necessidade algorítmica explícita.
 

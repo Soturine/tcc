@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Etapa 5 — identidade persistente de eventos e migrations
+- runner de migrations versionadas adicionado com tabela `schema_migrations`, checksum SHA-256, advisory lock MySQL, aplicação idempotente e rollback controlado da última migration
+- auditoria somente leitura identifica UUIDs ausentes, inválidos, recuperáveis, divergentes e duplicados antes de qualquer DDL
+- migration `001_event_identity` materializa `event_uuid` nullable com unicidade global, preserva UUIDs legados válidos e mantém ausências/inválidos como `NULL`, sem fabricar identidade histórica
+- `occurred_at_device`, `received_at`, `persisted_at`, `boot_id`, `device_uptime_ms` e `clock_quality` passam a representar separadamente ocorrência declarada, recebimento e persistência; legado sem evidência permanece nulo
+- ingestão backend usa a coluna estruturada e a restrição do banco como última linha de defesa: retry equivalente reaproveita o evento, enquanto UUID com identidade crítica divergente gera `EVENT_UUID_CONFLICT`
+- corrida real de duas transações MySQL com o mesmo UUID foi coberta, garantindo um evento lógico e um alerta; schema vazio, upgrade representativo, histórico/checksum e rollback também foram exercitados em bancos descartáveis
+- logs estruturados distinguem migration, evento novo, retry e conflito sem registrar payload completo; procedimento operacional e limitações de compatibilidade foram documentados
+- firmware ESP-MQTT, QoS 1, outbox persistente e ACK de aplicação não foram implementados nesta etapa
+
+### Pendente / Faltando
+- capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
+- ativar FFT como decisão real somente após calibração e validação com dados reais
+- implementar sessões completas de calibração por SOS
+- testar classificação de movimentos com múltiplas runs por classe
+- ampliar a validação ponta a ponta com mais cenários, repetições e dataset real
+
+## [tcc-baseline-v0.9.0] - 2026-09-02
+
 ### Baseline v0.9.0 importada no TCC
 - histórico não relacionado do `Soturine/iot-fall-monitor` importado até a origem auditada `09ad767`, preservando a proveniência, o histórico do TCC e os arquivos canônicos `README.md` e `AGENTS.md`
 - árvore v0.9.0 incorporada como baseline incremental de firmware ESP32, backend Node/Express/MySQL, frontend React/Vite, banco, scripts, assets e documentação; material do Projeto II classificado como evidência legada sem substituir a documentação canônica do TCC
@@ -11,6 +30,8 @@
 - baseline HTTP endurecida com rate limiting, allowlist explícita de CORS e geração uniforme de pairing code com `crypto.randomInt`
 - validação local concluída para backend (`71/71`, integração `42/42`, MQTT `16/16` e stress dry), integração real descartável (`25/25` persistidas), lint/build web e build PlatformIO `esp32dev`
 - merge commit da PR #2 validado novamente pelos quatro workflows em `main` e marcado pela tag anotada `tcc-baseline-v0.9.0`; flash/HIL, ensaio físico, staging TLS/ACL, Android/FCM e application ACK permaneceram fora do escopo
+
+## [v0.9.1] - 2026-09-03
 
 ### P1 do detector de quedas
 - ambiente PlatformIO `native` e helpers puros mínimos de matemática angular e semântica da baseline extraídos para testes sem hardware, sem refatoração ampla de `main.cpp`
@@ -22,12 +43,16 @@
 - workflow de firmware ampliado com testes host/native; BACKLOG, auditoria e documentos canônicos de alerta, integração, firmware, calibração e quickstart alinhados, mantendo changelogs e documentos v0.9.0 históricos intactos
 - validação concluída com `6/6` testes native, build ESP32, backend completo/integration/MQTT/stress, frontend lint/build, audits e CI de push/PR; a FSM permanece experimental e sem alegação de acurácia, sensibilidade, precisão, falsos positivos ou validação em campo
 
+## [v0.9.2] - 2026-09-03
+
 ### Replay e caracterização sintética da FSM
 - harness determinístico host/native adicionado para alimentar o `FallDetector` real com `std::vector<SensorReading>` e produzir alertas/índices reproduzíveis usando somente os timestamps das leituras
 - builders de sinais sintéticos adicionados para repouso, impacto, orientação, movimento, imobilidade e amostra inválida sem espalhar thresholds ou números mágicos pelos testes
 - nove cenários caracterizados: repouso; impacto isolado; orientação sem imobilidade suficiente; queda sintética completa; timestamps não uniformes; orientação sem impacto; wrap `+180°/-180°`; leitura inválida; e duas quedas válidas separadas
 - corrigida a contagem de imobilidade após leitura inválida: intervalos sem amostra válida deixam de ser tratados como imobilidade observada
 - suite native ampliada de `6` para `15` casos; sinais e resultados são sintéticos e não representam acurácia, movimentos humanos reais, HIL ou validação física
+
+## [v0.9.3] - 2026-09-03
 
 ### Etapa 4 — contratos HTTP/MQTT
 - inventário derivado do código registra 35 operações HTTP implementadas, autenticação/autorização, consumidores, entradas, respostas, erros e estado, sem promover endpoints planejados a comportamento real
@@ -46,13 +71,6 @@
 - contract tests usam Swagger Parser, Ajv e formatos JSON Schema em dependências de desenvolvimento MIT fixadas; validam OpenAPI, 35/35 operações, schemas/exemplos, campos ausentes, tipos/versões incompatíveis, tópicos e payload budget
 - documentação canônica organizada em `docs/contracts/`; docs históricos em `docs/legacy` não foram alterados
 - a etapa permanece contratual e automatizada: não valida ACK, entrega crítica, hardware, campo, acurácia do detector ou segurança MQTT externa
-
-### Pendente / Faltando
-- capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
-- ativar FFT como decisão real somente após calibração e validação com dados reais
-- implementar sessões completas de calibração por SOS
-- testar classificação de movimentos com múltiplas runs por classe
-- ampliar a validação ponta a ponta com mais cenários, repetições e dataset real
 
 ## [v0.9.0] - 2026-06-09
 ### Adicionado
