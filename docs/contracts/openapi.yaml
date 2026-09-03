@@ -1116,6 +1116,12 @@ components:
         evidenceStatus: { type: string, enum: [none, partial, linked] }
         eventUuid: { type: [string, 'null'] }
         eventTime: { type: [string, 'null'], format: date-time }
+        occurredAtDevice: { type: [string, 'null'], format: date-time }
+        receivedAt: { type: [string, 'null'], format: date-time }
+        persistedAt: { type: [string, 'null'], format: date-time }
+        bootId: { type: [string, 'null'] }
+        deviceUptimeMs: { type: [integer, 'null'], minimum: 0 }
+        clockQuality: { type: string, enum: [synced, unsynced, unknown] }
         rawPayloadJson: {}
         device: { type: object, additionalProperties: true }
       additionalProperties: true

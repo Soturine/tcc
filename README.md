@@ -2,7 +2,7 @@
 
 Repositório oficial da evolução para Trabalho de Conclusão de Curso do projeto [`Soturine/iot-fall-monitor`](https://github.com/Soturine/iot-fall-monitor).
 
-> **Estado atual:** baseline portada e validada, saneamento P1 e replay sintético concluídos, contratos HTTP/MQTT formalizados. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
+> **Estado atual:** baseline portada e validada, saneamento P1, replay sintético, contratos HTTP/MQTT e identidade temporal no MySQL concluídos. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
 
 ## Visão do projeto
 

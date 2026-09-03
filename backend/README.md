@@ -36,8 +36,10 @@ A bateria exibida é uma estimativa operacional, não uma medição elétrica re
 backend/
   scripts/
     check.js
+    auditEventIdentity.js
     devBroker.js
     initDb.js
+    migrationRunner.js
     migrateEvidenceSchema.js
     mockPublisher.js
     mqttPublishTest.js
@@ -159,7 +161,7 @@ Quando a mensagem chega sem `device_uid`, o backend ainda preserva o fallback le
 
 ### Concorrência e idempotência
 
-A ingestão MQTT usa um lock leve em memória por `device_id` para serializar mensagens simultâneas do mesmo ESP32 dentro de uma instância Node. Isso reduz corrida entre reconciliação de identidade, atualização de `device_status`, persistência de telemetria/eventos e emissão realtime. Em uma topologia com múltiplas instâncias de backend, ainda será necessário trocar esse lock por coordenação distribuída ou garantir particionamento por device no consumidor MQTT.
+A ingestão MQTT usa um lock leve em memória por `device_id` para serializar mensagens simultâneas do mesmo ESP32 dentro de uma instância Node. A correção de identidade de evento não depende desse lock: `events.event_uuid` possui unicidade global, e uma corrida entre transações reaproveita o evento existente somente quando a identidade crítica coincide. Reutilizar o UUID com conteúdo incompatível resulta em `EVENT_UUID_CONFLICT` sem sobrescrita.
 
 A criação de alertas para eventos de queda/SOS é idempotente sobre o índice único `alerts.event_id`: se duas rotas tentarem criar o mesmo alerta, o backend reaproveita o registro existente por `LAST_INSERT_ID(id)`.
 
@@ -319,7 +321,7 @@ Na ingestão:
 
 ### Confiabilidade de eventos críticos
 
-A partir da v0.8.25, eventos críticos MQTT podem trazer `event_uuid`, `event_sequence` e `sample_seq`. Quando `event_uuid` está presente, o backend deduplica o evento antes de criar alertas ou emitir `alert:new`, preservando `raw_payload_json` e `evidence_summary_json` para auditoria.
+A partir da v0.8.25, eventos críticos MQTT podem trazer `event_uuid`, `event_sequence` e `sample_seq`. Quando `event_uuid` está presente, o backend valida e materializa a identidade em coluna `UNIQUE` antes de criar alertas ou emitir `alert:new`, preservando `raw_payload_json` e `evidence_summary_json` para auditoria. Retry idêntico retorna o mesmo evento; UUID reutilizado com identidade crítica divergente é conflito.
 
 O contrato legado continua aceito: payloads antigos sem `event_uuid` seguem o fluxo anterior e ainda contam com a janela curta de deduplicação de alertas. O firmware mantém fila RAM de 10 eventos e snapshot NVS de até 4; isso reduz perda em alguns reboots, mas remove o evento após sucesso local de `publish()` e não substitui a outbox persistente + ACK pós-commit planejada.
 
@@ -415,6 +417,8 @@ Importante:
 
 - a versão atual do schema recria as tabelas do projeto
 - `npm run db:init` e `.\scripts\init-db.ps1` devem ser tratados como reset de ambiente nesta migração
+- bancos persistentes devem usar o runner versionado: auditoria somente leitura com `npm run db:audit:event-identity --prefix backend`, seguida de `npm run db:migrate --prefix backend`
+- o runner mantém `schema_migrations`, checksum e advisory lock; o procedimento de backup, upgrade e rollback está em [database/migrations/README.md](../database/migrations/README.md)
 - se o backend logar schema desatualizado para evidência, rode `npm run db:migrate:evidence --prefix backend`; esse script e idempotente e não apaga dados
 - para aplicar bateria estimada em banco existente, rode `npm run db:migrate:battery-estimation --prefix backend`; a migração é idempotente e não reseta dados
 
@@ -439,6 +443,10 @@ O diagrama das principais relações está em [docs/database-model.md](../docs/d
 - `npm run mqtt:watch`: assina os tópicos reais e imprime mensagens MQTT recebidas no broker
 - `npm run mqtt:publish:test`: publica status/telemetria de teste no contrato esperado pelo backend
 - `npm run db:init`: aplica schema e seed usando `mysql2` e o `backend/.env`
+- `npm run db:audit:event-identity`: audita identidade de evento sem alterar o banco
+- `npm run db:migrate`: aplica migrations versionadas pendentes com histórico/checksum
+- `npm run db:migrate:down`: reverte a última migration em ambiente controlado
+- `npm run test:mysql:migrations`: testa upgrade, rollback e concorrência em bancos MySQL descartáveis
 - `npm run db:migrate:alert-actions`: garante ações de alerta sem resetar dados existentes
 - `npm run db:migrate:evidence`: aplica colunas/tabela de evidência sem resetar dados existentes
 - `npm run db:migrate:sensor-diagnostics`: aplica colunas de diagnóstico do sensor em `device_status` sem resetar dados existentes

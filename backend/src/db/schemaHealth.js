@@ -1,6 +1,13 @@
 const { execute } = require("./pool");
 
 const REQUIRED_RUNTIME_SCHEMA = [
+  { tableName: "events", columnName: "event_uuid" },
+  { tableName: "events", columnName: "occurred_at_device" },
+  { tableName: "events", columnName: "received_at" },
+  { tableName: "events", columnName: "persisted_at" },
+  { tableName: "events", columnName: "boot_id" },
+  { tableName: "events", columnName: "device_uptime_ms" },
+  { tableName: "events", columnName: "clock_quality" },
   { tableName: "events", columnName: "evidence_status" },
   { tableName: "events", columnName: "evidence_telemetry_id" },
   { tableName: "events", columnName: "evidence_sample_count" },
@@ -63,6 +70,23 @@ async function columnExists(tableName, columnName) {
   return rows.length > 0;
 }
 
+async function indexExists(tableName, indexName) {
+  const rows = await execute(
+    null,
+    `
+      SELECT 1 AS found
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND INDEX_NAME = ?
+      LIMIT 1
+    `,
+    [tableName, indexName],
+  );
+
+  return rows.length > 0;
+}
+
 async function checkRuntimeSchema() {
   const missing = [];
 
@@ -79,6 +103,9 @@ async function checkRuntimeSchema() {
   }
   if (!(await tableExists("battery_calibrations"))) {
     missing.push("battery_calibrations");
+  }
+  if (!(await indexExists("events", "uq_events_event_uuid"))) {
+    missing.push("events.uq_events_event_uuid");
   }
 
   return {

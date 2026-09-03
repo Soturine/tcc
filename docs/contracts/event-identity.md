@@ -19,7 +19,11 @@ O buffer atual:
 
 Isso é uma fila persistida parcial, não a outbox confiável alvo. `publish()` não prova PUBACK nem commit no MySQL.
 
-No backend, `event_uuid` permanece dentro de `raw_payload_json`. A deduplicação consulta `device_id + JSON_EXTRACT(event_uuid)` antes do insert. Não existe coluna/index UNIQUE para essa identidade, logo duas instâncias ou uma corrida fora do lock local podem inserir duplicatas. Eventos legados sem UUID continuam aceitos e podem criar eventos lógicos distintos.
+No backend, `event_uuid` também é materializado em `events.event_uuid`, com unicidade global no banco. A ingestão valida o UUID recebido, persiste a identidade estruturada e trata a restrição `UNIQUE` como autoridade inclusive sob concorrência entre transações ou instâncias.
+
+Um retry com o mesmo UUID e a mesma identidade crítica retorna o evento lógico existente e não repete o alerta. Reutilizar o UUID com device, tipo ou evidência crítica divergente resulta em `EVENT_UUID_CONFLICT`; o evento anterior não é sobrescrito e o payload conflitante não é aceito como sucesso. Logs registram somente identificadores e nomes dos campos divergentes, sem despejar o payload completo.
+
+Eventos legados sem UUID continuam aceitos com `event_uuid = NULL` e não recebem garantia de deduplicação. A migration `001_event_identity` recupera somente UUIDs legados válidos e únicos; ausentes ou inválidos permanecem nulos, sem identidade fabricada. O procedimento operacional está em [`database/migrations/README.md`](../../database/migrations/README.md).
 
 ## Contrato v1 planejado
 
@@ -36,7 +40,7 @@ O schema [critical-event-v1.schema.json](mqtt/critical-event-v1.schema.json) é 
 - `detector_version`, `mode` e evidência compacta;
 - `confidence_status`, sem probabilidade fabricada.
 
-`event_uuid` deve nascer uma vez, ser persistido antes da primeira transmissão e nunca mudar em retry, reconnect ou reboot. O backend deve materializá-lo em coluna com unicidade adequada e retornar sempre o mesmo evento lógico.
+`event_uuid` deve nascer uma vez, ser persistido antes da primeira transmissão e nunca mudar em retry, reconnect ou reboot. A materialização e unicidade no backend estão **implemented** e cobertas por testes; a geração robusta a reboot e a outbox persistente do device continuam **planned**.
 
 ## ACK de aplicação planejado
 

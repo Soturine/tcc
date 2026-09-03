@@ -65,6 +65,20 @@ jobs:
           cp .env.example .env
           npm run db:init
 
+      - name: Validate versioned migrations and event identity
+        working-directory: backend
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ""
+          MYSQL_DATABASE: queda_monitor
+          MYSQL_INTEGRATION: "1"
+        run: |
+          npm run db:migrate
+          npm run db:audit:event-identity
+          npm run test:mysql:migrations
+
       - name: Start Mosquitto integration broker
         run: >-
           docker run --detach --name mosquitto-ci --publish 1883:1883

@@ -11,9 +11,11 @@ const { HttpError } = require("../utils/httpError");
 const { logger } = require("../utils/logger");
 const { getPagination } = require("../utils/pagination");
 const {
+  isPlausibleDeviceUnixSeconds,
   parseDateBoundary,
   resolveRealtimeMqttTimestamp,
   toDateFromDeviceTimestamp,
+  toDateFromUnixSeconds,
 } = require("../utils/time");
 const { buildScopeFilter, canAccessScope } = require("./scopeService");
 
@@ -22,6 +24,9 @@ const FALL_EVIDENCE_WINDOW_AFTER_MS = 3_000;
 const FALL_EVIDENCE_MAX_SAMPLES = 30;
 const FALL_EVIDENCE_LINKED_MIN_SAMPLES = 2;
 const TELEMETRY_REQUIRED_NUMERIC_FIELDS = ["ax", "ay", "az", "gx", "gy", "gz"];
+const EVENT_UUID_MAX_LENGTH = 160;
+const BOOT_ID_MAX_LENGTH = 128;
+const CLOCK_QUALITIES = new Set(["synced", "unsynced", "unknown"]);
 const ALERT_EVENT_TYPES = new Set([
   "fall_detected",
   "fall_suspected",
@@ -37,6 +42,87 @@ function toFiniteNumber(value, fallback = 0) {
 
 function isPlainObject(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function eventIdentityError(code, message, details = {}) {
+  const error = new Error(message);
+  error.code = code;
+  error.details = details;
+  return error;
+}
+
+function parseEventUuid(payload = {}) {
+  if (!isPlainObject(payload)) {
+    return { present: false, value: null, valid: true, reason: null };
+  }
+
+  const rawValue = payload.event_uuid ?? payload.eventUuid;
+  if (rawValue == null) {
+    return { present: false, value: null, valid: true, reason: null };
+  }
+  if (typeof rawValue !== "string") {
+    return { present: true, value: null, valid: false, reason: "not_string" };
+  }
+
+  const value = rawValue.trim();
+  if (!value) {
+    return { present: true, value: null, valid: false, reason: "empty" };
+  }
+  if (value.length > EVENT_UUID_MAX_LENGTH) {
+    return { present: true, value: null, valid: false, reason: "too_long" };
+  }
+
+  return { present: true, value, valid: true, reason: null };
+}
+
+function normalizeBoundedString(value, maxLength) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized && normalized.length <= maxLength ? normalized : null;
+}
+
+function normalizeNonNegativeInteger(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isSafeInteger(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function normalizeOccurredAtDevice(payload = {}) {
+  if (Object.hasOwn(payload, "occurred_at_device")) {
+    if (payload.occurred_at_device == null) {
+      return null;
+    }
+
+    const parsed = new Date(payload.occurred_at_device);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return isPlausibleDeviceUnixSeconds(payload.timestamp)
+    ? toDateFromUnixSeconds(payload.timestamp)
+    : null;
+}
+
+function resolveEventTemporalFields(payload = {}, receivedAt = null) {
+  const receivedDate = receivedAt instanceof Date ? receivedAt : new Date(receivedAt || Date.now());
+  const safeReceivedAt = Number.isNaN(receivedDate.getTime()) ? new Date() : receivedDate;
+  const clockQuality = CLOCK_QUALITIES.has(payload.clock_quality)
+    ? payload.clock_quality
+    : "unknown";
+
+  return {
+    occurredAtDevice: normalizeOccurredAtDevice(payload),
+    receivedAt: safeReceivedAt,
+    bootId: normalizeBoundedString(payload.boot_id, BOOT_ID_MAX_LENGTH),
+    deviceUptimeMs: normalizeNonNegativeInteger(
+      payload.device_uptime_ms ?? payload.event_uptime_ms,
+    ),
+    clockQuality,
+  };
 }
 
 function validateTelemetryPayload(payload = {}) {
@@ -237,21 +323,8 @@ function buildTelemetryEvidence(rows, eventTime, immobilityConfirmed = false) {
 }
 
 function normalizeEventUuid(payload = {}) {
-  if (!isPlainObject(payload)) {
-    return null;
-  }
-
-  const value = payload.event_uuid ?? payload.eventUuid;
-  if (value == null) {
-    return null;
-  }
-
-  const text = String(value).trim();
-  if (!text || text.length > 160) {
-    return null;
-  }
-
-  return text;
+  const parsed = parseEventUuid(payload);
+  return parsed.valid ? parsed.value : null;
 }
 
 function extractSampleSeq(payload = {}) {
@@ -461,11 +534,22 @@ function mapEventRow(row) {
     evidenceSampleCount: evidenceSampleCount == null ? 0 : Number(evidenceSampleCount),
     evidenceWindowSeconds: toNullableNumber(evidenceWindowSeconds),
     evidenceSummary: parseMaybeJson(evidenceSummaryJson),
-    eventUuid: normalizeEventUuid(rawPayloadJson),
+    eventUuid: normalizeBoundedString(row.eventUuid ?? row.event_uuid, EVENT_UUID_MAX_LENGTH)
+      || normalizeEventUuid(rawPayloadJson),
     sampleSeq: extractSampleSeq(rawPayloadJson),
     eventSequence: toNullableNumber(rawPayloadJson?.event_sequence),
     deduplicated: Boolean(row.deduplicated),
     eventTime: toIso(row.event_time),
+    occurredAtDevice: toIso(row.occurredAtDevice ?? row.occurred_at_device),
+    receivedAt: toIso(row.receivedAt ?? row.received_at),
+    persistedAt: toIso(row.persistedAt ?? row.persisted_at ?? row.created_at),
+    bootId: normalizeBoundedString(row.bootId ?? row.boot_id, BOOT_ID_MAX_LENGTH),
+    deviceUptimeMs: normalizeNonNegativeInteger(
+      row.deviceUptimeMs ?? row.device_uptime_ms,
+    ),
+    clockQuality: CLOCK_QUALITIES.has(row.clockQuality ?? row.clock_quality)
+      ? row.clockQuality ?? row.clock_quality
+      : "unknown",
     rawPayloadJson,
     createdAt: toIso(row.created_at),
     device: {
@@ -485,7 +569,7 @@ function mapEventRow(row) {
   };
 }
 
-async function findExistingEventByUuid({ device, eventUuid }, executor = null) {
+async function findExistingEventByUuid({ eventUuid }, executor = null, options = {}) {
   if (!eventUuid) {
     return null;
   }
@@ -506,15 +590,94 @@ async function findExistingEventByUuid({ device, eventUuid }, executor = null) {
       INNER JOIN devices d ON d.id = e.device_id
       LEFT JOIN patients p ON p.id = e.patient_id
       LEFT JOIN alerts a ON a.event_id = e.id
-      WHERE e.device_id = ?
-        AND JSON_UNQUOTE(JSON_EXTRACT(e.raw_payload_json, '$.event_uuid')) = ?
+      WHERE e.event_uuid = ?
       ORDER BY e.id ASC
       LIMIT 1
+      ${options.forUpdate ? "FOR UPDATE" : ""}
     `,
-    [device.id, eventUuid],
+    [eventUuid],
   );
 
   return row ? mapEventRow(row) : null;
+}
+
+function criticalIdentitySnapshot({ deviceId, eventType, payload = {} }) {
+  return {
+    deviceId: Number(deviceId),
+    eventType: String(eventType || payload.event_type || "device_event"),
+    bootId: normalizeBoundedString(payload.boot_id, BOOT_ID_MAX_LENGTH),
+    deviceUptimeMs: normalizeNonNegativeInteger(
+      payload.device_uptime_ms ?? payload.event_uptime_ms,
+    ),
+    eventSequence: normalizeNonNegativeInteger(payload.event_sequence),
+    sampleSeq: normalizeNonNegativeInteger(payload.sample_seq ?? payload.sampleSeq),
+    timestamp: payload.timestamp == null || payload.timestamp === ""
+      ? null
+      : Number.isFinite(Number(payload.timestamp))
+        ? Number(payload.timestamp)
+        : null,
+    immobility: toBoolean(payload.immobility ?? payload.immobility_confirmed),
+    intensity: toNullableNumber(payload.intensity ?? payload.accel_magnitude),
+  };
+}
+
+function findEventIdentityConflicts(existingEvent, { device, eventType, payload }) {
+  const existing = criticalIdentitySnapshot({
+    deviceId: existingEvent.device?.id,
+    eventType: existingEvent.eventType,
+    payload: existingEvent.rawPayloadJson || {},
+  });
+  const incoming = criticalIdentitySnapshot({
+    deviceId: device.id,
+    eventType,
+    payload,
+  });
+
+  return Object.keys(incoming).filter((field) => existing[field] !== incoming[field]);
+}
+
+function resolveDuplicateEvent(existingEvent, context) {
+  const conflictingFields = findEventIdentityConflicts(existingEvent, context);
+
+  if (conflictingFields.length > 0) {
+    logger.warn("Conflito de identidade para event_uuid ja persistido.", {
+      correlationId: context.correlationId,
+      eventUuid: context.eventUuid,
+      existingEventId: existingEvent.id,
+      incomingDeviceId: context.device.id,
+      existingDeviceId: existingEvent.device?.id || null,
+      conflictingFields,
+      reason: "event_uuid_conflict",
+    });
+    throw eventIdentityError(
+      "EVENT_UUID_CONFLICT",
+      "event_uuid ja pertence a um evento com dados criticos diferentes.",
+      {
+        eventUuid: context.eventUuid,
+        existingEventId: existingEvent.id,
+        conflictingFields,
+      },
+    );
+  }
+
+  logger.info("Evento MQTT duplicado ignorado por event_uuid estruturado.", {
+    correlationId: context.correlationId,
+    eventUuid: context.eventUuid,
+    duplicateOfEventId: existingEvent.id,
+    eventType: existingEvent.eventType,
+    deviceId: context.device.id,
+    deviceIdentifier: context.device.deviceIdentifier,
+    deviceUid: context.device.deviceUid,
+    organizationId: existingEvent.organizationId,
+    patientId: existingEvent.patientId,
+    duplicateSource: context.duplicateSource,
+  });
+
+  return {
+    ...existingEvent,
+    deduplicated: true,
+    duplicateReason: "event_uuid",
+  };
 }
 
 function mapTelemetryRow(row) {
@@ -546,6 +709,7 @@ async function getEventById(eventId, accessContext, executor = null) {
         e.organization_id AS organizationId,
         e.patient_id AS patientId,
         e.device_assignment_history_id AS assignmentHistoryId,
+        e.event_uuid AS eventUuid,
         e.event_type,
         e.severity,
         e.intensity,
@@ -557,6 +721,12 @@ async function getEventById(eventId, accessContext, executor = null) {
         e.evidence_window_seconds AS evidenceWindowSeconds,
         e.evidence_summary_json AS evidenceSummaryJson,
         e.event_time,
+        e.occurred_at_device AS occurredAtDevice,
+        e.received_at AS receivedAt,
+        e.persisted_at AS persistedAt,
+        e.boot_id AS bootId,
+        e.device_uptime_ms AS deviceUptimeMs,
+        e.clock_quality AS clockQuality,
         e.raw_payload_json,
         e.created_at,
         d.id AS deviceId,
@@ -595,30 +765,35 @@ async function recordEventFromMqtt({
   const intensity = toNullableNumber(payload.intensity ?? payload.accel_magnitude);
   const immobility = toBoolean(payload.immobility ?? payload.immobility_confirmed);
   const eventTime = resolveMqttPersistenceTime(payload, receivedAt, eventTimeOverride);
-  const eventUuid = normalizeEventUuid(payload);
+  const parsedEventUuid = parseEventUuid(payload);
+  if (!parsedEventUuid.valid) {
+    logger.warn("Evento MQTT rejeitado por event_uuid invalido.", {
+      correlationId,
+      deviceId: device.id,
+      deviceIdentifier: device.deviceIdentifier,
+      reason: parsedEventUuid.reason,
+    });
+    throw eventIdentityError(
+      "INVALID_EVENT_UUID",
+      "event_uuid deve ser uma string nao vazia com no maximo 160 caracteres.",
+      { reason: parsedEventUuid.reason },
+    );
+  }
+  const eventUuid = parsedEventUuid.value;
+  const temporal = resolveEventTemporalFields(payload, receivedAt);
 
   if (eventUuid) {
-    const existingEvent = await findExistingEventByUuid({ device, eventUuid }, executor);
+    const existingEvent = await findExistingEventByUuid({ eventUuid }, executor);
 
     if (existingEvent) {
-      logger.info("Evento MQTT duplicado ignorado por event_uuid.", {
+      return resolveDuplicateEvent(existingEvent, {
         correlationId,
+        device,
+        duplicateSource: "pre_insert_lookup",
+        eventType,
         eventUuid,
-        duplicateOfEventId: existingEvent.id,
-        eventType: existingEvent.eventType,
-        deviceId: device.id,
-        deviceIdentifier: device.deviceIdentifier,
-        deviceUid: device.deviceUid,
-        organizationId: existingEvent.organizationId,
-        patientId: existingEvent.patientId,
-        durationMs: elapsedMsSince(startedAt),
+        payload,
       });
-
-      return {
-        ...existingEvent,
-        deduplicated: true,
-        duplicateReason: "event_uuid",
-      };
     }
   }
 
@@ -634,48 +809,85 @@ async function recordEventFromMqtt({
     severity = "medium";
   }
 
-  const result = await execute(
-    executor,
-    `
-      INSERT INTO events (
-        organization_id,
-        patient_id,
-        device_id,
-        device_assignment_history_id,
-        event_type,
+  let result;
+  try {
+    result = await execute(
+      executor,
+      `
+        INSERT INTO events (
+          organization_id,
+          patient_id,
+          device_id,
+          device_assignment_history_id,
+          event_uuid,
+          event_type,
+          severity,
+          intensity,
+          immobility,
+          message,
+          evidence_status,
+          evidence_telemetry_id,
+          evidence_sample_count,
+          evidence_window_seconds,
+          evidence_summary_json,
+          event_time,
+          occurred_at_device,
+          received_at,
+          boot_id,
+          device_uptime_ms,
+          clock_quality,
+          raw_payload_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        device.organization?.id || null,
+        device.currentPatient?.id || null,
+        device.id,
+        device.currentAssignmentHistoryId || null,
+        eventUuid,
+        eventType,
         severity,
         intensity,
-        immobility,
+        immobility ? 1 : 0,
         message,
-        evidence_status,
-        evidence_telemetry_id,
-        evidence_sample_count,
-        evidence_window_seconds,
-        evidence_summary_json,
-        event_time,
-        raw_payload_json
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      device.organization?.id || null,
-      device.currentPatient?.id || null,
-      device.id,
-      device.currentAssignmentHistoryId || null,
+        evidence.status,
+        evidence.telemetryId,
+        evidence.sampleCount,
+        evidence.windowSeconds,
+        JSON.stringify(evidenceSummary),
+        eventTime,
+        temporal.occurredAtDevice,
+        temporal.receivedAt,
+        temporal.bootId,
+        temporal.deviceUptimeMs,
+        temporal.clockQuality,
+        JSON.stringify(payload),
+      ],
+    );
+  } catch (error) {
+    if (error.code !== "ER_DUP_ENTRY" || !eventUuid) {
+      throw error;
+    }
+
+    const existingEvent = await findExistingEventByUuid(
+      { eventUuid },
+      executor,
+      { forUpdate: true },
+    );
+    if (!existingEvent) {
+      throw error;
+    }
+
+    return resolveDuplicateEvent(existingEvent, {
+      correlationId,
+      device,
+      duplicateSource: "unique_constraint",
       eventType,
-      severity,
-      intensity,
-      immobility ? 1 : 0,
-      message,
-      evidence.status,
-      evidence.telemetryId,
-      evidence.sampleCount,
-      evidence.windowSeconds,
-      JSON.stringify(evidenceSummary),
-      eventTime,
-      JSON.stringify(payload),
-    ],
-  );
+      eventUuid,
+      payload,
+    });
+  }
 
   await insertEvidenceLinks(result.insertId, evidence, executor);
 
@@ -877,6 +1089,7 @@ async function listEvents(filters = {}, accessContext) {
         e.organization_id AS organizationId,
         e.patient_id AS patientId,
         e.device_assignment_history_id AS assignmentHistoryId,
+        e.event_uuid AS eventUuid,
         e.event_type,
         e.severity,
         e.intensity,
@@ -888,6 +1101,12 @@ async function listEvents(filters = {}, accessContext) {
         e.evidence_window_seconds AS evidenceWindowSeconds,
         e.evidence_summary_json AS evidenceSummaryJson,
         e.event_time,
+        e.occurred_at_device AS occurredAtDevice,
+        e.received_at AS receivedAt,
+        e.persisted_at AS persistedAt,
+        e.boot_id AS bootId,
+        e.device_uptime_ms AS deviceUptimeMs,
+        e.clock_quality AS clockQuality,
         e.raw_payload_json,
         e.created_at,
         d.id AS deviceId,
@@ -937,9 +1156,11 @@ module.exports = {
   listEvents,
   mapTelemetryRow,
   normalizeEventUuid,
+  parseEventUuid,
   recordEventFromMqtt,
   recordTelemetryFromMqtt,
   resolveFallTelemetryEvidence,
+  resolveEventTemporalFields,
   shouldCreateAlert,
   shouldCreateAlertForEvent,
   validateTelemetryPayload,

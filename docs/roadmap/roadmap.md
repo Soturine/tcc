@@ -12,8 +12,8 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 | ✓ | Correções P1 iniciais do detector | wrap angular, baseline circular, confidence indisponível, Normal default e Demo opt-in |
 | ✓ | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
 | ✓ | Contratos HTTP/MQTT | inventário real, OpenAPI, JSON Schemas, autoridade, identidade e tempo explícitos |
-| → | Banco, migrations e identidade temporal | contratos formalizados e gaps de persistência conhecidos |
-| ○ | Confiabilidade crítica | contratos e identidade definidos |
+| ✓ | Banco, migrations e identidade temporal | UUID explícito/UNIQUE, tempos separados, upgrade e concorrência MySQL validados |
+| → | Confiabilidade crítica | contratos e identidade definidos; lifecycle de dados continua como gate separado antes de staging contínuo |
 | ○ | Backend hardening | fronteiras críticas caracterizadas |
 | ○ | Android | API e pipeline crítico estáveis |
 | ○ | Push e Protection Health | backend/outbox e app Android disponíveis |
@@ -62,16 +62,18 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Estado:** **implemented** e **validated** por validação sintática/contratual e suites locais. ACK, QoS 1 no ESP32, outbox final, identidade MQTT autenticada e migrations temporais continuam **planned**; nada nesta etapa foi validado em hardware/campo.
 
-## Fase 2 — Banco, migrations e identidade temporal (etapa atual)
+## Fase 2 — Banco, migrations e identidade temporal (concluída)
 
 - migrations versionadas;
 - `event_uuid` explícito/UNIQUE;
 - timestamps separados (`occurred`/`received`);
-- lifecycle de telemetria/evidência.
+- compatibilidade e auditoria de dados legados sem fabricar identidade.
 
 **Saída:** contratos e invariantes de dados explícitos antes de novos clientes.
 
-## Fase 3 — Confiabilidade de evento crítico
+**Estado:** **implemented** e **validated** por testes unitários e bancos MySQL descartáveis, incluindo schema vazio, upgrade representativo, rollback e concorrência. A auditoria do banco local existente foi somente leitura. Lifecycle de telemetria/evidência, backup/restore em staging e robustez do UUID no firmware continuam pendentes.
+
+## Fase 3 — Confiabilidade de evento crítico (próxima etapa)
 
 - spike ESP-MQTT ou transporte equivalente com QoS 1 real;
 - critical-event outbox persistente;
