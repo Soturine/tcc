@@ -301,6 +301,7 @@ test("evento legado sem UUID permanece aceito com identidade estruturada nula", 
     });
 
     assert.equal(event.eventUuid, null);
+    assert.equal(event.deviceUptimeMs, null);
     assert.equal(event.clockQuality, "unknown");
     assert.equal(harness.calls.eventInserts.length, 1);
     assert.equal(eventInsertValue(harness.calls.eventInserts[0], "event_uuid"), null);

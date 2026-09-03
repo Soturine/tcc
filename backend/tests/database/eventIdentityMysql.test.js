@@ -144,6 +144,22 @@ integrationTest("migration recusa duplicatas historicas sem fabricar identidade"
   });
 });
 
+integrationTest("runner registra migration sobre schema canonico sem eventos", async () => {
+  await withDatabase("empty", async ({ pool }) => {
+    const schemaPath = path.resolve(__dirname, "../../../database/schema.sql");
+    await pool.query(removeDatabaseStatements(fs.readFileSync(schemaPath, "utf8")));
+
+    const { runMigrations } = require("../../scripts/migrationRunner");
+    const result = await runMigrations({ databasePool: pool });
+    const [history] = await pool.query("SELECT version, name FROM schema_migrations");
+    const [events] = await pool.query("SELECT COUNT(*) AS total FROM events");
+
+    assert.deepEqual(result.applied, ["001"]);
+    assert.deepEqual(history.map((row) => [row.version, row.name]), [["001", "event_identity"]]);
+    assert.equal(events[0].total, 0);
+  });
+});
+
 integrationTest("constraint resolve concorrencia e impede alerta duplicado", async () => {
   await withDatabase("concurrency", async ({ pool }) => {
     const schemaPath = path.resolve(__dirname, "../../../database/schema.sql");

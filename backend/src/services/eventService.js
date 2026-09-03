@@ -85,6 +85,9 @@ function normalizeBoundedString(value, maxLength) {
 }
 
 function normalizeNonNegativeInteger(value) {
+  if (value == null || value === "") {
+    return null;
+  }
   const numeric = Number(value);
   return Number.isSafeInteger(numeric) && numeric >= 0 ? numeric : null;
 }
@@ -608,7 +611,11 @@ function criticalIdentitySnapshot({ deviceId, eventType, payload = {} }) {
     ),
     eventSequence: normalizeNonNegativeInteger(payload.event_sequence),
     sampleSeq: normalizeNonNegativeInteger(payload.sample_seq ?? payload.sampleSeq),
-    timestamp: Number.isFinite(Number(payload.timestamp)) ? Number(payload.timestamp) : null,
+    timestamp: payload.timestamp == null || payload.timestamp === ""
+      ? null
+      : Number.isFinite(Number(payload.timestamp))
+        ? Number(payload.timestamp)
+        : null,
     immobility: toBoolean(payload.immobility ?? payload.immobility_confirmed),
     intensity: toNullableNumber(payload.intensity ?? payload.accel_magnitude),
   };
