@@ -47,10 +47,11 @@ async function withDatabase(suffix, work) {
 }
 
 async function insertTelemetry(pool, deviceId, createdAt) {
+  const databaseTimestamp = createdAt === null ? null : new Date(createdAt);
   const [result] = await pool.execute(
     `INSERT INTO telemetry_logs (device_id, accel_magnitude, created_at)
      VALUES (?, 1.0, ?)`,
-    [deviceId, createdAt],
+    [deviceId, databaseTimestamp],
   );
   return Number(result.insertId);
 }
