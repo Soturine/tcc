@@ -30,6 +30,7 @@ test("config exige cutoff passado com timezone e falha fechada", () => {
 
 test("dry-run e default e nao abre transacao destrutiva", async () => {
   const responses = [
+    [[{ found: 1 }], []],
     [[{
       candidate_count: 3,
       oldest_candidate_at: new Date("2026-08-01T00:00:00Z"),
@@ -61,7 +62,7 @@ test("dry-run e default e nao abre transacao destrutiva", async () => {
   assert.equal(result.protectedEvidenceRows, 2);
   assert.equal(result.legacyNullTimestampRows, 1);
   assert.equal(result.deletedRows, 0);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.ok(calls.every((call) => !/\bDELETE\b/i.test(call.sql)));
 });
 
@@ -78,4 +79,27 @@ test("sem --apply explicito, valores falsy continuam em dry-run", () => {
     before: "2026-09-01T00:00:00Z",
     apply: true,
   }, { now: NOW }).dryRun, false);
+});
+
+test("schema sem indice de cutoff falha antes da auditoria ou delete", async () => {
+  const calls = [];
+  const fakePool = {
+    execute: async (sql) => {
+      calls.push(sql);
+      return [[], []];
+    },
+    getConnection: async () => {
+      throw new Error("nao deve abrir transacao");
+    },
+  };
+
+  await assert.rejects(
+    runTelemetryRetention(
+      { before: "2026-09-01T00:00:00Z", apply: true },
+      { databasePool: fakePool, log: {}, now: NOW },
+    ),
+    (error) => error.code === "RETENTION_INDEX_MISSING",
+  );
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0], /DELETE/i);
 });

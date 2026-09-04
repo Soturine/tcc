@@ -6,6 +6,7 @@ const DEFAULT_MAX_BATCHES = 1;
 const MAX_BATCH_SIZE = 5000;
 const MAX_BATCHES = 1000;
 const RETENTION_TABLE = "telemetry_logs";
+const RETENTION_INDEX = "idx_telemetry_created_id";
 
 const ELIGIBLE_WHERE = `
   tl.created_at IS NOT NULL
@@ -91,6 +92,27 @@ function toIso(value) {
 
 function toCount(value) {
   return Number(value || 0);
+}
+
+async function assertRetentionSchema(executor) {
+  const [rows] = await executor.execute(
+    `
+      SELECT 1 AS found
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND INDEX_NAME = ?
+      LIMIT 1
+    `,
+    [RETENTION_TABLE, RETENTION_INDEX],
+  );
+  if (!rows.length) {
+    const error = new Error(
+      `Indice ${RETENTION_INDEX} ausente; aplique as migrations antes do retention job.`,
+    );
+    error.code = "RETENTION_INDEX_MISSING";
+    throw error;
+  }
 }
 
 async function inspectTelemetryRetention(before, executor) {
@@ -219,6 +241,7 @@ async function runTelemetryRetention(input, options = {}) {
   const databasePool = options.databasePool || pool;
   const log = options.log || logger;
   const config = normalizeRetentionConfig(input, { now: options.now });
+  await assertRetentionSchema(databasePool);
   const initial = await inspectTelemetryRetention(config.before, databasePool);
   const baseResult = {
     table: RETENTION_TABLE,
@@ -286,6 +309,7 @@ module.exports = {
   DEFAULT_MAX_BATCHES,
   MAX_BATCH_SIZE,
   MAX_BATCHES,
+  assertRetentionSchema,
   deleteTelemetryBatch,
   inspectTelemetryRetention,
   normalizeRetentionConfig,
