@@ -55,4 +55,3 @@ O comportamento atual não deve ser confundido com política LGPD concluída:
 - `audit_logs` pode manter metadados mesmo quando FKs de ator/entidade se tornam nulas.
 
 Solicitações de eliminação, obrigação de preservação e anonimização precisam de decisão jurídica/acadêmica e implementação transacional específica. Backup é proteção contra perda e recuperação operacional; não substitui retenção, e cópias de backup também precisarão de lifecycle próprio antes de staging contínuo.
-

@@ -63,4 +63,3 @@ Se dashboard, pesquisa ou custo demonstrarem necessidade real, uma etapa futura 
 Os testes exercitam configuração inválida, dry-run, ausência do índice, elegibilidade temporal, proteção pelas duas referências de evidência, timestamp nulo, batch limitado, múltiplas execuções, reexecução segura, preservação de auditoria, rollback por falha injetada e recuperação posterior em MySQL real descartável.
 
 Isto valida a mecânica implementada, não a adequação de um prazo, o comportamento em volume de produção, backup/restore, staging contínuo ou conformidade LGPD completa.
-
