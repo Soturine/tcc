@@ -57,6 +57,14 @@ async function createBaselineEventsTable(pool) {
       PRIMARY KEY (id)
     )
   `);
+  await pool.query(`
+    CREATE TABLE telemetry_logs (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      device_id BIGINT UNSIGNED NOT NULL,
+      created_at DATETIME NULL,
+      PRIMARY KEY (id)
+    )
+  `);
 }
 
 integrationTest("runner migra baseline, registra historico, reexecuta e reverte", async () => {
@@ -95,7 +103,7 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
     );
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
 
-    assert.deepEqual(first.applied, ["001"]);
+    assert.deepEqual(first.applied, ["001", "002"]);
     assert.deepEqual(second.applied, []);
     assert.equal(rows[0].event_uuid, "evt-upgrade-001");
     assert.equal(rows[0].boot_id, "boot-upgrade-001");
@@ -108,8 +116,13 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
     assert.equal(rows[2].event_uuid, null);
     assert.equal(rows[3].event_uuid, null);
     assert.equal(indexes[0].Non_unique, 0);
-    assert.deepEqual(history.map((row) => [row.version, row.name]), [["001", "event_identity"]]);
+    assert.deepEqual(history.map((row) => [row.version, row.name]), [
+      ["001", "event_identity"],
+      ["002", "telemetry_retention_index"],
+    ]);
 
+    const revertedIndex = await runMigrations({ direction: "down", databasePool: pool });
+    assert.deepEqual(revertedIndex.reverted, ["002"]);
     const reverted = await runMigrations({ direction: "down", databasePool: pool });
     const [columnsAfterDown] = await pool.query(
       "SHOW COLUMNS FROM events WHERE Field = 'event_uuid'",
@@ -154,8 +167,11 @@ integrationTest("runner registra migration sobre schema canonico sem eventos", a
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
     const [events] = await pool.query("SELECT COUNT(*) AS total FROM events");
 
-    assert.deepEqual(result.applied, ["001"]);
-    assert.deepEqual(history.map((row) => [row.version, row.name]), [["001", "event_identity"]]);
+    assert.deepEqual(result.applied, ["001", "002"]);
+    assert.deepEqual(history.map((row) => [row.version, row.name]), [
+      ["001", "event_identity"],
+      ["002", "telemetry_retention_index"],
+    ]);
     assert.equal(events[0].total, 0);
   });
 });
