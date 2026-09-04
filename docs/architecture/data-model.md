@@ -256,14 +256,16 @@ Evitar banco “preparado para tudo” antes dos casos de uso reais.
 
 ## Telemetria e lifecycle
 
-Não reter amostragem de alta frequência indefinidamente. Separar:
+O inventário e a política inicial estão em [`../data/data-classification.md`](../data/data-classification.md) e [`../data/retention-policy.md`](../data/retention-policy.md). O modelo separa:
 
 1. telemetria operacional;
 2. evidência associada a evento;
 3. agregados;
 4. dataset de pesquisa selecionado/protocolado.
 
-Antes de staging contínuo, medir taxa de crescimento e definir política. Prazos só depois de necessidade/volume/LGPD serem avaliados.
+A taxa de crescimento pode ser medida sem escrita por `npm run data:measure:lifecycle --prefix backend`. A limpeza manual atua somente sobre telemetria operacional antiga não referenciada, exige cutoff explícito e preserva evidência ligada. Nenhum prazo é default: duração depende de necessidade, volume, replay tardio, LGPD e protocolo acadêmico.
+
+O backend atual ainda pode depender de telemetria SQL próxima para criar alerta de `fall_detected`. Evidência já ligada é protegida, mas eventos offline ainda não recebidos não podem ser antecipados pelo job; a evidência device-first continua requisito da fase de confiabilidade crítica.
 
 ## Migrations
 
@@ -273,7 +275,8 @@ Estrutura implementada:
 database/
 ├── migrations/
 │   ├── README.md
-│   └── 001_event_identity.js
+│   ├── 001_event_identity.js
+│   └── 002_telemetry_retention_index.js
 ├── schema.sql
 └── seed.sql
 ```

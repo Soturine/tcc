@@ -216,6 +216,23 @@ Para cada migration relevante:
 5. validar backup/restore para mudanças de risco;
 6. não usar `schema.sql` destrutivo como mecanismo de upgrade.
 
+## Lifecycle e retenção
+
+Antes de habilitar uma política recorrente, validar em MySQL descartável e, depois, em staging controlado:
+
+- cutoff ausente, inválido, sem timezone e futuro falham fechado;
+- dry-run não abre transação de exclusão e reporta candidatos/proteções;
+- somente telemetria anterior ao cutoff e não referenciada é elegível;
+- referências diretas e pela tabela de vínculo preservam evidência crítica;
+- timestamp legado nulo, eventos, alertas, ações e auditoria permanecem intactos;
+- batch e número máximo de batches limitam cada execução;
+- falha injetada causa rollback atômico do batch;
+- reexecução após sucesso ou falha é segura;
+- ausência do índice da migration 002 bloqueia o job;
+- crescimento é medido novamente e classificado como medido, derivado ou estimado.
+
+Teste MySQL automatizado prova a mecânica, não define prazo, performance de produção, compliance LGPD ou segurança de replay tardio. O CUJ de queda offline sem telemetria SQL continua no gate de confiabilidade crítica.
+
 ## Virtual device
 
 Criar `tools/virtual-device/` para simular:

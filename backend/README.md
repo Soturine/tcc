@@ -110,6 +110,9 @@ MQTT_KEEPALIVE_SECONDS=60
 MQTT_TLS_REJECT_UNAUTHORIZED=true
 MQTT_TLS_CA_FILE=
 DEVICE_OFFLINE_THRESHOLD_SECONDS=120
+TELEMETRY_RETENTION_BEFORE=
+TELEMETRY_RETENTION_BATCH_SIZE=500
+TELEMETRY_RETENTION_MAX_BATCHES=1
 ```
 
 O ambiente local atual do projeto usa `MYSQL_PASSWORD=` vazio. Se o seu MySQL exigir senha, ajuste `backend/.env` e rode novamente os scripts de banco e start.
@@ -447,6 +450,9 @@ O diagrama das principais relações está em [docs/database-model.md](../docs/d
 - `npm run db:migrate`: aplica migrations versionadas pendentes com histórico/checksum
 - `npm run db:migrate:down`: reverte a última migration em ambiente controlado
 - `npm run test:mysql:migrations`: testa upgrade, rollback e concorrência em bancos MySQL descartáveis
+- `npm run test:mysql:retention`: testa retenção, evidência, auditoria, batches e rollback em MySQL descartável
+- `npm run data:measure:lifecycle`: mede contagens, alocação, estimativas do engine e cadência sem alterar dados
+- `npm run data:retention:telemetry`: executa dry-run manual; somente `-- --before=<ISO_COM_TIMEZONE> --apply` autoriza batches de exclusão
 - `npm run db:migrate:alert-actions`: garante ações de alerta sem resetar dados existentes
 - `npm run db:migrate:evidence`: aplica colunas/tabela de evidência sem resetar dados existentes
 - `npm run db:migrate:sensor-diagnostics`: aplica colunas de diagnóstico do sensor em `device_status` sem resetar dados existentes
@@ -496,6 +502,7 @@ As suítes cobrem, entre outros pontos, status sem bateria, normalização de `b
 - o ambiente atual continua operando por padrão com `mqtt://` sem TLS, embora `mqtts://` já esteja preparado de forma opt-in
 - ainda não existe fluxo completo de unpair cross-tenant pela UI
 - a restricao por caregiver assignment hoje entra em acao quando existem assignments explícitos para aquele membro; sem eles, o membro continua vendo a organização ativa inteira
+- retenção não possui scheduler nem prazo default; evidência já ligada é preservada, mas evento offline futuro ainda depende da transição device-first descrita em [docs/data/retention-policy.md](../docs/data/retention-policy.md)
 
 ## Como rodar isoladamente
 
