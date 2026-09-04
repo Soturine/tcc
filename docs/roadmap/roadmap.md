@@ -13,7 +13,8 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 | ✓ | Replay e caracterização da FSM | detector real exercitado no host com sinais sintéticos antes de recalibrar ou formalizar os contratos finais |
 | ✓ | Contratos HTTP/MQTT | inventário real, OpenAPI, JSON Schemas, autoridade, identidade e tempo explícitos |
 | ✓ | Banco, migrations e identidade temporal | UUID explícito/UNIQUE, tempos separados, upgrade e concorrência MySQL validados |
-| → | Confiabilidade crítica | contratos e identidade definidos; lifecycle de dados continua como gate separado antes de staging contínuo |
+| ✓ | Lifecycle de dados | classificação, medição, retenção manual de telemetria e proteção de evidência implementadas; prazos permanecem decisão empírica/legal |
+| → | Confiabilidade crítica | contratos, identidade e lifecycle inicial definidos; transporte/outbox/ACK e evidência device-first são o próximo gate |
 | ○ | Backend hardening | fronteiras críticas caracterizadas |
 | ○ | Android | API e pipeline crítico estáveis |
 | ○ | Push e Protection Health | backend/outbox e app Android disponíveis |
@@ -71,7 +72,18 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Saída:** contratos e invariantes de dados explícitos antes de novos clientes.
 
-**Estado:** **implemented** e **validated** por testes unitários e bancos MySQL descartáveis, incluindo schema vazio, upgrade representativo, rollback e concorrência. A auditoria do banco local existente foi somente leitura. Lifecycle de telemetria/evidência, backup/restore em staging e robustez do UUID no firmware continuam pendentes.
+**Estado:** **implemented** e **validated** por testes unitários e bancos MySQL descartáveis, incluindo schema vazio, upgrade representativo, rollback e concorrência. A auditoria do banco local existente foi somente leitura. Backup/restore em staging e robustez do UUID no firmware continuam pendentes.
+
+## Marco concluído — Lifecycle de telemetria, evidência e auditoria
+
+- dados classificados por finalidade, sensibilidade, frequência, acesso e impacto de exclusão;
+- crescimento medido por consulta somente leitura, separando contagens exatas, metadados alocados, estimativas do engine e derivações de cadência;
+- migration de índice e job manual de telemetria com dry-run, cutoff explícito, batches/transações limitados e retry seguro;
+- evidência já ligada, timestamps nulos, eventos, respostas humanas e auditoria protegidos da limpeza comum;
+- agregação permanente adiada por ausência de consumidor/granularidade comprovados;
+- duração, lifecycle de backups, erasure/pseudonimização e proteção de evento tardio mantidos como decisões explícitas pendentes.
+
+**Estado:** mecanismo **implemented** e **validated** em testes unitários/MySQL descartável. O prazo não foi definido; staging contínuo, LGPD completa e replay tardio permanecem não validados.
 
 ## Fase 3 — Confiabilidade de evento crítico (próxima etapa)
 

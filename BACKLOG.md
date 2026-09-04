@@ -58,7 +58,7 @@ Não iniciar reestruturação grande enquanto a baseline não puder ser reproduz
 - [x] Planejar e executar migration segura para `event_uuid` explícito/UNIQUE após backfill/validação.
 - [x] Introduzir `database/migrations/` + tabela/runner de histórico.
 - [x] Testar migration em banco vazio e upgrade da baseline.
-- [ ] Definir lifecycle de telemetria/evidência/auditoria antes de staging contínuo.
+- [x] Definir lifecycle de telemetria/evidência/auditoria antes de staging contínuo, com classificação, medição, retenção manual segura e prazos ainda pendentes de decisão empírica/legal.
 - [ ] Minimizar PII sincronizada/persistida no ESP32; não manter nome humano/peso/altura sem necessidade algorítmica explícita.
 
 ### Gate P1

@@ -2,7 +2,7 @@
 
 Repositório oficial da evolução para Trabalho de Conclusão de Curso do projeto [`Soturine/iot-fall-monitor`](https://github.com/Soturine/iot-fall-monitor).
 
-> **Estado atual:** baseline portada e validada, saneamento P1, replay sintético, contratos HTTP/MQTT e identidade temporal no MySQL concluídos. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
+> **Estado atual:** baseline portada e validada, saneamento P1, replay sintético, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
 
 ## Visão do projeto
 
@@ -115,6 +115,8 @@ Isso reduz uma falha de UX comum em sistemas de segurança: o usuário acreditar
 - [Cloud/deployment](docs/architecture/cloud-deployment.md)
 - [Opções de cloud avaliadas](docs/architecture/cloud-options-evaluation.md)
 - [Modelo de dados](docs/architecture/data-model.md)
+- [Classificação e crescimento dos dados](docs/data/data-classification.md)
+- [Retenção de telemetria e preservação de evidência](docs/data/retention-policy.md)
 - [Contratos](docs/architecture/contracts.md)
 - [Contratos executáveis HTTP/MQTT](docs/contracts/README.md)
 
@@ -211,7 +213,8 @@ Ensaios de queda devem priorizar objeto/manequim/cenários seguros e protocolo i
 - [x] validar CI remota no SHA exato da branch;
 - [ ] fechar critical-event reliability;
 - [x] inventário e contratos HTTP/MQTT concretos;
-- [ ] migrations e identidade temporal concretas;
+- [x] migrations e identidade temporal concretas;
+- [x] lifecycle inicial de telemetria/evidência/auditoria;
 - [ ] Android MVP;
 - [ ] FCM/Protection Health;
 - [ ] provisioning seguro;

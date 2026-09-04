@@ -22,6 +22,8 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 - [`architecture/mobile-technology-evaluation.md`](architecture/mobile-technology-evaluation.md) — racional Kotlin × Flutter/RN/KMP.
 - [`architecture/cloud-deployment.md`](architecture/cloud-deployment.md) — staging provider-agnostic.
 - [`architecture/cloud-options-evaluation.md`](architecture/cloud-options-evaluation.md) — opções de fornecedores avaliadas.
+- [`data/data-classification.md`](data/data-classification.md) — classes, PII, frequência, crescimento medido e impacto da exclusão.
+- [`data/retention-policy.md`](data/retention-policy.md) — retenção manual de telemetria, proteção de evidência e decisões pendentes.
 
 ## Produto e requisitos
 

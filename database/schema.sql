@@ -288,6 +288,7 @@ CREATE TABLE IF NOT EXISTS telemetry_logs (
   KEY idx_telemetry_org_created (organization_id, created_at),
   KEY idx_telemetry_device_created (device_id, created_at),
   KEY idx_telemetry_device_created_id (device_id, created_at, id),
+  KEY idx_telemetry_created_id (created_at, id),
   CONSTRAINT fk_telemetry_device
     FOREIGN KEY (device_id) REFERENCES devices (id)
     ON DELETE CASCADE,

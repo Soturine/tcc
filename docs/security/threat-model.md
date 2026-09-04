@@ -260,7 +260,18 @@ Distinguir:
 - push delivery metadata;
 - sessões/tokens expirados.
 
-Prazos não são inventados neste documento. Devem ser definidos conforme necessidade científica, acadêmica, legal e capacidade de armazenamento.
+Prazos não são inventados neste documento. Devem ser definidos conforme necessidade científica, acadêmica, legal, atraso de replay e capacidade de armazenamento.
+
+O job atual é manual, dry-run por default e limitado a telemetria operacional com cutoff explícito. Referências de evidência são rechecadas dentro da transação; evento, alerta, ação humana e auditoria ficam fora da limpeza. Timestamp legado nulo falha para o lado da preservação.
+
+Riscos residuais:
+
+- um evento offline ainda não recebido não possui vínculo relacional que o job possa proteger; até a evidência device-first ser implementada, o cutoff precisa de revisão deliberada e não pode ser automatizado silenciosamente;
+- exclusão física de device/usuário/organização possui cascades amplas e não é mecanismo aprovado de retenção ou erasure;
+- backup restaura disponibilidade, mas não satisfaz minimização nem substitui política de retenção; as próprias cópias precisam de lifecycle;
+- logs e exportações podem reidentificar por correlação mesmo sem nome direto.
+
+Classificação, PII e efeitos de exclusão estão em [`../data/data-classification.md`](../data/data-classification.md); a operação está em [`../data/retention-policy.md`](../data/retention-policy.md).
 
 ## LGPD e pesquisa
 

@@ -40,3 +40,9 @@ A migration:
 UUIDs antigos válidos são preservados. Registros sem identidade confiável continuam compatíveis, mas não recebem garantia de deduplicação. Duplicatas existentes bloqueiam a migration e exigem investigação explícita antes de qualquer correção de dados.
 
 Os testes cobrem schema vazio, upgrade representativo da baseline, rollback, histórico/checksum e concorrência real contra MySQL descartável.
+
+## `002_telemetry_retention_index`
+
+A migration adiciona `idx_telemetry_created_id (created_at, id)` a `telemetry_logs` para seleção ordenada e limitada do job de retenção. Ela não altera nem exclui linhas e pode ser reaplicada pelo runner sem duplicar o índice. O rollback remove somente esse índice.
+
+O job falha fechado quando o índice não está presente. Operação, critérios e proteção de evidência estão em [`docs/data/retention-policy.md`](../../docs/data/retention-policy.md); o teste MySQL descartável é executado por `npm run test:mysql:retention --prefix backend`.

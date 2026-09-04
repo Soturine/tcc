@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Lifecycle de telemetria, evidência e auditoria
+- inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
+- medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB e cadências derivadas com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA
+- migration `002_telemetry_retention_index` adiciona o índice `(created_at, id)` sem alterar dados e é validada em schema vazio, upgrade, reexecução e rollback MySQL
+- job manual de retenção de telemetria opera em dry-run por padrão, exige cutoff ISO 8601 com timezone, falha fechado sem a migration, limita batches/transações e só aplica exclusão com `--apply`
+- telemetria já ligada por `events.evidence_telemetry_id` ou `event_telemetry_evidence.telemetry_log_id`, timestamps legados nulos, eventos, alertas, ações e auditoria permanecem protegidos
+- testes unitários e MySQL descartável cobrem configuração inválida, elegibilidade, dry-run, batches, reexecução, rollback de falha injetada, evidência crítica e auditoria preservadas
+- o risco de evento offline ainda não recebido depender de telemetria SQL antiga foi documentado; evidência device-first e remoção desse gate continuam na etapa de confiabilidade crítica
+- duração de retenção permanece `pending empirical decision`, agregação permanente está `deferred`, e backup foi separado de política de retenção/LGPD
+- advisory moderado transitivo `GHSA-p498-v437-472g` foi corrigido separadamente no lockfile do frontend com `@humanfs/node` 0.16.8, sem nova dependência direta; audit, lint, build e CI foram revalidados
+
+### Pendente / Faltando
+- definir prazo de retenção somente após decisão acadêmica/legal e medições representativas de staging
+- implementar evidência local versionada para que replay tardio de queda confirmada não dependa exclusivamente da telemetria SQL
+- definir lifecycle de backups e eventual workflow de eliminação/pseudonimização antes de dados de participantes humanos
+- capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
+- ativar FFT como decisão real somente após calibração e validação com dados reais
+- implementar sessões completas de calibração por SOS
+- testar classificação de movimentos com múltiplas runs por classe
+- ampliar a validação ponta a ponta com mais cenários, repetições e dataset real
+
+## [v0.9.4] - 2026-09-04
+
 ### Etapa 5 — identidade persistente de eventos e migrations
 - runner de migrations versionadas adicionado com tabela `schema_migrations`, checksum SHA-256, advisory lock MySQL, aplicação idempotente e rollback controlado da última migration
 - auditoria somente leitura identifica UUIDs ausentes, inválidos, recuperáveis, divergentes e duplicados antes de qualquer DDL
@@ -11,13 +34,6 @@
 - corrida real de duas transações MySQL com o mesmo UUID foi coberta, garantindo um evento lógico e um alerta; schema vazio, upgrade representativo, histórico/checksum e rollback também foram exercitados em bancos descartáveis
 - logs estruturados distinguem migration, evento novo, retry e conflito sem registrar payload completo; procedimento operacional e limitações de compatibilidade foram documentados
 - firmware ESP-MQTT, QoS 1, outbox persistente e ACK de aplicação não foram implementados nesta etapa
-
-### Pendente / Faltando
-- capturar GIF real de uma nova queda controlada percorrendo ESP32/evento -> MQTT -> backend -> dashboard
-- ativar FFT como decisão real somente após calibração e validação com dados reais
-- implementar sessões completas de calibração por SOS
-- testar classificação de movimentos com múltiplas runs por classe
-- ampliar a validação ponta a ponta com mais cenários, repetições e dataset real
 
 ## [v0.9.3] - 2026-09-03
 

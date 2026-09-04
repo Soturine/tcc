@@ -78,6 +78,7 @@ jobs:
           npm run db:migrate
           npm run db:audit:event-identity
           npm run test:mysql:migrations
+          npm run test:mysql:retention
 
       - name: Start Mosquitto integration broker
         run: >-

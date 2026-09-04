@@ -227,6 +227,8 @@ Antes de tag/release:
 9. deployment config/secrets não estão no Git;
 10. tag somente após comprovação.
 
+Tags patch podem marcar marcos técnicos integrados quando a release for explicitamente aprovada e o SHA de `main` satisfizer os gates acima. Merge verde não cria autorização automática para uma nova tag; versão, mensagem e momento precisam estar registrados na tarefa/release. Não reescrever nem reposicionar tags publicadas.
+
 Versão acadêmica final pode ser `v1.0.0-tcc` ou SemVer equivalente definida perto da entrega.
 
 ## Post-deploy verification
