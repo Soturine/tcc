@@ -46,3 +46,8 @@ Os testes cobrem schema vazio, upgrade representativo da baseline, rollback, his
 A migration adiciona `idx_telemetry_created_id (created_at, id)` a `telemetry_logs` para seleção ordenada e limitada do job de retenção. Ela não altera nem exclui linhas e pode ser reaplicada pelo runner sem duplicar o índice. O rollback remove somente esse índice.
 
 O job falha fechado quando o índice não está presente. Operação, critérios e proteção de evidência estão em [`docs/data/retention-policy.md`](../../docs/data/retention-policy.md); o teste MySQL descartável é executado por `npm run test:mysql:retention --prefix backend`.
+
+## `003_event_evidence_source`
+
+Adiciona `events.evidence_source ENUM('device', 'server_telemetry', 'both', 'none') NULL`, registrando qual evidência sustentou a decisão de alerta de um evento crítico (ADR-016). Não há backfill: registros anteriores ficam `NULL` e o backend mantém para eles a regra antiga baseada somente em telemetria. O rollback remove apenas essa coluna. Sem a migration, a inserção de eventos falha (o device não recebe ACK e retransmite), e o health de schema aponta a coluna ausente no startup.
+

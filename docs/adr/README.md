@@ -139,3 +139,23 @@ Workflows remotos mínimos entram antes de refatorações relevantes. A ausênci
 O sistema deve expor, no app, se a cadeia de proteção está operacional ou degradada, combinando device last seen, sensor health, bateria/origem, config sync, conectividade/ACK, permissão de notificações e saúde de registro FCM. Deve existir um fluxo seguro de **Testar alerta** que valide a cadeia de notificação sem exigir queda física.
 
 Não apresentar o indicador como garantia médica de disponibilidade.
+
+## ADR-020 — Outbox crítica com ACK de aplicação sobre PubSubClient; ESP-MQTT QoS 1 condicionado a HIL
+**Status:** Accepted (2026-10-21). Complementa ADR-005; não o substitui.
+
+**Contexto.** ADR-005 exige outbox persistente → QoS 1 → commit → ACK de aplicação. O firmware usava PubSubClient (somente QoS 0) e removia o evento quando `publish()` retornava `true`. O spike [`spikes/esp_mqtt_qos1`](../../spikes/esp_mqtt_qos1/platformio.ini) compilou o mesmo sketch no framework fixado (`espressif32@7.1.3`) com três clientes:
+
+| Ambiente | Flash | RAM estática |
+|---|---|---|
+| PubSubClient sem TLS | 365.129 B | 25.208 B |
+| PubSubClient + `WiFiClientSecure` (como o produto) | 538.053 B | 26.284 B |
+| ESP-MQTT (`esp_mqtt_client_publish(..., qos=1)`, `MQTT_EVENT_PUBLISHED`) | 535.097 B | 25.820 B |
+
+Valores de build (`pio run`), não medições em execução. O firmware completo com a outbox ocupa 1.192.973 B (91,0%) da partição de app de 1.310.720 B.
+
+**Decisão.**
+1. A garantia de entrega crítica é implementada **na aplicação**: `CriticalEventOutbox` persistente (LittleFS), `event_uuid` estável, retry com backoff e remoção **somente** por ACK pós-commit. Isso independe do QoS do transporte e cobre perda de PUBACK, de sessão e de processamento no backend.
+2. O transporte continua PubSubClient nesta fase. ESP-MQTT é viável em memória (spike), mas executa em task própria, entrega callbacks fora do `loop()` e muda TLS/reconexão; trocá-lo sem ESP32 físico colocaria em risco o caminho crítico sem evidência de execução.
+3. A adoção de ESP-MQTT QoS 1 fica como próximo passo de firmware, atrás de interface de transporte, com critério de aceite: HIL com broker TLS, perda de Wi‑Fi, reboot e medição de heap/stack em execução.
+
+**Consequências.** O backend já assina com QoS 1 e publica ACK com QoS 1. Do device para o broker a mensagem segue QoS 0; perdas nesse trecho são recuperadas por retry da outbox (maior latência de recuperação, não perda lógica). Sessão persistente continua otimização (F-13), não requisito de correção.

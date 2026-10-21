@@ -2,7 +2,7 @@
 
 Repositório oficial da evolução para Trabalho de Conclusão de Curso do projeto [`Soturine/iot-fall-monitor`](https://github.com/Soturine/iot-fall-monitor).
 
-> **Estado atual:** baseline portada e validada, saneamento P1, replay sintético, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Android, entrega crítica ponta a ponta e nova infraestrutura ainda não são considerados implementados.
+> **Estado atual (2026-10-21):** baseline portada e validada, saneamento P1, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Entrega crítica com outbox persistente no ESP32, `event_uuid` robusto a reboot, ACK de aplicação pós-commit e alerta de queda offline por evidência local estão **implementados e verificados em testes host e emulação ponta a ponta**, ainda **sem validação em ESP32 físico** e com transporte device→broker em QoS 0 (ADR-020). A infraestrutura de avaliação do detector com datasets reais existe, mas **nenhum resultado com dados reais foi produzido**. Android, FCM, provisioning seguro e staging continuam planejados.
 
 ## Visão do projeto
 
@@ -72,6 +72,7 @@ As escolhas são baseline de arquitetura. Mudanças relevantes exigem evidência
 Antes de importar o código da v0.9.0, foi feita uma auditoria específica para identificar o que deve ser preservado, corrigido, deprecado ou adiado:
 
 - [Auditoria completa do `iot-fall-monitor` para o porte](docs/audit/iot-fall-monitor-port-audit-2026-09-01.md)
+- [Auditoria abrangente do TCC — 2026-10-21](docs/audit/tcc-comprehensive-audit-2026-10-21.md) (33 findings, estado por checkpoint)
 
 Principais gaps encontrados na baseline histórica:
 
@@ -129,6 +130,8 @@ Isso reduz uma falha de UX comum em sistemas de segurança: o usuário acreditar
 
 - [Threat model](docs/security/threat-model.md)
 - [QA/Verificação/Validação](docs/quality/qa-strategy.md)
+- [Validação da entrega crítica](docs/quality/critical-delivery-validation.md)
+- [Matriz de rastreabilidade](docs/requirements/traceability.md)
 - [SDLC, Git, CI/CD e release](docs/devops/sdlc-and-ci-cd.md)
 - [Engineering Constitution](ENGINEERING_CONSTITUTION.md)
 - [AGENTS](AGENTS.md)
@@ -136,6 +139,10 @@ Isso reduz uma falha de UX comum em sistemas de segurança: o usuário acreditar
 ### TCC/pesquisa
 
 - [Plano acadêmico](docs/research/tcc-plan.md)
+- [Protocolo experimental do TG1](docs/research/experimental-protocol.md)
+- [Datasets verificados](docs/research/datasets.md)
+- [Baseline congelada do detector](docs/research/detector-baseline.md)
+- [Ferramentas de avaliação (`tools/research`)](tools/research/README.md)
 - [Fontes e evidências](docs/research/sources-and-evidence.md)
 - [Roadmap](docs/roadmap/roadmap.md)
 - [ADRs](docs/adr/README.md)
@@ -211,7 +218,8 @@ Ensaios de queda devem priorizar objeto/manequim/cenários seguros e protocolo i
 - [x] reproduzir baseline localmente;
 - [x] implementar CI mínima;
 - [x] validar CI remota no SHA exato da branch;
-- [ ] fechar critical-event reliability;
+- [ ] fechar critical-event reliability (implementado e emulado; HIL e QoS 1 pendentes);
+- [x] infraestrutura experimental do TG1 (sem resultados com dados reais);
 - [x] inventário e contratos HTTP/MQTT concretos;
 - [x] migrations e identidade temporal concretas;
 - [x] lifecycle inicial de telemetria/evidência/auditoria;

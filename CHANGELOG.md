@@ -2,9 +2,40 @@
 
 ## [Unreleased]
 
+### Auditoria 2026-10-21 e hardening da baseline
+- auditoria canônica em `docs/audit/tcc-comprehensive-audit-2026-10-21.md` classifica 21 findings com evidência de código, impacto e checkpoint
+- advisories de produção do backend corrigidos somente no lockfile: `engine.io` 6.6.11 (GHSA-2gc4-cqfq-p2gv), `ip-address` 10.7.4 (GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw) e `proxy-addr` 2.0.8 (GHSA-jqcg-44mw-7w3h); `npm audit` do backend sem vulnerabilidades
+- lockfile do frontend atualizado sem `--force` (vite, follow-redirects e outros transitivos); produção sem vulnerabilidades; resíduo dev/build da cadeia Tailwind 3 → `braces@3.0.3` registrado como risco aceito até a migração para Tailwind 4
+- backend recusa iniciar fora de `NODE_ENV=development|test` com `JWT_SECRET` ausente, default ou curto, MQTT sem TLS verificado, CA ilegível, credenciais MQTT ausentes ou CORS permissivo; mensagens não expõem segredos
+- manifests do backend e do frontend alinhados à última versão publicada (0.9.4)
+
+### Fundação experimental do TG1
+- baseline A do detector congelada e identificada por hash semântico dos parâmetros efetivos (`docs/research/detector-baseline.md`)
+- filtro IIR e derivações de magnitude/pitch/roll extraídos para `src/sensor_signal.cpp`, compartilhados pelo driver do MPU e pelo replay, com testes nativos de caracterização
+- `tools/research/fallbench` (somente stdlib): adaptadores SisFall/KFall/normalizado, mapeamento de eixos explícito, reamostragem na cadência do firmware sem interpolação de lacunas, saturação na faixa do MPU, métricas por trial com IC de Wilson e valores indefinidos para denominador zero, falsos alarmes por hora, latência a partir de anotações, split por participante e proveniência
+- binário `fall_replay` compilado das fontes do firmware; CI `research-replay` compila e testa com fixtures sintéticas reprodutíveis
+- inventário de datasets verificado em fontes primárias e protocolo experimental com pergunta, objetivos O1–O5, hipóteses, ameaças à validade e coleta segura; nenhum resultado com dados reais foi produzido
+- plataforma `espressif32@7.1.3`, `native@1.2.1` e bibliotecas fixadas após a versão 8.0.0 quebrar o build; `scripts/pio-docker.sh` reproduz firmware e pesquisa em Linux
+
+### Confiabilidade crítica (P2)
+- firmware: `CriticalEventOutbox` persistente em LittleFS (16 itens, CRC32, escrita atômica, quarentena de arquivo corrompido) remove eventos somente com ACK de aplicação; outbox cheia recusa o novo evento de forma observável; retry com backoff e mesmo UUID; migração dos eventos NVS legados
+- firmware: `event_uuid` com contador de boot persistido, nonce de hardware e sequência por boot, independente de NTP; payload crítico ganha `boot_id`, `device_uptime_ms`, `clock_quality`, `occurred_at_device` e `local_evidence` v1
+- firmware: diagnóstico `status.critical_outbox`; buffer legado removido após caracterização; falha de gravação NVS deixa de ser ignorada
+- backend: ACK de aplicação `critical-event-ack-v1` publicado somente após COMMIT (`committed`/`duplicate`), no tópico derivado da identidade do tópico; sem ACK para rollback, conflito ou rejeição
+- backend: queda confirmada pelo edge gera alerta sem depender de telemetria SQL; `evidence_source` (migration 003) distingue evidência local, do servidor, combinada ou insuficiente; `alert_test` nunca vira alerta real
+- backend: eventos entregues após período offline usam `occurred_at_device` sincronizado como instante de ocorrência, preservando `received_at`
+- `npm run test:e2e:critical`: 11 cenários de falha com virtual device e backend/MySQL/Mosquitto reais (emulação, não HIL), incluídos no CI
+- spike ESP-MQTT QoS 1 e ADR-020; budget do payload de evento revisado para 3.584 bytes
+
+### Segunda auditoria e documentação
+- MQTT recusa `device_uid` de device pareado usado em outro tópico antes de qualquer escrita (F-11)
+- arquivos da outbox nomeados pelo hash do `event_uuid`, eliminando sobrescrita entre boots com contador não persistido (F-25); idade de itens restaurados corrigida (F-26)
+- ACL de referência do Mosquitto torna o backend o único publisher de ACK; verificada contra broker real (F-27)
+- matriz de rastreabilidade requisito → implementação → evidência e objetivo → experimento → resultado; README, roadmap e fontes verificadas atualizados
+
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
-- medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB e cadências derivadas com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA
+- medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA
 - migration `002_telemetry_retention_index` adiciona o índice `(created_at, id)` sem alterar dados e é validada em schema vazio, upgrade, reexecução e rollback MySQL
 - job manual de retenção de telemetria opera em dry-run por padrão, exige cutoff ISO 8601 com timezone, falha fechado sem a migration, limita batches/transações e só aplica exclusão com `--apply`
 - telemetria já ligada por `events.evidence_telemetry_id` ou `event_telemetry_evidence.telemetry_log_id`, timestamps legados nulos, eventos, alertas, ações e auditoria permanecem protegidos

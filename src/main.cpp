@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include <esp_system.h>
+
+#include <string>
 
 #include "app_config.h"
 #include "app_logging.h"
@@ -8,12 +11,15 @@
 #include "config_store.h"
 #include "connectivity_manager.h"
 #include "device_config.h"
-#include "event_buffer.h"
+#include "critical_ack.h"
+#include "critical_outbox.h"
+#include "critical_outbox_fs_store.h"
+#include "event_identity.h"
 #include "fall_feature_extractor.h"
 #include "fall_detector.h"
 #include "firmware_baseline.h"
 #include "models.h"
-#include "mqtt_client.h"
+#include "device_mqtt_client.h"
 #include "patient_profile_client.h"
 #include "sensor_mpu6050.h"
 #include "sos_button.h"
@@ -31,7 +37,17 @@ WifiManager wifiManager;
 DeviceMqttClient mqttClient;
 SetupPortal setupPortal(configStore, mqttClient);
 ConnectivityManager connectivityManager(configStore, wifiManager, mqttClient, setupPortal);
-EventBuffer eventBuffer;
+CriticalOutboxFsStore criticalOutboxStore;
+OutboxConfig criticalOutboxConfig() {
+  OutboxConfig config;
+  config.capacity = AppConfig::CRITICAL_OUTBOX_CAPACITY;
+  config.maxPayloadBytes = AppConfig::CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES;
+  config.retryBaseMs = AppConfig::CRITICAL_OUTBOX_RETRY_BASE_MS;
+  config.retryMaxMs = AppConfig::CRITICAL_OUTBOX_RETRY_MAX_MS;
+  return config;
+}
+CriticalEventOutbox criticalOutbox(criticalOutboxConfig(), []() { return esp_random(); });
+EventIdentity::Generator eventIdentity;
 BuzzerLed indicator;
 SosButton sosButton;
 
@@ -48,14 +64,14 @@ unsigned long lastMotionTestTriggerAtMs = 0;
 unsigned long lastExperimentalAlertAtMs = 0;
 unsigned long lastExperimentalAlertSkipLogAtMs = 0;
 unsigned long motionTestStableSinceAtMs = 0;
-unsigned long lastEventBufferPersistAtMs = 0;
+unsigned long lastOutboxPersistRetryAtMs = 0;
+uint32_t invalidAckCount = 0;
 unsigned long lastSensorHealthLogAtMs = 0;
 unsigned long lastTelemetrySkipLogAtMs = 0;
 unsigned long lastLoopHealthLogAtMs = 0;
 unsigned long lastSensorBeginRetryAtMs = 0;
 unsigned long consecutiveSensorReadFailures = 0;
 uint32_t sensorSampleSeq = 0;
-uint32_t criticalEventSeq = 0;
 bool lastPatientProfileSyncSucceeded = false;
 bool mqttRuntimeContextLogged = false;
 bool lastSensorReadSucceeded = false;
@@ -87,75 +103,21 @@ uint32_t nextMonotonicSequence(uint32_t& sequence) {
   return sequence;
 }
 
-String buildCriticalEventUuid(const char* eventType,
-                              uint32_t eventSequence,
-                              unsigned long nowMs) {
-  char suffix[64] = {0};
-  snprintf(suffix,
-           sizeof(suffix),
-           "%lu-%lu-%lu",
-           currentTimestampSeconds(),
-           nowMs,
-           static_cast<unsigned long>(eventSequence));
-
-  return DeviceSettings::technicalDeviceUid() + "-" + String(eventType) + "-" + suffix;
+bool deviceClockSynced() {
+  return time(nullptr) >= 1700000000;
 }
 
-String extractJsonStringField(const String& payload, const char* fieldName) {
-  const String needle = String("\"") + fieldName + "\":\"";
-  const int start = payload.indexOf(needle);
-  if (start < 0) {
-    return "";
-  }
-
-  const int valueStart = start + needle.length();
-  const int valueEnd = payload.indexOf('"', valueStart);
-  if (valueEnd <= valueStart) {
-    return "";
-  }
-
-  return payload.substring(valueStart, valueEnd);
+// ISO 8601 UTC do relogio do device; somente chamado com relogio sincronizado.
+String deviceClockIsoUtc() {
+  const time_t now = time(nullptr);
+  struct tm utc;
+  gmtime_r(&now, &utc);
+  char buffer[32];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &utc);
+  return String(buffer);
 }
 
-size_t buildCriticalEventSnapshot(BufferedEvent* snapshot, size_t snapshotCapacity) {
-  if (snapshot == nullptr || snapshotCapacity == 0U) {
-    return 0U;
-  }
-
-  BufferedEvent allEvents[AppConfig::EVENT_BUFFER_CAPACITY];
-  const size_t bufferedCount =
-      eventBuffer.copyTo(allEvents, AppConfig::EVENT_BUFFER_CAPACITY);
-  size_t snapshotCount = 0;
-
-  for (size_t index = 0; index < bufferedCount && snapshotCount < snapshotCapacity; ++index) {
-    if (!allEvents[index].topic.endsWith("/events")) {
-      continue;
-    }
-
-    snapshot[snapshotCount] = allEvents[index];
-    ++snapshotCount;
-  }
-
-  return snapshotCount;
-}
-
-bool persistCriticalEventSnapshot(unsigned long nowMs) {
-  if (!AppConfig::EVENT_BUFFER_PERSISTENCE_ENABLED) {
-    return false;
-  }
-
-  BufferedEvent snapshot[AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY];
-  const size_t snapshotCount =
-      buildCriticalEventSnapshot(snapshot, AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY);
-
-  if (!configStore.savePendingEvents(snapshot, snapshotCount)) {
-    return false;
-  }
-
-  eventBuffer.markPersisted();
-  lastEventBufferPersistAtMs = nowMs;
-  return true;
-}
+String criticalAckTopic();
 
 const DeviceSettings::DeviceConfig& runtimeConfig() {
   return connectivityManager.config();
@@ -463,7 +425,8 @@ String buildEventPayload(const char* eventType,
                          uint32_t sampleSeq,
                          const FallAlert* fallAlert = nullptr) {
   // Mantem o formato do payload centralizado em um unico ponto.
-  StaticJsonDocument<3584> doc;
+  // Heap em vez de pilha: o documento do evento critico e o maior do firmware.
+  DynamicJsonDocument doc(4096);
   const unsigned long nowMs = millis();
   addDeviceIdentityToPayload(doc);
   doc["event_type"] = eventType;
@@ -471,7 +434,18 @@ String buildEventPayload(const char* eventType,
   doc["event_sequence"] = eventSequence;
   doc["sample_seq"] = sampleSeq;
   doc["timestamp"] = currentTimestampSeconds();
-  doc["event_uptime_ms"] = millis();
+  doc["event_uptime_ms"] = nowMs;
+  // Identidade e tempo independentes de NTP (contracts/time-semantics.md).
+  doc["boot_id"] = eventIdentity.bootId().c_str();
+  doc["boot_id_counter_persisted"] = eventIdentity.bootCounterPersisted();
+  doc["device_uptime_ms"] = nowMs;
+  if (deviceClockSynced()) {
+    doc["clock_quality"] = "synced";
+    doc["occurred_at_device"] = deviceClockIsoUtc();
+  } else {
+    doc["clock_quality"] = "unsynced";
+    doc["occurred_at_device"] = nullptr;
+  }
   doc["accel_magnitude"] = accelMagnitudeG;
   doc["gyro_magnitude"] = gyroMagnitudeDegPerSec;
   doc["immobility_confirmed"] = immobilityConfirmed;
@@ -546,6 +520,24 @@ String buildEventPayload(const char* eventType,
         fallAlert->linkedTelemetryWindow.windowEndedAtMs;
     linkedTelemetryWindow["sample_count"] = fallAlert->linkedTelemetryWindow.sampleCount;
 
+    // Evidencia local versionada: permite ao backend criar o alerta de queda
+    // confirmada no edge sem depender da telemetria periodica (ADR-016).
+    JsonObject localEvidence = doc.createNestedObject("local_evidence");
+    localEvidence["version"] = 1;
+    localEvidence["decision_source"] = "edge";
+    localEvidence["algorithm_version"] = fallAlert->algorithmVersion;
+    localEvidence["detector_mode"] = fallAlert->detectorMode;
+    localEvidence["impact_detected"] = fallAlert->impactDetected;
+    localEvidence["orientation_change_detected"] = fallAlert->orientationChangeDetected;
+    localEvidence["immobility_detected"] = fallAlert->immobilityDetected;
+    localEvidence["peak_accel_g"] = fallAlert->peakAccelG;
+    localEvidence["peak_gyro_dps"] = fallAlert->peakGyroDps;
+    localEvidence["orientation_delta_deg"] = fallAlert->orientationDeltaDeg;
+    localEvidence["immobility_duration_ms"] = fallAlert->immobilityDurationMs;
+    localEvidence["immobility_required_ms"] = fallAlert->immobilityRequiredMs;
+    localEvidence["analysis_window_ms"] = fallAlert->analysisWindowMs;
+    localEvidence["samples_considered"] = fallAlert->samplesConsidered;
+
     JsonObject thresholds = doc.createNestedObject("thresholds");
     thresholds["impact_accel_g"] = fallAlert->impactAccelThresholdG;
     thresholds["impact_gyro_dps"] = fallAlert->impactGyroThresholdDps;
@@ -566,11 +558,38 @@ String buildEventPayload(const char* eventType,
   return payload;
 }
 
+void addCriticalOutboxDiagnostics(JsonDocument& doc, unsigned long nowMs) {
+  const OutboxStats stats = criticalOutbox.stats();
+  doc["buffered_events"] = stats.pending;  // compatibilidade com o status legado
+  JsonObject outbox = doc.createNestedObject("critical_outbox");
+  outbox["pending"] = stats.pending;
+  outbox["capacity"] = stats.capacity;
+  outbox["not_persisted"] = stats.notPersisted;
+  outbox["store_available"] = stats.storeAvailable;
+  outbox["oldest_age_ms"] =
+      stats.hasOldest ? static_cast<uint32_t>(nowMs) - stats.oldestCreatedUptimeMs : 0U;
+  outbox["overflow_count"] = stats.overflowCount;
+  outbox["too_large_count"] = stats.tooLargeCount;
+  outbox["persist_failures"] = stats.persistFailures;
+  outbox["corrupted_on_load"] = stats.corruptedOnLoad;
+  outbox["acked"] = stats.acked;
+  outbox["duplicate_acks"] = stats.duplicateAcks;
+  outbox["unknown_acks"] = stats.unknownAcks;
+  outbox["invalid_acks"] = invalidAckCount;
+  if (stats.hasLastAck) {
+    outbox["last_ack_age_ms"] = static_cast<uint32_t>(nowMs) - stats.lastAckAtMs;
+  } else {
+    outbox["last_ack_age_ms"] = nullptr;
+  }
+  outbox["ack_subscribed"] = mqttClient.isSubscribed();
+  doc["boot_id"] = eventIdentity.bootId().c_str();
+}
+
 String buildStatusPayload() {
   // O status periodico carrega telemetria minima para observabilidade do dispositivo.
   const unsigned long nowMs = millis();
   const bool sensorSampleFresh = hasFreshSensorSample(nowMs);
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<1536> doc;
   addDeviceIdentityToPayload(doc);
   doc["event_type"] = "device_status";
   doc["timestamp"] = currentTimestampSeconds();
@@ -582,7 +601,7 @@ String buildStatusPayload() {
   addBatteryFieldsToPayload(doc);
   addOperationModeFieldsToPayload(doc);
   addNetworkFieldsToPayload(doc);
-  doc["buffered_events"] = eventBuffer.size();
+  addCriticalOutboxDiagnostics(doc, nowMs);
   doc["sample_seq"] = sensorSampleSeq;
   addSensorDiagnosticsToPayload(doc, nowMs, sensorSampleFresh);
 
@@ -619,89 +638,121 @@ String buildTelemetryPayload() {
   return payload;
 }
 
-bool publishCriticalEvent(const String& topic,
-                          const String& payload,
-                          const char* eventType,
-                          const String& eventUuid) {
-  if (mqttClient.publish(topic, payload, false)) {
-    AppLog::infof("[event] publish ok topic=%s type=%s event_uuid=%s bytes=%u buffered_events=%u\n",
-                  topic.c_str(),
-                  eventType,
-                  eventUuid.c_str(),
-                  static_cast<unsigned>(payload.length()),
-                  static_cast<unsigned>(eventBuffer.size()));
-    return true;
-  }
-
-  const char* reason = mqttClient.isConnected() ? "publish_failed" : "mqtt_disconnected";
-  AppLog::warnf("[event] publish failed reason=%s topic=%s type=%s event_uuid=%s bytes=%u mqtt_state=%d\n",
-                reason,
-                topic.c_str(),
-                eventType,
-                eventUuid.c_str(),
-                static_cast<unsigned>(payload.length()),
-                mqttClient.currentStateCode());
-
-  if (eventBuffer.size() >= eventBuffer.capacity()) {
-    AppLog::warnf("[event] dropped by buffer limit policy=drop_oldest type=%s event_uuid=%s capacity=%u\n",
-                  eventType,
-                  eventUuid.c_str(),
-                  static_cast<unsigned>(eventBuffer.capacity()));
-  }
-
-  // Se a publicacao falhar, o evento critico entra no buffer local para reenvio posterior.
-  eventBuffer.push(topic, payload, millis());
-
-  AppLog::warnf("[event] queued reason=%s topic=%s type=%s event_uuid=%s buffered_events=%u/%u\n",
-                reason,
-                topic.c_str(),
-                eventType,
-                eventUuid.c_str(),
-                static_cast<unsigned>(eventBuffer.size()),
-                static_cast<unsigned>(eventBuffer.capacity()));
-
-  persistCriticalEventSnapshot(millis());
-
-  return false;
+String criticalAckTopic() {
+  return DeviceSettings::buildTopic(runtimeConfig(), "critical-event-acks");
 }
 
-void flushBufferedEvents() {
-  if (!mqttClient.isConnected()) {
+// Tenta transmitir um unico item vencido por chamada (nao bloqueia o laco).
+// Transmitir NAO remove: o item permanece ate o ACK de aplicacao pos-commit.
+void serviceCriticalOutbox(unsigned long nowMs) {
+  const uint32_t now32 = static_cast<uint32_t>(nowMs);
+
+  if (criticalOutbox.stats().notPersisted > 0U &&
+      (nowMs - lastOutboxPersistRetryAtMs) >= AppConfig::CRITICAL_OUTBOX_PERSIST_RETRY_INTERVAL_MS) {
+    lastOutboxPersistRetryAtMs = nowMs;
+    const size_t written = criticalOutbox.retryPersistence();
+    if (written > 0U) {
+      AppLog::infof("[outbox] persisted_after_retry count=%u\n", static_cast<unsigned>(written));
+    }
+  }
+
+  // Sem assinatura do topico de ACK o envio geraria retries cegos.
+  if (!mqttClient.isConnected() || !mqttClient.isSubscribed()) {
     return;
   }
 
-  BufferedEvent bufferedEvent;
-  size_t flushedCount = 0;
+  const OutboxEntry* due = criticalOutbox.nextDue(now32);
+  if (due == nullptr) {
+    return;
+  }
 
-  while (flushedCount < eventBuffer.capacity() && eventBuffer.peek(bufferedEvent)) {
-    const String eventType = extractJsonStringField(bufferedEvent.payload, "event_type");
-    const String eventUuid = extractJsonStringField(bufferedEvent.payload, "event_uuid");
+  const std::string uuid = due->uuid;
+  const bool accepted = mqttClient.publish(due->topic.c_str(), due->payload.c_str(), false);
+  criticalOutbox.onPublishAttempt(uuid, now32, accepted);
+  const OutboxStats stats = criticalOutbox.stats();
+  if (accepted) {
+    AppLog::infof("[outbox] sent_awaiting_ack event_uuid=%s pending=%u\n",
+                  uuid.c_str(),
+                  static_cast<unsigned>(stats.pending));
+  } else {
+    AppLog::warnf("[outbox] publish_failed event_uuid=%s mqtt_state=%d pending=%u\n",
+                  uuid.c_str(),
+                  mqttClient.currentStateCode(),
+                  static_cast<unsigned>(stats.pending));
+  }
+}
 
-    if (!mqttClient.publish(bufferedEvent.topic, bufferedEvent.payload, false)) {
-      AppLog::warnf("[event] publish failed reason=flush_publish_failed topic=%s type=%s event_uuid=%s mqtt_state=%d buffered_events=%u\n",
-                    bufferedEvent.topic.c_str(),
-                    eventType.c_str(),
+// Persiste ANTES da primeira transmissao; retorna true se o item foi aceito.
+bool enqueueCriticalEvent(const String& topic,
+                          const String& payload,
+                          const char* eventType,
+                          const String& eventUuid,
+                          uint64_t order) {
+  const EnqueueResult result = criticalOutbox.enqueue(
+      eventUuid.c_str(), topic.c_str(), payload.c_str(), order, static_cast<uint32_t>(millis()));
+  const OutboxStats stats = criticalOutbox.stats();
+
+  switch (result) {
+    case EnqueueResult::Persisted:
+    case EnqueueResult::AcceptedVolatile:
+      AppLog::infof("[outbox] enqueued type=%s event_uuid=%s persisted=%u bytes=%u pending=%u/%u\n",
+                    eventType,
                     eventUuid.c_str(),
-                    mqttClient.currentStateCode(),
-                    static_cast<unsigned>(eventBuffer.size()));
-      break;
-    }
+                    result == EnqueueResult::Persisted ? 1U : 0U,
+                    static_cast<unsigned>(payload.length()),
+                    static_cast<unsigned>(stats.pending),
+                    static_cast<unsigned>(stats.capacity));
+      serviceCriticalOutbox(millis());
+      return true;
+    case EnqueueResult::RejectedFull:
+      AppLog::errorf("[outbox] overflow_rejected type=%s event_uuid=%s capacity=%u overflow_count=%lu\n",
+                     eventType,
+                     eventUuid.c_str(),
+                     static_cast<unsigned>(stats.capacity),
+                     static_cast<unsigned long>(stats.overflowCount));
+      return false;
+    case EnqueueResult::RejectedTooLarge:
+      AppLog::errorf("[outbox] payload_too_large type=%s event_uuid=%s bytes=%u limit=%u\n",
+                     eventType,
+                     eventUuid.c_str(),
+                     static_cast<unsigned>(payload.length()),
+                     static_cast<unsigned>(AppConfig::CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES));
+      return false;
+    case EnqueueResult::DuplicateUuid:
+    case EnqueueResult::RejectedInvalid:
+      AppLog::errorf("[outbox] enqueue_rejected type=%s event_uuid=%s\n", eventType, eventUuid.c_str());
+      return false;
+  }
+  return false;
+}
 
-    // Remove do buffer somente depois de confirmar que a publicacao foi aceita.
-    eventBuffer.pop();
-    ++flushedCount;
-    AppLog::infof("[event] flushed topic=%s type=%s event_uuid=%s remaining=%u\n",
-                  bufferedEvent.topic.c_str(),
-                  eventType.c_str(),
-                  eventUuid.c_str(),
-                  static_cast<unsigned>(eventBuffer.size()));
-    mqttClient.update(connectivityManager.isWifiConnected());
-    delay(5);
+void handleIncomingMqttMessage(const char* topic, const uint8_t* payload, unsigned int length) {
+  CriticalAck::Ack ack;
+  const CriticalAck::ParseStatus status = CriticalAck::parse(criticalAckTopic().c_str(),
+                                                             topic == nullptr ? "" : topic,
+                                                             reinterpret_cast<const char*>(payload),
+                                                             length,
+                                                             ack);
+  if (status != CriticalAck::ParseStatus::Ok) {
+    ++invalidAckCount;
+    AppLog::warnf("[outbox] ack_ignored reason=%s topic=%s bytes=%u\n",
+                  CriticalAck::describe(status),
+                  topic == nullptr ? "" : topic,
+                  length);
+    return;
   }
 
-  if (flushedCount > 0U) {
-    persistCriticalEventSnapshot(millis());
-  }
+  const AckResult result = criticalOutbox.onAck(ack.eventUuid, static_cast<uint32_t>(millis()));
+  const char* outcome = result == AckResult::Removed             ? "removed"
+                        : result == AckResult::RemovedStoreError ? "removed_store_error"
+                        : result == AckResult::DuplicateAck      ? "duplicate_ack"
+                                                                 : "unknown_uuid";
+  AppLog::infof("[outbox] ack event_uuid=%s event_id=%lld status=%s outcome=%s pending=%u\n",
+                ack.eventUuid.c_str(),
+                static_cast<long long>(ack.eventId),
+                ack.status.c_str(),
+                outcome,
+                static_cast<unsigned>(criticalOutbox.stats().pending));
 }
 
 IndicatorState computeIndicatorState() {
@@ -751,8 +802,9 @@ void publishThresholdAlertEvent(const char* eventType,
                                 bool immobilityConfirmed,
                                 uint8_t buzzerCycles) {
   const String topic = DeviceSettings::buildTopic(runtimeConfig(), "events");
-  const uint32_t eventSequence = nextMonotonicSequence(criticalEventSeq);
-  const String eventUuid = buildCriticalEventUuid(eventType, eventSequence, millis());
+  const EventIdentity::NextEvent identity = eventIdentity.next();
+  const uint32_t eventSequence = identity.sequence;
+  const String eventUuid = identity.uuid.c_str();
   const String payload = buildEventPayload(eventType,
                                            alert.accelMagnitudeG,
                                            alert.gyroMagnitudeDegPerSec,
@@ -761,10 +813,11 @@ void publishThresholdAlertEvent(const char* eventType,
                                            eventSequence,
                                            sensorSampleSeq,
                                            &alert);
-  const bool published = publishCriticalEvent(topic, payload, eventType, eventUuid);
+  const bool published = enqueueCriticalEvent(
+      topic, payload, eventType, eventUuid, eventIdentity.orderFor(eventSequence));
 
   AppLog::warnf("[alert] %s event=%s topic=%s event_uuid=%s sample_seq=%lu published=%u reason=%s accel=%.2f gyro=%.2f confidence_status=%s cooldown_ms=%lu preset=%s\n",
-                published ? "event_published" : "event_queued",
+                published ? "event_enqueued" : "event_rejected",
                 eventType,
                 topic.c_str(),
                 eventUuid.c_str(),
@@ -786,8 +839,9 @@ void publishThresholdAlertEvent(const char* eventType,
 
 void publishFallAlert(const FallAlert& alert) {
   const String topic = DeviceSettings::buildTopic(runtimeConfig(), "events");
-  const uint32_t eventSequence = nextMonotonicSequence(criticalEventSeq);
-  const String eventUuid = buildCriticalEventUuid("fall_detected", eventSequence, millis());
+  const EventIdentity::NextEvent identity = eventIdentity.next();
+  const uint32_t eventSequence = identity.sequence;
+  const String eventUuid = identity.uuid.c_str();
   const String payload = buildEventPayload(
       "fall_detected",
       alert.accelMagnitudeG,
@@ -797,10 +851,11 @@ void publishFallAlert(const FallAlert& alert) {
       eventSequence,
       sensorSampleSeq,
       &alert);
-  const bool published = publishCriticalEvent(topic, payload, "fall_detected", eventUuid);
+  const bool published = enqueueCriticalEvent(
+      topic, payload, "fall_detected", eventUuid, eventIdentity.orderFor(eventSequence));
   if (AppConfig::FIRMWARE_MQTT_DIAGNOSTIC_ENABLED) {
-    AppLog::warnf("[event] publish %s topic=%s type=fall_detected event_uuid=%s sample_seq=%lu bytes=%u reason=%s samples=%u window_ms=%lu peak_accel=%.2f peak_gyro=%.2f orientation_delta=%.1f\n",
-                  published ? "ok" : "queued",
+    AppLog::warnf("[event] outbox %s topic=%s type=fall_detected event_uuid=%s sample_seq=%lu bytes=%u reason=%s samples=%u window_ms=%lu peak_accel=%.2f peak_gyro=%.2f orientation_delta=%.1f\n",
+                  published ? "accepted" : "rejected",
                   topic.c_str(),
                   eventUuid.c_str(),
                   static_cast<unsigned long>(sensorSampleSeq),
@@ -820,8 +875,9 @@ void publishSosAlert() {
   const float gyroMagnitude =
       latestReading.valid ? latestReading.gyroMagnitudeDegPerSec : 0.0f;
 
-  const uint32_t eventSequence = nextMonotonicSequence(criticalEventSeq);
-  const String eventUuid = buildCriticalEventUuid("sos_pressed", eventSequence, millis());
+  const EventIdentity::NextEvent identity = eventIdentity.next();
+  const uint32_t eventSequence = identity.sequence;
+  const String eventUuid = identity.uuid.c_str();
   const String payload = buildEventPayload("sos_pressed",
                                            accelMagnitude,
                                            gyroMagnitude,
@@ -830,10 +886,11 @@ void publishSosAlert() {
                                            eventSequence,
                                            sensorSampleSeq);
   const String topic = DeviceSettings::buildTopic(runtimeConfig(), "events");
-  const bool published = publishCriticalEvent(topic, payload, "sos_pressed", eventUuid);
+  const bool published = enqueueCriticalEvent(
+      topic, payload, "sos_pressed", eventUuid, eventIdentity.orderFor(eventSequence));
   if (AppConfig::FIRMWARE_MQTT_DIAGNOSTIC_ENABLED) {
-    AppLog::warnf("[event] publish %s topic=%s type=sos_pressed event_uuid=%s sample_seq=%lu bytes=%u\n",
-                  published ? "ok" : "queued",
+    AppLog::warnf("[event] outbox %s topic=%s type=sos_pressed event_uuid=%s sample_seq=%lu bytes=%u\n",
+                  published ? "accepted" : "rejected",
                   topic.c_str(),
                   eventUuid.c_str(),
                   static_cast<unsigned long>(sensorSampleSeq),
@@ -859,7 +916,7 @@ void publishPeriodicStatus() {
                   sensorReady ? 1U : 0U,
                   sensorSampleFresh ? 1U : 0U,
                   lastSensorReadSucceeded ? 1U : 0U,
-                  static_cast<unsigned>(eventBuffer.size()));
+                  static_cast<unsigned>(criticalOutbox.stats().pending));
   }
 }
 
@@ -980,44 +1037,71 @@ void maybeSyncPatientProfile(unsigned long nowMs) {
   }
 }
 
-void maybePersistBufferedEvents(unsigned long nowMs) {
-  if (!AppConfig::EVENT_BUFFER_PERSISTENCE_ENABLED || !eventBuffer.isDirty()) {
+// Eventos persistidos em NVS pelo buffer legado (<= v0.9.4) entram na outbox
+// com a identidade original e ordem anterior a qualquer evento novo.
+void migrateLegacyPendingEvents() {
+  BufferedEvent legacy[AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY];
+  const size_t count =
+      configStore.loadPendingEvents(legacy, AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY);
+  if (count == 0U) {
     return;
   }
 
-  if (lastEventBufferPersistAtMs > 0U &&
-      (nowMs - lastEventBufferPersistAtMs) < AppConfig::EVENT_BUFFER_PERSIST_INTERVAL_MS) {
-    return;
-  }
-
-  if (persistCriticalEventSnapshot(nowMs)) {
-    if (AppConfig::FIRMWARE_EVENT_BUFFER_DEBUG_ENABLED) {
-      BufferedEvent snapshot[AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY];
-      const size_t snapshotCount =
-          buildCriticalEventSnapshot(snapshot, AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY);
-      AppLog::debugf("Snapshot do buffer critico salvo em NVS com %u evento(s).\n",
-                     static_cast<unsigned>(snapshotCount));
+  size_t migrated = 0;
+  for (size_t index = 0; index < count; ++index) {
+    StaticJsonDocument<64> filter;
+    filter["event_uuid"] = true;
+    StaticJsonDocument<256> identity;
+    deserializeJson(identity, legacy[index].payload, DeserializationOption::Filter(filter));
+    const char* uuid = identity["event_uuid"] | "";
+    if (uuid[0] == '\0') {
+      AppLog::errorf("[outbox] legacy_event_without_uuid index=%u kept_in_nvs=1\n",
+                     static_cast<unsigned>(index));
+      continue;
     }
+    const EnqueueResult result = criticalOutbox.enqueue(uuid,
+                                                        legacy[index].topic.c_str(),
+                                                        legacy[index].payload.c_str(),
+                                                        index + 1U,
+                                                        static_cast<uint32_t>(millis()));
+    if (result == EnqueueResult::Persisted || result == EnqueueResult::DuplicateUuid) {
+      ++migrated;
+    }
+  }
+
+  // Limpa o NVS legado somente se TODOS foram gravados no novo armazenamento.
+  if (migrated == count && configStore.clearPendingEvents()) {
+    AppLog::warnf("[outbox] legacy_migrated count=%u\n", static_cast<unsigned>(migrated));
+  } else {
+    AppLog::errorf("[outbox] legacy_migration_partial migrated=%u total=%u kept_in_nvs=1\n",
+                   static_cast<unsigned>(migrated),
+                   static_cast<unsigned>(count));
   }
 }
 
-void restoreBufferedEventsFromStore() {
-  if (!AppConfig::EVENT_BUFFER_PERSISTENCE_ENABLED) {
-    return;
-  }
+void beginCriticalDelivery() {
+  uint32_t bootCounter = 0;
+  const bool counterPersisted = incrementPersistentBootCounter(bootCounter);
+  eventIdentity.begin(DeviceSettings::technicalDeviceUid().c_str(),
+                      bootCounter,
+                      esp_random(),
+                      counterPersisted);
 
-  BufferedEvent persistedEvents[AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY];
-  const size_t restoredCount =
-      configStore.loadPendingEvents(persistedEvents, AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY);
+  const bool storeReady = criticalOutboxStore.begin();
+  criticalOutbox.begin(&criticalOutboxStore, static_cast<uint32_t>(millis()));
+  migrateLegacyPendingEvents();
 
-  if (restoredCount == 0U) {
-    return;
-  }
+  const OutboxStats stats = criticalOutbox.stats();
+  AppLog::infof("[boot] boot_id=%s counter_persisted=%u outbox_store=%u restored=%lu corrupted=%lu pending=%u\n",
+                eventIdentity.bootId().c_str(),
+                counterPersisted ? 1U : 0U,
+                storeReady ? 1U : 0U,
+                static_cast<unsigned long>(stats.restored),
+                static_cast<unsigned long>(stats.corruptedOnLoad),
+                static_cast<unsigned>(stats.pending));
 
-  eventBuffer.restoreFrom(persistedEvents, restoredCount);
-  eventBuffer.markPersisted();
-  AppLog::warnf("Restaurados %u evento(s) critico(s) pendente(s) apos reboot.\n",
-                static_cast<unsigned>(restoredCount));
+  mqttClient.setMessageHandler(handleIncomingMqttMessage);
+  mqttClient.setSubscription(criticalAckTopic(), 1);
 }
 
 void holdDisabledBuzzerInactive() {
@@ -1418,7 +1502,7 @@ void setup() {
                 AppConfig::BUZZER_ACTIVE_HIGH ? 1U : 0U,
                 AppConfig::BUZZER_ALARM_ONLY ? 1U : 0U);
   indicator.triggerPulse(80, "boot_autotest");
-  restoreBufferedEventsFromStore();
+  beginCriticalDelivery();
 
   lastStatusSentAtMs = millis();
   lastTelemetrySentAtMs = millis();
@@ -1489,9 +1573,9 @@ void loop() {
 
   maybeSyncPatientProfile(nowMs);
 
-  // Reenvia eventos pendentes em segundo plano quando a conectividade ja voltou.
-  flushBufferedEvents();
-  maybePersistBufferedEvents(nowMs);
+  // O device_id (e portanto o topico de ACK) pode mudar pelo portal.
+  mqttClient.setSubscription(criticalAckTopic(), 1);
+  serviceCriticalOutbox(nowMs);
 
   indicator.setBuzzerEnabled(runtimeConfig().alertTuning.buzzerEnabled);
   indicator.setState(computeIndicatorState());

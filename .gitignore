@@ -50,3 +50,9 @@ scripts/.runtime/
 *.bak
 *.tmp
 shared_chat.html
+
+# Research replay build and evaluation outputs (datasets reais nunca entram no Git)
+build/
+tools/research/out/
+tools/research/datasets/
+__pycache__/

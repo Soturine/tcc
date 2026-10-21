@@ -1,6 +1,7 @@
-#include "mqtt_client.h"
+#include "device_mqtt_client.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "app_config.h"
 #include "app_logging.h"
@@ -69,6 +70,7 @@ void DeviceMqttClient::configure(const DeviceSettings::DeviceConfig& config) {
 void DeviceMqttClient::disconnect() {
   client_.disconnect();
   wasConnected_ = false;
+  subscribed_ = false;
   resetFailureTracking();
 }
 
@@ -79,6 +81,7 @@ void DeviceMqttClient::update(bool wifiConnected) {
     }
     client_.disconnect();
     wasConnected_ = false;
+    subscribed_ = false;
     resetFailureTracking();
     return;
   }
@@ -92,6 +95,7 @@ void DeviceMqttClient::update(bool wifiConnected) {
 
   if (wasConnected_) {
     wasConnected_ = false;
+    subscribed_ = false;
     lastFailureCode_ = client_.state();
     if (AppConfig::FIRMWARE_MQTT_DIAGNOSTIC_ENABLED) {
       AppLog::warnf("[mqtt] disconnected state=%d reason=%s\n",
@@ -111,6 +115,47 @@ bool DeviceMqttClient::publish(const String& topic, const String& payload, bool 
   }
 
   return client_.publish(topic.c_str(), payload.c_str(), retained);
+}
+
+void DeviceMqttClient::setSubscription(const String& topic, uint8_t qos) {
+  if (topic == subscriptionTopic_ && qos == subscriptionQos_) {
+    return;
+  }
+  if (subscribed_ && client_.connected() && !subscriptionTopic_.isEmpty()) {
+    client_.unsubscribe(subscriptionTopic_.c_str());
+  }
+  subscriptionTopic_ = topic;
+  subscriptionQos_ = qos > 1U ? 1U : qos;
+  subscribed_ = false;
+  if (client_.connected()) {
+    subscribeIfConfigured();
+  }
+}
+
+void DeviceMqttClient::setMessageHandler(MessageHandler handler) {
+  client_.setCallback([handler](char* topic, uint8_t* payload, unsigned int length) {
+    if (handler) {
+      handler(topic, payload, length);
+    }
+  });
+}
+
+bool DeviceMqttClient::isSubscribed() const {
+  return subscribed_;
+}
+
+void DeviceMqttClient::subscribeIfConfigured() {
+  if (subscriptionTopic_.isEmpty()) {
+    return;
+  }
+  subscribed_ = client_.subscribe(subscriptionTopic_.c_str(), subscriptionQos_);
+  if (subscribed_) {
+    AppLog::infof("[mqtt] subscribed topic=%s qos=%u\n",
+                  subscriptionTopic_.c_str(),
+                  static_cast<unsigned>(subscriptionQos_));
+  } else {
+    AppLog::warnf("[mqtt] subscribe failed topic=%s\n", subscriptionTopic_.c_str());
+  }
 }
 
 bool DeviceMqttClient::isConnected() {
@@ -269,6 +314,7 @@ bool DeviceMqttClient::reconnect() {
     resetFailureTracking();
     lastSuccessfulConnectAtMs_ = millis();
     lastFailureCode_ = MQTT_CONNECTED;
+    subscribeIfConfigured();
     AppLog::infof("[mqtt] connected broker=%s:%u tls=%s clientId=%s\n",
                   host_.c_str(),
                   port_,

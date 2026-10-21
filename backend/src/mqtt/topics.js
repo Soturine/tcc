@@ -13,6 +13,12 @@ function getSubscriptionTopics(base = env.mqtt.topicBase) {
   ];
 }
 
+// Topico do ACK de aplicacao (critical-event-ack-v1). Usa o identificador do
+// topico autenticado de origem, nunca um identificador escolhido pelo payload.
+function buildCriticalEventAckTopic(deviceIdentifier, base = env.mqtt.topicBase) {
+  return `${normalizeBase(base)}/${deviceIdentifier}/critical-event-acks`;
+}
+
 function parseDeviceTopic(topic, base = env.mqtt.topicBase) {
   const normalizedBase = normalizeBase(base);
   const baseParts = normalizedBase.split("/");
@@ -36,6 +42,7 @@ function parseDeviceTopic(topic, base = env.mqtt.topicBase) {
 }
 
 module.exports = {
+  buildCriticalEventAckTopic,
   getSubscriptionTopics,
   parseDeviceTopic,
 };

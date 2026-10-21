@@ -1,0 +1,2 @@
+# Scripts executados em Linux/Docker/CI precisam de LF mesmo em checkout Windows.
+*.sh text eol=lf

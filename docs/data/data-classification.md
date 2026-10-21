@@ -31,6 +31,8 @@ O comando somente leitura `npm run data:measure:lifecycle --prefix backend` prod
 | Alocação de dados/índices de telemetria | 3.686.400 / 7.438.336 bytes | **measured engine metadata**; bytes alocados, não tamanho lógico do payload |
 | Linhas estimadas / média estimada pelo InnoDB | 21.939 / 168 bytes | **estimated** pelo storage engine |
 | Cadência registrada em `device_status` | 500 ms, Demo, 1 device | configuração **measured**; 172.800 linhas/device/dia é **derived** sob persistência contínua |
+| Alocação atual por linha exata | 456,999 bytes | **derived** de bytes alocados de dados + índices divididos pelas 24.343 linhas exatas; não é tamanho lógico do payload |
+| Crescimento por device/dia a 500 ms | 78.969.427,2 bytes | **estimated** ao combinar cadência derivada e alocação atual por linha; não é tráfego observado nem projeção de produção |
 
 No recorte de 24.483 linhas formado por telemetria, eventos, alertas e auditoria, as contagens exatas foram 24.343, 106, 22 e 12. As proporções correspondentes — 99,428%, 0,433%, 0,090% e 0,049% — são **derived** dessas contagens e servem apenas para mostrar que a telemetria domina esse recorte.
 

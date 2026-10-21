@@ -4,6 +4,8 @@
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
+#include <functional>
+
 #include "device_config.h"
 
 struct MqttConnectionProbeResult {
@@ -19,7 +21,14 @@ class DeviceMqttClient {
   void disconnect();
   void update(bool wifiConnected);
 
+  using MessageHandler = std::function<void(const char* topic, const uint8_t* payload, unsigned int length)>;
+
   bool publish(const String& topic, const String& payload, bool retained = false);
+  // Topico assinado a cada (re)conexao; sessao limpa nao preserva assinaturas.
+  void setSubscription(const String& topic, uint8_t qos);
+  void setMessageHandler(MessageHandler handler);
+  // true somente depois que a assinatura do topico configurado foi aceita.
+  bool isSubscribed() const;
   bool isConnected();
   bool hasValidConfiguration() const;
   uint8_t consecutiveFailureCount() const;
@@ -35,6 +44,7 @@ class DeviceMqttClient {
 
  private:
   bool reconnect();
+  void subscribeIfConfigured();
   void configureTransport();
   void resetFailureTracking();
 
@@ -57,4 +67,8 @@ class DeviceMqttClient {
   uint8_t consecutiveFailureCount_ = 0;
   int lastFailureCode_ = MQTT_DISCONNECTED;
   bool wasConnected_ = false;
+
+  String subscriptionTopic_;
+  uint8_t subscriptionQos_ = 1;
+  bool subscribed_ = false;
 };

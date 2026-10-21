@@ -103,7 +103,7 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
     );
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
 
-    assert.deepEqual(first.applied, ["001", "002"]);
+    assert.deepEqual(first.applied, ["001", "002", "003"]);
     assert.deepEqual(second.applied, []);
     assert.equal(rows[0].event_uuid, "evt-upgrade-001");
     assert.equal(rows[0].boot_id, "boot-upgrade-001");
@@ -119,8 +119,15 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
     assert.deepEqual(history.map((row) => [row.version, row.name]), [
       ["001", "event_identity"],
       ["002", "telemetry_retention_index"],
+      ["003", "event_evidence_source"],
     ]);
 
+    const revertedEvidenceSource = await runMigrations({ direction: "down", databasePool: pool });
+    assert.deepEqual(revertedEvidenceSource.reverted, ["003"]);
+    const [evidenceSourceAfterDown] = await pool.query(
+      "SHOW COLUMNS FROM events WHERE Field = 'evidence_source'",
+    );
+    assert.equal(evidenceSourceAfterDown.length, 0);
     const revertedIndex = await runMigrations({ direction: "down", databasePool: pool });
     assert.deepEqual(revertedIndex.reverted, ["002"]);
     const reverted = await runMigrations({ direction: "down", databasePool: pool });
@@ -167,10 +174,11 @@ integrationTest("runner registra migration sobre schema canonico sem eventos", a
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
     const [events] = await pool.query("SELECT COUNT(*) AS total FROM events");
 
-    assert.deepEqual(result.applied, ["001", "002"]);
+    assert.deepEqual(result.applied, ["001", "002", "003"]);
     assert.deepEqual(history.map((row) => [row.version, row.name]), [
       ["001", "event_identity"],
       ["002", "telemetry_retention_index"],
+      ["003", "event_evidence_source"],
     ]);
     assert.equal(events[0].total, 0);
   });

@@ -4,7 +4,7 @@
 
 #include "config_store.h"
 #include "device_config.h"
-#include "mqtt_client.h"
+#include "device_mqtt_client.h"
 #include "setup_portal.h"
 #include "wifi_manager.h"
 

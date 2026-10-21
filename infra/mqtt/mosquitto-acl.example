@@ -1,0 +1,18 @@
+# ACL de menor privilegio para staging/producao experimental (ADR-015, auditoria CP5).
+# Convencao: o username MQTT de cada device e o proprio device_id do topico.
+# Sem esta ACL qualquer cliente poderia publicar um ACK falso em
+# queda/devices/<outro>/critical-event-acks e fazer a outbox do device descartar
+# um evento que nunca foi persistido.
+
+# Backend: le todos os canais de device e e o UNICO publisher de ACK.
+user queda-backend
+topic read queda/devices/+/events
+topic read queda/devices/+/status
+topic read queda/devices/+/telemetry
+topic write queda/devices/+/critical-event-acks
+
+# Devices: escrevem apenas nos proprios canais e leem apenas o proprio ACK.
+pattern write queda/devices/%u/events
+pattern write queda/devices/%u/status
+pattern write queda/devices/%u/telemetry
+pattern read queda/devices/%u/critical-event-acks

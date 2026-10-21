@@ -92,6 +92,8 @@ Divergência entre tópico/principal e payload deve ser rejeitada/quarentenada e
 - rotação se houver exposição;
 - secret scanning.
 
+**Implementado (2026-10-21, F-03):** `validateRuntimeConfig()` em `backend/src/config/env.js` trata somente `NODE_ENV=development|test` como local. Fora disso não existe fallback e o startup é recusado com segredo ausente, conhecido/default ou com menos de 32 caracteres; as mensagens não contêm o valor. Coberto por `backend/tests/security/runtimeConfig.test.js`. Rotação e sessão revogável continuam pendentes (ADR-009).
+
 ### Sessão móvel roubada
 
 **Risco:** access token de longa duração extraído do device continua válido.
@@ -152,6 +154,22 @@ Os tempos exatos serão definidos posteriormente.
 - revogação;
 - diagnóstico claro de certificate/auth failure;
 - sem fallback silencioso para plaintext.
+
+**Implementado no backend (2026-10-21, F-04):** fora do ambiente local o startup é recusado com `mqtt://`, `MQTT_TLS_REJECT_UNAUTHORIZED=false`, CA declarada e ilegível ou credenciais MQTT ausentes. CORS `*` é recusado em qualquer ambiente e origens `http://` fora do local. O firmware ainda permite `tlsInsecure` e o default de fábrica continua apontando para broker público (F-17, P8); ACL por device permanece **planned**.
+
+### ACK de aplicação forjado
+
+**Risco (identificado no CP5 de 2026-10-21):** o device remove um evento crítico da outbox ao receber ACK válido no próprio tópico. Sem ACL no broker, qualquer cliente pode publicar em `queda/devices/<id>/critical-event-acks` e fazer o device descartar um evento nunca persistido.
+
+**Mitigação:** somente o principal do backend pode publicar em `+/critical-event-acks`; cada device lê apenas o próprio ACK e escreve apenas nos próprios canais. Referência em [`infra/mqtt/mosquitto-acl.example`](../../infra/mqtt/mosquitto-acl.example), verificada contra Mosquitto 2.1.2 real e descartável por [`infra/mqtt/verify-acl.js`](../../infra/mqtt/verify-acl.js): credencial inválida recusada, ACK forjado por outro device não entregue, ACK alheio não lido, evento em tópico alheio não entregue ao backend.
+
+**Risco residual:** o broker de CI e o default de fábrica do firmware continuam sem autenticação (F-17); a ACL só protege um ambiente que a aplique. O firmware valida tópico e schema, mas não autentica a origem do ACK além do broker.
+
+### Remapeamento de identidade pelo `device_uid` do payload
+
+**Risco (F-11):** mensagem MQTT com o `device_uid` de um device pareado, publicada em outro tópico, renomeava o device e herdava seu tenant.
+
+**Implementado:** a ingestão MQTT recusa, antes de qualquer escrita, `device_uid` que pertença a device pareado com outro identificador (`DEVICE_IDENTITY_MISMATCH`). Fluxos HTTP autenticados de cadastro/pairing continuam podendo renomear. Testes: `backend/tests/security/deviceIdentityMismatch.test.js` e cenário 12 de `npm run test:e2e:critical`.
 
 ### CORS/WebSocket origin aberto
 

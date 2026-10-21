@@ -451,7 +451,7 @@ O diagrama das principais relações está em [docs/database-model.md](../docs/d
 - `npm run db:migrate:down`: reverte a última migration em ambiente controlado
 - `npm run test:mysql:migrations`: testa upgrade, rollback e concorrência em bancos MySQL descartáveis
 - `npm run test:mysql:retention`: testa retenção, evidência, auditoria, batches e rollback em MySQL descartável
-- `npm run data:measure:lifecycle`: mede contagens, alocação, estimativas do engine e cadência sem alterar dados
+- `npm run data:measure:lifecycle`: mede contagens/alocação e deriva cadência, bytes por linha e crescimento aproximado por device/dia sem alterar dados
 - `npm run data:retention:telemetry`: executa dry-run manual; somente `-- --before=<ISO_COM_TIMEZONE> --apply` autoriza batches de exclusão
 - `npm run db:migrate:alert-actions`: garante ações de alerta sem resetar dados existentes
 - `npm run db:migrate:evidence`: aplica colunas/tabela de evidência sem resetar dados existentes

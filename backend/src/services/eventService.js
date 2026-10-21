@@ -34,6 +34,10 @@ const ALERT_EVENT_TYPES = new Set([
   "manual_sos",
   "sensor_fault",
 ]);
+// "Testar alerta" (P5): persistido e confirmado ao device, nunca vira alerta real.
+const TEST_EVENT_TYPES = new Set(["alert_test"]);
+const LOCAL_EVIDENCE_VERSION = 1;
+const EVIDENCE_SOURCES = new Set(["device", "server_telemetry", "both", "none"]);
 
 function toFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -157,6 +161,10 @@ function resolveMqttPersistenceTime(payload, receivedAt, override = null) {
 }
 
 function deriveSeverity(eventType, payload) {
+  if (TEST_EVENT_TYPES.has(eventType)) {
+    return "low";
+  }
+
   switch (eventType) {
     case "fall_detected":
       return toBoolean(payload.immobility_confirmed ?? payload.immobility)
@@ -195,6 +203,8 @@ function deriveMessage(eventType, payload) {
       return "SOS manual acionado pelo dispositivo.";
     case "sensor_fault":
       return "Falha crítica de sensor reportada pelo dispositivo.";
+    case "alert_test":
+      return "Teste de alerta solicitado; não representa queda.";
     default:
       return "Evento recebido do dispositivo.";
   }
@@ -208,12 +218,73 @@ function hasTelemetryEvidence(event) {
   return ["linked", "partial"].includes(event?.evidenceStatus);
 }
 
+/**
+ * Evidencia local versionada enviada pelo edge (ADR-016). So conta como queda
+ * confirmada quando as tres etapas da FSM foram declaradas: impacto, mudanca de
+ * orientacao e imobilidade. Um impacto isolado nunca confirma queda.
+ */
+function resolveLocalEvidence(payload = {}) {
+  const evidence = isPlainObject(payload) ? payload.local_evidence : null;
+
+  if (!isPlainObject(evidence)) {
+    return { present: false, confirmed: false, version: null, reason: "absent" };
+  }
+  if (evidence.version !== LOCAL_EVIDENCE_VERSION) {
+    return { present: true, confirmed: false, version: evidence.version ?? null, reason: "unsupported_version" };
+  }
+  if (evidence.decision_source !== "edge") {
+    return { present: true, confirmed: false, version: LOCAL_EVIDENCE_VERSION, reason: "invalid_decision_source" };
+  }
+
+  const confirmed =
+    evidence.impact_detected === true &&
+    evidence.orientation_change_detected === true &&
+    evidence.immobility_detected === true;
+
+  return {
+    present: true,
+    confirmed,
+    version: LOCAL_EVIDENCE_VERSION,
+    reason: confirmed ? null : "incomplete_fsm_stages",
+    algorithmVersion: typeof evidence.algorithm_version === "string" ? evidence.algorithm_version : null,
+    detectorMode: typeof evidence.detector_mode === "string" ? evidence.detector_mode : null,
+    peakAccelG: toNullableNumber(evidence.peak_accel_g),
+    peakGyroDps: toNullableNumber(evidence.peak_gyro_dps),
+    orientationDeltaDeg: toNullableNumber(evidence.orientation_delta_deg),
+    immobilityDurationMs: toNullableNumber(evidence.immobility_duration_ms),
+  };
+}
+
+function resolveEvidenceSource(localEvidence, telemetryEvidence) {
+  const device = Boolean(localEvidence?.confirmed);
+  const server = ["linked", "partial"].includes(telemetryEvidence?.status);
+
+  if (device && server) {
+    return "both";
+  }
+  if (device) {
+    return "device";
+  }
+  return server ? "server_telemetry" : "none";
+}
+
+/**
+ * Politica de alerta:
+ * - fall_detected: alerta com evidencia local confirmada OU telemetria do servidor;
+ *   sem nenhuma das duas ("none") o evento e persistido sem alerta (evidencia insuficiente);
+ * - fall_suspected, SOS e sensor_fault: alerta (severidade derivada no backend);
+ * - alert_test e eventos informativos: nunca geram alerta real.
+ * Registros antigos sem evidence_source mantem a regra baseada so na telemetria.
+ */
 function shouldCreateAlertForEvent(event) {
   if (!event || !shouldCreateAlert(event.eventType)) {
     return false;
   }
 
   if (event.eventType === "fall_detected") {
+    if (EVIDENCE_SOURCES.has(event.evidenceSource)) {
+      return event.evidenceSource !== "none";
+    }
     return hasTelemetryEvidence(event);
   }
 
@@ -427,6 +498,10 @@ function buildEvidenceSummaryForPayload(evidence, payload = {}) {
     links: evidence?.links || [],
   };
 
+  const localEvidence = resolveLocalEvidence(payload);
+  summary.localEvidence = localEvidence;
+  summary.evidenceSource = resolveEvidenceSource(localEvidence, evidence);
+
   if (firmwareDecision) {
     summary.firmwareDecision = firmwareDecision;
     summary.decisionSource = firmwareDecision.decisionSource;
@@ -534,6 +609,9 @@ function mapEventRow(row) {
     evidenceSampleCount: evidenceSampleCount == null ? 0 : Number(evidenceSampleCount),
     evidenceWindowSeconds: toNullableNumber(evidenceWindowSeconds),
     evidenceSummary: parseMaybeJson(evidenceSummaryJson),
+    evidenceSource: EVIDENCE_SOURCES.has(row.evidenceSource ?? row.evidence_source)
+      ? row.evidenceSource ?? row.evidence_source
+      : null,
     eventUuid: normalizeBoundedString(row.eventUuid ?? row.event_uuid, EVENT_UUID_MAX_LENGTH)
       || normalizeEventUuid(rawPayloadJson),
     sampleSeq: extractSampleSeq(rawPayloadJson),
@@ -720,6 +798,7 @@ async function getEventById(eventId, accessContext, executor = null) {
         e.evidence_sample_count AS evidenceSampleCount,
         e.evidence_window_seconds AS evidenceWindowSeconds,
         e.evidence_summary_json AS evidenceSummaryJson,
+        e.evidence_source AS evidenceSource,
         e.event_time,
         e.occurred_at_device AS occurredAtDevice,
         e.received_at AS receivedAt,
@@ -803,9 +882,11 @@ async function recordEventFromMqtt({
     ? await resolveFallTelemetryEvidence({ device, eventTime, immobility }, executor)
     : buildEmptyEvidence(immobility);
   const evidenceSummary = buildEvidenceSummaryForPayload(evidence, payload);
+  const evidenceSource = shouldLinkTelemetryEvidence ? evidenceSummary.evidenceSource : null;
   let severity = deriveSeverity(eventType, payload);
 
-  if (eventType === "fall_detected" && evidence.status === "none") {
+  // Sem evidencia local confirmada nem telemetria, a queda nao e tratada como urgente.
+  if (eventType === "fall_detected" && evidenceSource === "none") {
     severity = "medium";
   }
 
@@ -830,6 +911,7 @@ async function recordEventFromMqtt({
           evidence_sample_count,
           evidence_window_seconds,
           evidence_summary_json,
+          evidence_source,
           event_time,
           occurred_at_device,
           received_at,
@@ -838,7 +920,7 @@ async function recordEventFromMqtt({
           clock_quality,
           raw_payload_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         device.organization?.id || null,
@@ -856,6 +938,7 @@ async function recordEventFromMqtt({
         evidence.sampleCount,
         evidence.windowSeconds,
         JSON.stringify(evidenceSummary),
+        evidenceSource,
         eventTime,
         temporal.occurredAtDevice,
         temporal.receivedAt,
@@ -925,8 +1008,8 @@ async function recordEventFromMqtt({
     durationMs: elapsedMsSince(startedAt),
   });
 
-  if (eventType === "fall_detected" && event.evidenceStatus === "none") {
-    logger.warn("Evento fall_detected sem evidencia de telemetria recente.", {
+  if (eventType === "fall_detected" && evidenceSource === "none") {
+    logger.warn("Evento fall_detected sem evidencia local confirmada nem telemetria recente.", {
       correlationId,
       eventId: event.id,
       deviceId: device.id,
@@ -1100,6 +1183,7 @@ async function listEvents(filters = {}, accessContext) {
         e.evidence_sample_count AS evidenceSampleCount,
         e.evidence_window_seconds AS evidenceWindowSeconds,
         e.evidence_summary_json AS evidenceSummaryJson,
+        e.evidence_source AS evidenceSource,
         e.event_time,
         e.occurred_at_device AS occurredAtDevice,
         e.received_at AS receivedAt,
@@ -1146,6 +1230,8 @@ async function listDeviceEvents(deviceId, filters = {}, accessContext) {
 }
 
 module.exports = {
+  resolveEvidenceSource,
+  resolveLocalEvidence,
   buildTelemetryEvidence,
   buildEvidenceSummaryForPayload,
   deriveMessage,

@@ -500,3 +500,138 @@ test("fall_detected nao usa telemetria stale ou de outro device", async () => {
     harness.restore();
   }
 });
+
+function confirmedLocalEvidence(overrides = {}) {
+  return {
+    version: 1,
+    decision_source: "edge",
+    algorithm_version: "threshold_fsm_v2_time_features_v1",
+    detector_mode: "normal",
+    impact_detected: true,
+    orientation_change_detected: true,
+    immobility_detected: true,
+    peak_accel_g: 3.1,
+    peak_gyro_dps: 210,
+    orientation_delta_deg: 80,
+    immobility_duration_ms: 2000,
+    ...overrides,
+  };
+}
+
+test("queda confirmada offline sem telemetria SQL usa evidencia local e permanece alertavel", async () => {
+  const harness = buildHarness([]);
+
+  try {
+    const event = await harness.eventService.recordEventFromMqtt({
+      device: buildDevice(),
+      payload: {
+        event_type: "fall_detected",
+        event_uuid: "esp32-aabb:b00000003-00000001:00000001",
+        immobility_confirmed: true,
+        clock_quality: "synced",
+        occurred_at_device: "2026-05-13T13:00:00.000Z",
+        local_evidence: confirmedLocalEvidence(),
+      },
+      eventTime: new Date("2026-05-13T13:00:00.000Z"),
+      receivedAt: new Date("2026-05-13T14:38:10.000Z"),
+    });
+
+    assert.equal(event.evidenceStatus, "none");
+    assert.equal(event.evidenceSource, "device");
+    assert.equal(event.severity, "critical");
+    assert.equal(eventInsertValue(harness.calls.eventInserts[0], "evidence_source"), "device");
+    assert.equal(harness.eventService.shouldCreateAlertForEvent(event), true);
+    assert.equal(event.evidenceSummary.localEvidence.confirmed, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("evidencia local incompleta ou de versao desconhecida nao confirma queda", async () => {
+  const harness = buildHarness([]);
+
+  try {
+    for (const localEvidence of [
+      confirmedLocalEvidence({ orientation_change_detected: false }),
+      confirmedLocalEvidence({ immobility_detected: "true" }),
+      confirmedLocalEvidence({ version: 2 }),
+      confirmedLocalEvidence({ decision_source: "server" }),
+    ]) {
+      const event = await harness.eventService.recordEventFromMqtt({
+        device: buildDevice(),
+        payload: { event_type: "fall_detected", immobility_confirmed: true, local_evidence: localEvidence },
+      });
+      assert.equal(event.evidenceSource, "none");
+      assert.equal(event.severity, "medium");
+      assert.equal(harness.eventService.shouldCreateAlertForEvent(event), false);
+    }
+  } finally {
+    harness.restore();
+  }
+});
+
+test("evidencia local e telemetria do servidor combinadas resultam em both", async () => {
+  const harness = buildHarness([
+    {
+      id: 81,
+      device_id: 5,
+      organization_id: 1,
+      patient_id: 2,
+      device_assignment_history_id: 3,
+      accel_magnitude: 2.9,
+      gyro_magnitude: 180,
+      created_at: "2026-05-13T14:38:09.000Z",
+    },
+    {
+      id: 82,
+      device_id: 5,
+      organization_id: 1,
+      patient_id: 2,
+      device_assignment_history_id: 3,
+      accel_magnitude: 1.0,
+      gyro_magnitude: 3,
+      created_at: "2026-05-13T14:38:11.000Z",
+    },
+  ]);
+
+  try {
+    const event = await harness.eventService.recordEventFromMqtt({
+      device: buildDevice(),
+      payload: {
+        event_type: "fall_detected",
+        immobility_confirmed: true,
+        local_evidence: confirmedLocalEvidence(),
+      },
+      eventTime: new Date("2026-05-13T14:38:10.000Z"),
+    });
+    assert.equal(event.evidenceStatus, "linked");
+    assert.equal(event.evidenceSource, "both");
+  } finally {
+    harness.restore();
+  }
+});
+
+test("politica de alerta distingue tipos e fontes de evidencia", () => {
+  const harness = buildHarness([]);
+  try {
+    const { resolveEvidenceSource, resolveLocalEvidence, shouldCreateAlertForEvent, deriveSeverity, shouldCreateAlert } =
+      harness.eventService;
+    assert.deepEqual(resolveLocalEvidence({}), { present: false, confirmed: false, version: null, reason: "absent" });
+    assert.equal(resolveEvidenceSource({ confirmed: false }, { status: "partial" }), "server_telemetry");
+    assert.equal(resolveEvidenceSource({ confirmed: true }, { status: "none" }), "device");
+    assert.equal(resolveEvidenceSource({ confirmed: false }, { status: "none" }), "none");
+
+    assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "device" }), true);
+    assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "server_telemetry" }), true);
+    assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "none", evidenceStatus: "linked" }), false);
+    // Registro legado sem evidence_source preserva a regra anterior.
+    assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: null, evidenceStatus: "linked" }), true);
+    assert.equal(shouldCreateAlertForEvent({ eventType: "sos_pressed", evidenceSource: null }), true);
+
+    assert.equal(shouldCreateAlert("alert_test"), false);
+    assert.equal(shouldCreateAlertForEvent({ eventType: "alert_test", evidenceSource: "device" }), false);
+    assert.equal(deriveSeverity("alert_test", { immobility_confirmed: true }), "low");
+  } finally {
+    harness.restore();
+  }
+});

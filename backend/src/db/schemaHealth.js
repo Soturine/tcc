@@ -13,6 +13,7 @@ const REQUIRED_RUNTIME_SCHEMA = [
   { tableName: "events", columnName: "evidence_sample_count" },
   { tableName: "events", columnName: "evidence_window_seconds" },
   { tableName: "events", columnName: "evidence_summary_json" },
+  { tableName: "events", columnName: "evidence_source" },
   { tableName: "device_status", columnName: "sensor_ready" },
   { tableName: "device_status", columnName: "sensor_valid" },
   { tableName: "device_status", columnName: "sensor_read_ok" },

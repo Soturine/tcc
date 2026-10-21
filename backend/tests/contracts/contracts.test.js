@@ -127,7 +127,7 @@ test("schemas MQTT current validam exemplos reais e rejeitam campos obrigatorios
   }
 });
 
-test("schemas planned v1 exigem versao e correlacao do ACK", () => {
+test("envelope planned v1 e ACK implementado exigem versao e correlacao", () => {
   const ajv = buildAjv();
   const eventValidator = ajv.compile(readJson("critical-event-v1.schema.json"));
   const ackValidator = ajv.compile(readJson("critical-event-ack-v1.schema.json"));
@@ -143,6 +143,10 @@ test("schemas planned v1 exigem versao e correlacao do ACK", () => {
   const ackWithoutEventUuid = clone(ack);
   delete ackWithoutEventUuid.event_uuid;
   assert.equal(ackValidator(ackWithoutEventUuid), false);
+  assert.equal(ackValidator({ ...ack, status: "duplicate" }), true);
+  assert.equal(ackValidator({ ...ack, status: "rejected" }), false);
+  assert.equal(ackValidator({ ...ack, retain: true }), false);
+
 });
 
 test("topicos e payloads representativos respeitam o buffer MQTT atual", () => {
@@ -158,7 +162,9 @@ test("topicos e payloads representativos respeitam o buffer MQTT atual", () => {
   const cases = [
     ["status", "examples/status.current.json", 1024],
     ["telemetry", "examples/telemetry.current.json", 1024],
-    ["events", "examples/event.current.json", 3072],
+    // 3584: budget revisado em 2026-10-21 apos boot_id/clock/local_evidence; o firmware
+    // recusa payload critico > 3800 bytes e o pacote MQTT precisa caber em 4096 bytes.
+    ["events", "examples/event.current.json", 3584],
   ];
   const measured = {};
 
@@ -175,4 +181,27 @@ test("topicos e payloads representativos respeitam o buffer MQTT atual", () => {
   }
 
   console.log(`contract payload sizes: ${JSON.stringify(measured)}`);
+});
+
+test("ACK gerado pelo backend valida contra critical-event-ack-v1", () => {
+  const { buildCriticalEventAck } = require("../../src/services/mqttIngestionService");
+  const validate = buildAjv().compile(readJson("critical-event-ack-v1.schema.json"));
+
+  const committed = buildCriticalEventAck({
+    id: 42,
+    eventUuid: "esp32-aabb:b00000002-1234abcd:00000001",
+    persistedAt: "2026-10-21T10:00:00.123Z",
+  });
+  const duplicate = buildCriticalEventAck({
+    id: "42",
+    eventUuid: "esp32-aabb:b00000002-1234abcd:00000001",
+    deduplicated: true,
+    persistedAt: "2026-10-21T10:00:00.123Z",
+  });
+
+  assert.equal(validate(committed), true, JSON.stringify(validate.errors));
+  assert.equal(validate(duplicate), true, JSON.stringify(validate.errors));
+  assert.equal(committed.status, "committed");
+  assert.equal(duplicate.status, "duplicate");
+  assert.equal(duplicate.event_id, 42);
 });

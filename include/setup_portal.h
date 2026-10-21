@@ -6,7 +6,7 @@
 
 #include "config_store.h"
 #include "device_config.h"
-#include "mqtt_client.h"
+#include "device_mqtt_client.h"
 
 using BuzzerTestCallback = bool (*)(String* message);
 

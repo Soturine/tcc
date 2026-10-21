@@ -4,6 +4,7 @@
 
 #include "app_config.h"
 #include "models.h"
+#include "sensor_signal.h"
 
 class SensorMPU6050 {
  public:
@@ -50,7 +51,6 @@ class SensorMPU6050 {
 
   SensorReading reading_;
   bool ready_ = false;
-  bool filterInitialized_ = false;
   bool lastReadSucceeded_ = false;
   TwoWire* wire_ = nullptr;
   uint8_t address_ = 0x68;
@@ -77,10 +77,5 @@ class SensorMPU6050 {
   float accelOffsetYG_ = 0.0f;
   float accelOffsetZG_ = 0.0f;
 
-  float filteredAccelXG_ = 0.0f;
-  float filteredAccelYG_ = 0.0f;
-  float filteredAccelZG_ = 0.0f;
-  float filteredGyroXDegPerSec_ = 0.0f;
-  float filteredGyroYDegPerSec_ = 0.0f;
-  float filteredGyroZDegPerSec_ = 0.0f;
+  SensorSignal::LowPassState lowPass_;
 };

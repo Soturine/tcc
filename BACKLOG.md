@@ -19,7 +19,7 @@ Auditorias:
 - [x] Alinhar CI a Node 24 LTS.
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
-- [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.
+- [x] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios (`validateRuntimeConfig`, auditoria 2026-10-21 F-03/F-04).
 - [x] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
 - [x] Implementar CI remota mínima **antes de refatorações relevantes**:
   - backend check/test;
@@ -67,37 +67,39 @@ Detector baseline deve ter semântica honesta e regressões básicas; contratos 
 
 ## P2 — Critical Event Reliability
 
-- [ ] Criar testes de caracterização do buffer/retry atual.
-- [ ] Fazer spike do firmware com ESP-MQTT (`esp_mqtt_client`) ou alternativa que prove QoS 1 real.
-- [ ] Registrar decisão da biblioteca em ADR se o spike alterar a direção atual.
-- [ ] Criar `CriticalEventOutbox` persistente/testável.
-- [ ] Gerar `event_uuid` robusto a reboot e independente de wall clock.
-- [ ] Publicar evento crítico QoS 1.
-- [ ] Backend persiste evento de forma idempotente.
-- [ ] Backend emite ACK de aplicação **somente após commit**.
-- [ ] Device remove da outbox somente após ACK correspondente.
-- [ ] ACK duplicado deve ser seguro.
-- [ ] Reenvio após timeout/reboot deve preservar UUID.
-- [ ] Avaliar sessão MQTT persistente como otimização de recovery/latência; não depender dela para correção ponta a ponta.
+- [x] Criar testes de caracterização do buffer/retry atual (`e9011f0`).
+- [x] Fazer spike do firmware com ESP-MQTT (`esp_mqtt_client`): API QoS 1 e custo de memória comprovados em build; execução em hardware pendente.
+- [x] Registrar decisão da biblioteca em ADR (ADR-020).
+- [x] Criar `CriticalEventOutbox` persistente/testável (LittleFS + testes host).
+- [x] Gerar `event_uuid` robusto a reboot e independente de wall clock.
+- [ ] Publicar evento crítico QoS 1 — adiado por ADR-020 até HIL; entrega garantida pela outbox + ACK de aplicação.
+- [x] Backend persiste evento de forma idempotente.
+- [x] Backend emite ACK de aplicação **somente após commit**.
+- [x] Device remove da outbox somente após ACK correspondente (host; HIL pendente).
+- [x] ACK duplicado deve ser seguro.
+- [x] Reenvio após timeout/reboot deve preservar UUID (host; HIL pendente).
+- [x] Avaliar sessão MQTT persistente como otimização de recovery/latência — avaliada e adiada (F-13, ADR-020); correção não depende dela.
 - [ ] Testar broker temporariamente offline.
-- [ ] Testar backend temporariamente offline/restart.
-- [ ] Testar duplicata, reorder e ACK perdido.
-- [ ] Instrumentar fila: quantidade, item mais antigo, overflow/drop.
-- [ ] Definir comportamento de overflow sem `drop oldest` silencioso para críticos.
+- [x] Testar backend temporariamente offline/restart (emulação E2E).
+- [x] Testar duplicata, reorder e ACK perdido (emulação E2E).
+- [x] Instrumentar fila: quantidade, item mais antigo, overflow, falhas de persistência e ACKs (`status.critical_outbox`).
+- [x] Definir comportamento de overflow sem `drop oldest` silencioso para críticos (novo evento recusado e contado).
 
 ### Offline fall evidence
 
 - [ ] Separar evidence bundle grande/raw do evento crítico se a pesquisa exigir janela maior.
 - [ ] `fall_suspected` não deve seguir o mesmo caminho urgente de uma queda confirmada por default.
-- [ ] Remover dependência exclusiva de `telemetry_logs` para criar alerta de `fall_detected` confirmado pelo edge.
-- [ ] Definir evidência local versionada no evento/bundle.
-- [ ] Adicionar `evidence_source = device/server_telemetry/both/none`.
-- [ ] Testar queda offline → reconexão → **um alerta lógico** mesmo sem telemetria SQL da janela original.
-- [ ] Garantir que evento antigo não seja reclassificado como ocorrido no momento da reconexão.
+- [x] Remover dependência exclusiva de `telemetry_logs` para criar alerta de `fall_detected` confirmado pelo edge.
+- [x] Definir evidência local versionada no evento (`local_evidence.version = 1`).
+- [x] Adicionar `evidence_source = device/server_telemetry/both/none` (migration 003).
+- [x] Testar queda offline → reconexão → **um alerta lógico** mesmo sem telemetria SQL da janela original (emulação E2E; HIL pendente).
+- [x] Garantir que evento antigo não seja reclassificado como ocorrido no momento da reconexão quando o relógio do device está sincronizado; sem sincronização, `event_time` usa `received_at` e `clock_quality=unsynced` fica registrado.
 
 ### Gate P2
 
 Antes do app ser chamado de interface principal, CUJ de perda de Internet deve provar persistência e criação correta de alerta.
+
+**Estado (2026-10-21):** provado em testes host do firmware e em emulação ponta a ponta com backend/MySQL/Mosquitto reais ([registro](docs/quality/critical-delivery-validation.md)). Falta HIL com ESP32 físico e o teste com broker indisponível; o gate permanece **parcial**.
 
 ## P3 — Hardening backend, portal e modularização conservadora
 
@@ -106,12 +108,12 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Criar transactional outbox backend para notificações.
 - [ ] Criar worker de notificações idempotente.
 - [ ] Reforçar testes de tenant/object authorization.
-- [ ] JWT secret ausente/fraco deve falhar em ambiente externo.
+- [x] JWT secret ausente/fraco deve falhar em ambiente externo.
 - [ ] Criar modelo de sessão mobile revogável com refresh rotation.
 - [ ] Rate limit em login/register/pairing/sync/rotas expostas.
 - [ ] Decidir se staging precisa de self-registration pública; caso contrário usar bootstrap/invite/admin controlado.
 - [ ] Reforçar política/validação de senha e e-mail antes de exposição pública.
-- [ ] CORS/Socket origins allowlist em staging.
+- [x] CORS/Socket origins allowlist em staging (`*` recusado; `http://` recusado fora do ambiente local).
 - [ ] Adicionar `/live` e `/ready` distintos.
 - [ ] Schema incompatível deixa readiness false/falha startup conforme ambiente.
 - [ ] Métricas/logs para MQTT, outbox, push, rejects e devices offline.
@@ -218,14 +220,14 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 
 - [ ] Revisão bibliográfica validada.
 - [ ] Incluir trabalhos de real-fall/long-term/cross-dataset na revisão, não apenas datasets laboratoriais.
-- [ ] Definir protocolo experimental antes da coleta final.
+- [x] Definir protocolo experimental antes da coleta final (proposta versionada em `docs/research/experimental-protocol.md`; pendente de validação do orientador).
 - [ ] Instrumentar t0..t5 e clock quality.
 - [ ] Executar baseline de latência/recovery.
 - [ ] Analisar p50/p95/p99.
 - [ ] Definir requisitos quantitativos a partir dos dados.
 - [ ] Ensaios seguros de detecção.
-- [ ] Scripts/dados reproduzíveis.
-- [ ] Separar métricas do detector de métricas do pipeline de entrega.
+- [x] Scripts reproduzíveis (`tools/research`: replay com detector real, métricas, split, proveniência). Execução com dados reais pendente.
+- [x] Separar métricas do detector de métricas do pipeline de entrega.
 
 ## P11 — Wearable / ML (somente após core verde)
 
@@ -235,7 +237,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] BLE gateway somente se necessário.
 - [ ] Validar background Android no hardware real.
 - [ ] Dataset compatível com posição/taxa do sensor.
-- [ ] Split de avaliação sem participant leakage.
+- [x] Infraestrutura de split por participante sem leakage (`fallbench split`).
 - [ ] Avaliar cross-dataset/real-fall generalization quando aplicável.
 - [ ] Comparar FSM com ML/TinyML somente com hipótese/baseline/métricas.
 - [ ] Avaliar Edge Impulse/ESP-DL apenas se justificarem o experimento.

@@ -76,6 +76,46 @@ function resolveRealtimeMqttTimestamp(value, receivedAt = new Date()) {
   };
 }
 
+// Tolerancia para relogio do device a frente do backend (drift/latencia).
+const MAX_DEVICE_FUTURE_SKEW_SECONDS = 60;
+
+/**
+ * Instante em que um evento critico OCORREU, para correlacao (evidencia,
+ * deduplicacao de alerta). Diferente da telemetria realtime, um evento entregue
+ * apos periodo offline pode ser legitimamente antigo: usa `occurred_at_device`
+ * somente quando o device declara relogio sincronizado e o valor e plausivel.
+ * Sem isso, usa a regra realtime (que cai para `received_at`) e sinaliza a fonte.
+ */
+function resolveCriticalEventOccurrence(payload = {}, receivedAt = new Date()) {
+  const receivedDate = receivedAt instanceof Date ? receivedAt : new Date(receivedAt);
+  const safeReceivedAt = Number.isNaN(receivedDate.getTime()) ? new Date() : receivedDate;
+
+  if (payload.clock_quality === "synced" && typeof payload.occurred_at_device === "string") {
+    const occurred = new Date(payload.occurred_at_device);
+    const deltaSeconds = (occurred.getTime() - safeReceivedAt.getTime()) / 1000;
+
+    if (
+      !Number.isNaN(occurred.getTime()) &&
+      deltaSeconds <= MAX_DEVICE_FUTURE_SKEW_SECONDS &&
+      deltaSeconds >= -MAX_DEVICE_CLOCK_SKEW_SECONDS
+    ) {
+      return {
+        date: occurred,
+        source: "device_occurred_at",
+        reason: null,
+        delaySeconds: Math.max(0, Math.round(-deltaSeconds)),
+      };
+    }
+
+    return {
+      ...resolveRealtimeMqttTimestamp(payload.timestamp, safeReceivedAt),
+      reason: "implausible_occurred_at_device",
+    };
+  }
+
+  return resolveRealtimeMqttTimestamp(payload.timestamp, safeReceivedAt);
+}
+
 function toIsoDate(value) {
   if (!value) {
     return null;
@@ -103,6 +143,7 @@ function parseDateBoundary(value, endOfDay = false) {
 module.exports = {
   isPlausibleDeviceUnixSeconds,
   parseDateBoundary,
+  resolveCriticalEventOccurrence,
   resolveRealtimeMqttTimestamp,
   toDateFromDeviceTimestamp,
   toDateFromUnixSeconds,

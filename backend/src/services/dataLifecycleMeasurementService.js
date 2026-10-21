@@ -62,6 +62,37 @@ function deriveConfiguredRowsPerDay(intervalMs) {
   return Number((86_400_000 / parsed).toFixed(3));
 }
 
+function deriveTelemetryGrowth(exactRowCount, dataLengthBytes, indexLengthBytes, cadences) {
+  const rowCount = toNumber(exactRowCount);
+  const allocatedDataBytes = toNumber(dataLengthBytes);
+  const allocatedIndexBytes = toNumber(indexLengthBytes);
+  const totalAllocatedBytes = allocatedDataBytes + allocatedIndexBytes;
+  const allocatedBytesPerExactRow = rowCount > 0
+    ? Number((totalAllocatedBytes / rowCount).toFixed(3))
+    : null;
+
+  return {
+    currentAllocation: {
+      exactRowCount: rowCount,
+      allocatedDataBytes,
+      allocatedIndexBytes,
+      allocatedBytesPerExactRow,
+      classification: "derived_from_measured_engine_allocation",
+      caveat: "Allocated bytes include table/index overhead and are not logical payload size.",
+    },
+    byConfiguredCadence: cadences.map((cadence) => ({
+      intervalMs: cadence.intervalMs,
+      detectorMode: cadence.detectorMode,
+      approximateAllocatedBytesPerDeviceDay:
+        allocatedBytesPerExactRow === null
+          ? null
+          : Number((cadence.configuredRowsPerDeviceDay * allocatedBytesPerExactRow).toFixed(3)),
+      classification: "estimated_from_derived_cadence_and_current_allocation",
+      condition: cadence.condition,
+    })),
+  };
+}
+
 async function telemetryObservations(executor) {
   const [[range]] = await executor.query(`
     SELECT
@@ -142,6 +173,14 @@ async function measureDataLifecycle(options = {}) {
     telemetryObservations(executor),
   ]);
 
+  const telemetryMetadata = metadata.get("telemetry_logs") || {};
+  const telemetryGrowth = deriveTelemetryGrowth(
+    counts.telemetry_logs,
+    telemetryMetadata.data_length_bytes,
+    telemetryMetadata.index_length_bytes,
+    telemetry.configuredCadences,
+  );
+
   return {
     measuredAt: new Date().toISOString(),
     tables: TRACKED_TABLES.map((tableName) => {
@@ -159,12 +198,16 @@ async function measureDataLifecycle(options = {}) {
         rowEstimateClassification: "estimated_by_storage_engine",
       };
     }),
-    telemetry,
+    telemetry: {
+      ...telemetry,
+      growth: telemetryGrowth,
+    },
     selectedRowProportions: buildProportions(counts),
     caveats: [
       "InnoDB TABLE_ROWS and AVG_ROW_LENGTH are storage-engine estimates.",
       "DATA_LENGTH and INDEX_LENGTH are allocated bytes, not logical payload bytes.",
       "Configured cadence derivation assumes continuous connectivity and valid samples; it is not observed persistence.",
+      "Per-device/day bytes are an estimate combining derived cadence with current allocated data/index bytes per exact row.",
       "This read-only measurement does not define a retention duration.",
     ],
   };
@@ -176,5 +219,6 @@ module.exports = {
   TRACKED_TABLES,
   buildProportions,
   deriveConfiguredRowsPerDay,
+  deriveTelemetryGrowth,
   measureDataLifecycle,
 };

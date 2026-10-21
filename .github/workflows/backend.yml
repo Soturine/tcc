@@ -102,7 +102,8 @@ jobs:
           MQTT_TOPIC_BASE: queda/devices
           ALERT_DELIVERY_DRY_RUN: "true"
         run: |
-          npm start > backend-ci.log 2>&1 &
+          # node direto: matar "npm start" deixaria o processo node orfao assinando o broker.
+          node src/server.js > backend-ci.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true' EXIT
 
@@ -127,3 +128,16 @@ jobs:
             cat backend-ci.log
             exit 1
           fi
+
+      - name: Run critical delivery failure scenarios (virtual device emulation)
+        working-directory: backend
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ""
+          MYSQL_DATABASE: queda_monitor
+          MQTT_BROKER_URL: mqtt://127.0.0.1:1883
+          MQTT_TOPIC_BASE: queda/devices
+          E2E_BACKEND_PORT: 4100
+        run: npm run test:e2e:critical

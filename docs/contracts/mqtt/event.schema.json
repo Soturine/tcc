@@ -58,7 +58,34 @@
     "sensor_failures": { "type": "integer", "minimum": 0 },
     "i2c_error_count": { "type": "integer", "minimum": 0 },
     "i2c_recovery_count": { "type": "integer", "minimum": 0 },
-    "i2c_last_error": { "type": "string" }
+    "i2c_last_error": { "type": "string" },
+    "boot_id": { "type": "string", "minLength": 1, "maxLength": 128, "description": "b<boot counter hex8>-<hardware nonce hex8>" },
+    "boot_id_counter_persisted": { "type": "boolean" },
+    "device_uptime_ms": { "type": "integer", "minimum": 0 },
+    "clock_quality": { "enum": ["synced", "unsynced", "unknown"] },
+    "occurred_at_device": { "type": ["string", "null"], "format": "date-time", "description": "null when the device clock is not synchronized" },
+    "local_evidence": {
+      "type": "object",
+      "description": "Versioned edge evidence (ADR-016). The backend treats it as a confirmed fall only when all three FSM stages are true.",
+      "required": ["version", "decision_source", "impact_detected", "orientation_change_detected", "immobility_detected"],
+      "properties": {
+        "version": { "const": 1 },
+        "decision_source": { "const": "edge" },
+        "algorithm_version": { "type": "string", "minLength": 1 },
+        "detector_mode": { "enum": ["normal", "demo"] },
+        "impact_detected": { "type": "boolean" },
+        "orientation_change_detected": { "type": "boolean" },
+        "immobility_detected": { "type": "boolean" },
+        "peak_accel_g": { "type": "number", "minimum": 0 },
+        "peak_gyro_dps": { "type": "number", "minimum": 0 },
+        "orientation_delta_deg": { "type": "number", "minimum": 0, "maximum": 180 },
+        "immobility_duration_ms": { "type": "integer", "minimum": 0 },
+        "immobility_required_ms": { "type": "integer", "minimum": 0 },
+        "analysis_window_ms": { "type": "integer", "minimum": 0 },
+        "samples_considered": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
   },
   "allOf": [
     {

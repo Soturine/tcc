@@ -29,6 +29,10 @@ O wearable novo e ML permanecem extensões condicionadas.
 
 Essa pergunta continua adequada após a auditoria. A formulação final depende da revisão bibliográfica e do recorte experimental aprovado pelo orientador.
 
+### Revisão proposta em 2026-10-21 (pendente de orientador)
+
+A auditoria de 2026-10-21 (F-12) observou que a pergunta acima não incorpora a avaliação do detector, embora o histórico de orientação enfatize a diferenciação entre quedas e atividades cotidianas. A proposta de pergunta principal que concilia as duas linhas, com objetivos mensuráveis O1–O5 e hipóteses H1a–H2, está no [protocolo experimental](experimental-protocol.md). Ela separa explicitamente o estudo da decisão (detector) do estudo da entrega (pipeline) e não substitui esta seção até validação com o orientador.
+
 ## Subquestões candidatas
 
 1. Como garantir que uma queda detectada durante perda de conectividade seja entregue uma única vez logicamente após recuperação?
@@ -178,8 +182,11 @@ Os ensaios devem ser controlados e reproduzíveis.
 Datasets devem corresponder ao posicionamento do sensor.
 
 - `SisFall` é referência importante para quedas/ADLs, mas é waist-based.
-- `WEDA-FALL` é wrist-based e contém movimentos de idosos, sendo mais pertinente se o wearable final for no pulso.
-- `SmartFall` é referência de smartwatch→Android e processamento próximo ao sensor.
+- `KFall` (lombar, 100 Hz) traz onset/impacto anotados e permite medir latência; acesso controlado e sem redistribuição.
+- `WEDA-FALL`: publicação primária **não verificada** em 2026-10-21; tratar como pulso e não usar até confirmação.
+- `SmartFall` é referência de smartwatch→Android; o dataset de smartwatch não contém giroscópio e é incompatível com a FSM atual.
+
+Inventário verificado: [`datasets.md`](datasets.md). Baseline congelada: [`detector-baseline.md`](detector-baseline.md).
 
 Nenhum dataset é incorporado automaticamente ao experimento sem verificar fonte primária, licença, taxa de amostragem, sensores, participantes e protocolo.
 
@@ -242,6 +249,7 @@ Entre as referências técnicas/científicas já levantadas estão:
 
 - Sucerquia, López, Vargas-Bonilla — *SisFall: A Fall and Movement Dataset*, Sensors 2017, DOI 10.3390/s17010198.
 - Mauldin et al. — *SmartFall: A Smartwatch-Based Fall Detection System Using Deep Learning*, Sensors 2018, DOI 10.3390/s18103363.
+- Yu, Jang, Xiong — *A Large-Scale Open Motion Dataset (KFall) and Benchmark Algorithms for Detecting Pre-impact Fall of the Elderly Using Wearable Inertial Sensors*, Frontiers in Aging Neuroscience 2021, DOI 10.3389/fnagi.2021.692865.
 - Marques & Moreno — *Online Fall Detection Using Wrist Devices*, Sensors 2023, DOI 10.3390/s23031146.
 
 Ver também [`comparable-systems-and-patterns.md`](comparable-systems-and-patterns.md) e [`sources-and-evidence.md`](sources-and-evidence.md).

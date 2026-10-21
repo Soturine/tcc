@@ -1,0 +1,45 @@
+{
+  "dataset": "synthetic_fixtures",
+  "data_kind": "synthetic",
+  "sensor_position": "synthetic",
+  "source_rate_hz": 100.0,
+  "generator": "tools/research/fixtures/make_synthetic.py",
+  "trials": [
+    {
+      "file": "SYN_FALL_LYING_01.csv",
+      "trial_id": "SYN_FALL_LYING_01",
+      "subject_id": "SYN01",
+      "activity_code": "SYN_FALL",
+      "label": "fall",
+      "fall_onset_ms": 1990.0,
+      "fall_impact_ms": 2150.0
+    },
+    {
+      "file": "SYN_FALL_RECOVERS_01.csv",
+      "trial_id": "SYN_FALL_RECOVERS_01",
+      "subject_id": "SYN02",
+      "activity_code": "SYN_FALL_GETS_UP",
+      "label": "fall",
+      "fall_onset_ms": 1990.0,
+      "fall_impact_ms": 2150.0
+    },
+    {
+      "file": "SYN_ADL_JUMP_01.csv",
+      "trial_id": "SYN_ADL_JUMP_01",
+      "subject_id": "SYN01",
+      "activity_code": "SYN_JUMP_UPRIGHT",
+      "label": "adl",
+      "fall_onset_ms": null,
+      "fall_impact_ms": null
+    },
+    {
+      "file": "SYN_ADL_LIE_DOWN_01.csv",
+      "trial_id": "SYN_ADL_LIE_DOWN_01",
+      "subject_id": "SYN02",
+      "activity_code": "SYN_LIE_DOWN_SLOW",
+      "label": "adl",
+      "fall_onset_ms": null,
+      "fall_impact_ms": null
+    }
+  ]
+}

@@ -849,7 +849,11 @@ async function reconcileLegacyDeviceIdentity({
   return normalizedUid;
 }
 
-async function getOrCreateDeviceByIdentity({ deviceUid, deviceIdentifier, name }, executor = null) {
+async function getOrCreateDeviceByIdentity(
+  { deviceUid, deviceIdentifier, name },
+  executor = null,
+  options = {},
+) {
   const normalizedIdentifier = normalizeDeviceIdentifier(deviceIdentifier, "");
   const requestedUid = normalizeDeviceUid(deviceUid, normalizedIdentifier);
   const normalizedUid = await reconcileLegacyDeviceIdentity({
@@ -857,6 +861,28 @@ async function getOrCreateDeviceByIdentity({ deviceUid, deviceIdentifier, name }
     normalizedIdentifier,
     executor,
   });
+
+  // ADR-015: em mensagens MQTT o topico e a identidade; o device_uid do payload
+  // nao pode renomear um device ja pareado a uma organizacao e herdar seu escopo.
+  if (options.rejectClaimedIdentifierChange && normalizedIdentifier) {
+    const existing = await findDeviceByUidForUpdate(normalizedUid, executor);
+    if (
+      existing &&
+      isClaimedScopedDevice(existing) &&
+      existing.device_identifier !== normalizedIdentifier
+    ) {
+      logger.warn("Identidade MQTT rejeitada: device_uid pertence a device pareado com outro identificador.", {
+        topicDeviceIdentifier: normalizedIdentifier,
+        existingDeviceId: Number(existing.id),
+        existingOrganizationId: Number(existing.organization_id),
+        reason: "device_uid_identifier_mismatch",
+      });
+      const error = new Error("device_uid pertence a outro device pareado; mensagem rejeitada.");
+      error.code = "DEVICE_IDENTITY_MISMATCH";
+      error.details = { topicDeviceIdentifier: normalizedIdentifier };
+      throw error;
+    }
+  }
   const fallbackName = normalizeDeviceIdentifier(name, normalizedIdentifier || normalizedUid);
 
   await execute(

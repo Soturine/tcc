@@ -13,6 +13,7 @@ function topicInfo(channel = "telemetry", deviceIdentifier = "esp32_01") {
 
 function buildHarness(options = {}) {
   const calls = {
+    acks: [],
     alerts: [],
     events: [],
     emits: [],
@@ -58,7 +59,12 @@ function buildHarness(options = {}) {
   const fakePool = {
     transaction: async (work) => {
       calls.transactions += 1;
-      return work({ connection: true });
+      const result = await work({ connection: true });
+      if (options.failCommit) {
+        // Simula falha no COMMIT: o trabalho executou, mas nada foi confirmado.
+        throw Object.assign(new Error("commit failed"), { code: "PROTOCOL_CONNECTION_LOST" });
+      }
+      return result;
     },
   };
   const fakeDeviceService = {
@@ -153,6 +159,7 @@ function buildHarness(options = {}) {
           evidenceSummary: null,
           deduplicated: true,
           duplicateReason: "event_uuid",
+          persistedAt: "2026-10-21T00:00:00.000Z",
           device: {
             id: device.id,
             deviceUid: device.deviceUid,
@@ -169,6 +176,8 @@ function buildHarness(options = {}) {
         organizationId: organization?.id || null,
         patientId: currentPatient?.id || null,
         eventType,
+        eventUuid: payload.event_uuid || null,
+        persistedAt: "2026-10-21T00:00:01.000Z",
         severity: payload.immobility_confirmed ? "critical" : "high",
         evidenceStatus,
         evidenceTelemetryId: evidenceStatus === "none" ? null : 200,
@@ -249,7 +258,17 @@ function buildHarness(options = {}) {
 
   return {
     calls,
-    handleMqttMessage: module.handleMqttMessage,
+    handleMqttMessage: (args) => module.handleMqttMessage({
+      publishAck: options.noAckPublisher
+        ? null
+        : (topic, ack, callback) => {
+          calls.acks.push({ topic, ack, transactionsAtPublish: calls.transactions });
+          if (callback) {
+            callback(options.ackPublishError ? new Error("broker offline") : undefined);
+          }
+        },
+      ...args,
+    }),
     maxActiveIdentityCalls: () => maxActiveIdentityCalls,
     restore,
   };
@@ -612,5 +631,114 @@ test("mensagens concorrentes do mesmo device passam pelo lock por chave", async 
 
     assert.equal(harness.calls.transactions, 5);
     assert.equal(harness.maxActiveIdentityCalls(), 1);
+  });
+});
+
+function criticalEventPayload(overrides = {}) {
+  return JSON.stringify({
+    device_id: "esp32_01",
+    event_type: "fall_detected",
+    event_uuid: "esp32-aabb:b00000002-1234abcd:00000001",
+    immobility_confirmed: true,
+    timestamp: Math.floor(Date.now() / 1000),
+    ...overrides,
+  });
+}
+
+test("ACK de aplicacao e publicado somente apos commit, no topico do device autenticado", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
+
+    assert.equal(calls.acks.length, 1);
+    assert.equal(calls.acks[0].topic, "queda/devices/esp32_01/critical-event-acks");
+    assert.equal(calls.acks[0].transactionsAtPublish, 1);
+    assert.deepEqual(calls.acks[0].ack, {
+      schema_version: 1,
+      event_uuid: "esp32-aabb:b00000002-1234abcd:00000001",
+      event_id: 101,
+      status: "committed",
+      committed_at: "2026-10-21T00:00:01.000Z",
+    });
+  });
+});
+
+test("retry com o mesmo UUID recebe ACK duplicate sem novo alerta", async () => {
+  await withHarness({ deduplicateEventUuid: true }, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
+
+    assert.equal(calls.alerts.length, 0);
+    assert.equal(calls.acks.length, 2);
+    assert.ok(calls.acks.every((entry) => entry.ack.status === "duplicate" && entry.ack.event_id === 707));
+  });
+});
+
+test("falha no commit nao publica ACK e propaga erro para o device retransmitir", async () => {
+  await withHarness({ failCommit: true }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(
+      handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} }),
+      /commit failed/,
+    );
+    assert.equal(calls.acks.length, 0);
+    assert.equal(calls.emits.length, 0);
+  });
+});
+
+test("evento rejeitado por identidade divergente nao recebe ACK", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events", "esp32_01"),
+      payloadText: criticalEventPayload({ device_id: "esp32_99" }),
+      io: {},
+    });
+    assert.equal(calls.events.length, 0);
+    assert.equal(calls.acks.length, 0);
+  });
+});
+
+test("evento legado sem event_uuid e persistido sem ACK de aplicacao", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events"),
+      payloadText: criticalEventPayload({ event_uuid: undefined }),
+      io: {},
+    });
+    assert.equal(calls.events.length, 1);
+    assert.equal(calls.acks.length, 0);
+  });
+});
+
+test("falha ao publicar ACK e registrada sem desfazer o evento committed", async () => {
+  await withHarness({ ackPublishError: true }, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
+    assert.equal(calls.events.length, 1);
+    assert.equal(calls.alerts.length, 1);
+    assert.ok(calls.logs.some((entry) => entry.metadata?.reason === "ack_publish_failed"));
+  });
+});
+
+test("evento entregue apos periodo offline usa occurred_at_device sincronizado como instante", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    const occurred = new Date(Date.now() - 45 * 60 * 1000);
+    await handleMqttMessage({
+      topicInfo: topicInfo("events"),
+      payloadText: criticalEventPayload({
+        clock_quality: "synced",
+        occurred_at_device: occurred.toISOString(),
+        timestamp: Math.floor(occurred.getTime() / 1000),
+      }),
+      io: {},
+    });
+
+    assert.equal(calls.events[0].eventTime.getTime(), occurred.getTime());
+    assert.ok(calls.events[0].receivedAt.getTime() > occurred.getTime());
+  });
+});
+
+test("sem publisher de ACK o evento e persistido e a ausencia e registrada", async () => {
+  await withHarness({ noAckPublisher: true }, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
+    assert.equal(calls.events.length, 1);
+    assert.ok(calls.logs.some((entry) => entry.metadata?.reason === "ack_publisher_missing"));
   });
 });

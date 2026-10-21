@@ -279,32 +279,23 @@ size_t ConfigStore::loadPendingEvents(BufferedEvent* events, size_t capacity) {
   return loadedCount;
 }
 
-bool ConfigStore::savePendingEvents(const BufferedEvent* events, size_t count) {
+// Usado somente apos migrar eventos legados para a outbox critica. O contador e
+// zerado primeiro e o resultado verificado: falha mantem os eventos legados.
+bool ConfigStore::clearPendingEvents() {
   Preferences preferences;
   if (!preferences.begin(kNamespace, false)) {
     return false;
   }
 
-  const size_t persistedCount =
-      count < AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY
-          ? count
-          : AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY;
-  preferences.putUChar(kPendingEventCountKey, static_cast<uint8_t>(persistedCount));
-
-  for (size_t index = 0; index < AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY; ++index) {
-    const bool active = events != nullptr && index < persistedCount;
-    preferences.putString(pendingEventTopicKey(index).c_str(),
-                          active ? events[index].topic : "");
-    preferences.putString(pendingEventPayloadKey(index).c_str(),
-                          active ? events[index].payload : "");
-    preferences.putULong(pendingEventQueuedAtKey(index).c_str(),
-                         active ? events[index].queuedAtMs : 0U);
+  const bool countCleared = preferences.putUChar(kPendingEventCountKey, 0) == sizeof(uint8_t);
+  if (countCleared) {
+    for (size_t index = 0; index < AppConfig::PERSISTED_EVENT_BUFFER_CAPACITY; ++index) {
+      preferences.remove(pendingEventTopicKey(index).c_str());
+      preferences.remove(pendingEventPayloadKey(index).c_str());
+      preferences.remove(pendingEventQueuedAtKey(index).c_str());
+    }
   }
 
   preferences.end();
-  return true;
-}
-
-bool ConfigStore::clearPendingEvents() {
-  return savePendingEvents(nullptr, 0U);
+  return countCleared;
 }
