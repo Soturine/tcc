@@ -92,6 +92,8 @@ Divergência entre tópico/principal e payload deve ser rejeitada/quarentenada e
 - rotação se houver exposição;
 - secret scanning.
 
+**Implementado (2026-10-21, F-03):** `validateRuntimeConfig()` em `backend/src/config/env.js` trata somente `NODE_ENV=development|test` como local. Fora disso não existe fallback e o startup é recusado com segredo ausente, conhecido/default ou com menos de 32 caracteres; as mensagens não contêm o valor. Coberto por `backend/tests/security/runtimeConfig.test.js`. Rotação e sessão revogável continuam pendentes (ADR-009).
+
 ### Sessão móvel roubada
 
 **Risco:** access token de longa duração extraído do device continua válido.
@@ -152,6 +154,8 @@ Os tempos exatos serão definidos posteriormente.
 - revogação;
 - diagnóstico claro de certificate/auth failure;
 - sem fallback silencioso para plaintext.
+
+**Implementado no backend (2026-10-21, F-04):** fora do ambiente local o startup é recusado com `mqtt://`, `MQTT_TLS_REJECT_UNAUTHORIZED=false`, CA declarada e ilegível ou credenciais MQTT ausentes. CORS `*` é recusado em qualquer ambiente e origens `http://` fora do local. O firmware ainda permite `tlsInsecure` e o default de fábrica continua apontando para broker público (F-17, P8); ACL por device permanece **planned**.
 
 ### CORS/WebSocket origin aberto
 

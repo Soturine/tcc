@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Auditoria 2026-10-21 e hardening da baseline
+- auditoria canônica em `docs/audit/tcc-comprehensive-audit-2026-10-21.md` classifica 21 findings com evidência de código, impacto e checkpoint
+- advisories de produção do backend corrigidos somente no lockfile: `engine.io` 6.6.11 (GHSA-2gc4-cqfq-p2gv), `ip-address` 10.7.4 (GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw) e `proxy-addr` 2.0.8 (GHSA-jqcg-44mw-7w3h); `npm audit` do backend sem vulnerabilidades
+- lockfile do frontend atualizado sem `--force` (vite, follow-redirects e outros transitivos); produção sem vulnerabilidades; resíduo dev/build da cadeia Tailwind 3 → `braces@3.0.3` registrado como risco aceito até a migração para Tailwind 4
+- backend recusa iniciar fora de `NODE_ENV=development|test` com `JWT_SECRET` ausente, default ou curto, MQTT sem TLS verificado, CA ilegível, credenciais MQTT ausentes ou CORS permissivo; mensagens não expõem segredos
+- manifests do backend e do frontend alinhados à última versão publicada (0.9.4)
+
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
 - medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA

@@ -53,11 +53,35 @@ function toCsv(value, fallback = []) {
   return entries.length > 0 ? entries : fallback;
 }
 
+// Somente estes perfis aceitam defaults de conveniencia. Qualquer outro valor
+// de NODE_ENV (production, staging, ...) e tratado como ambiente externo.
+const LOCAL_NODE_ENVS = new Set(["development", "test"]);
+const LOCAL_DEV_JWT_SECRET = "change-me";
+const KNOWN_WEAK_JWT_SECRETS = new Set([
+  LOCAL_DEV_JWT_SECRET,
+  "ci-local-only-not-for-staging",
+  "secret",
+  "changeme",
+  "jwt-secret",
+]);
+const MIN_EXTERNAL_JWT_SECRET_LENGTH = 32;
+
+function isLocalNodeEnv(nodeEnv) {
+  return LOCAL_NODE_ENVS.has(nodeEnv);
+}
+
+const nodeEnv = toTrimmed(process.env.NODE_ENV, "development");
+
 const env = {
-  nodeEnv: process.env.NODE_ENV || "development",
-  isProduction: process.env.NODE_ENV === "production",
+  nodeEnv,
+  isProduction: nodeEnv === "production",
+  isLocal: isLocalNodeEnv(nodeEnv),
   port: toNumber(process.env.PORT, 4000),
-  jwtSecret: toTrimmed(process.env.JWT_SECRET, "change-me"),
+  // Em ambiente externo nao existe fallback: a validacao de startup recusa iniciar.
+  jwtSecret: toTrimmed(
+    process.env.JWT_SECRET,
+    isLocalNodeEnv(nodeEnv) ? LOCAL_DEV_JWT_SECRET : "",
+  ),
   logLevel: toLogLevel(process.env.LOG_LEVEL, "info"),
   corsAllowedOrigins: toCsv(process.env.CORS_ALLOWED_ORIGINS, [
     "http://localhost:5173",
@@ -91,6 +115,55 @@ const env = {
   ),
 };
 
+/**
+ * Valida a configuracao efetiva sem efeitos colaterais.
+ * `errors` impedem o startup; `warnings` sao aceitaveis apenas localmente.
+ * Mensagens nunca incluem o valor de segredos.
+ */
+function validateRuntimeConfig(config) {
+  const errors = [];
+  const warnings = [];
+  const local = isLocalNodeEnv(config.nodeEnv);
+  const report = (message) => (local ? warnings : errors).push(message);
+  const secret = config.jwtSecret || "";
+
+  if (!secret) {
+    errors.push("JWT_SECRET ausente.");
+  } else if (KNOWN_WEAK_JWT_SECRETS.has(secret.toLowerCase())) {
+    report("JWT_SECRET usa um valor default/conhecido.");
+  } else if (secret.length < MIN_EXTERNAL_JWT_SECRET_LENGTH) {
+    report(`JWT_SECRET tem menos de ${MIN_EXTERNAL_JWT_SECRET_LENGTH} caracteres.`);
+  }
+
+  const brokerUrl = config.mqtt?.brokerUrl || "";
+  if (!brokerUrl.startsWith("mqtts://")) {
+    report("MQTT_BROKER_URL nao usa mqtts:// (TLS).");
+  } else {
+    if (config.mqtt.tlsRejectUnauthorized === false) {
+      report("MQTT_TLS_REJECT_UNAUTHORIZED=false desabilita a verificacao do certificado do broker.");
+    }
+    if (config.mqtt.tlsCaFile && config.mqtt.tlsCaReadable === false) {
+      errors.push("MQTT_TLS_CA_FILE configurado mas ilegivel; recusando seguir sem a CA declarada.");
+    }
+  }
+
+  if (!config.mqtt?.username || !config.mqtt?.password) {
+    report("Credenciais MQTT do backend ausentes.");
+  }
+
+  const origins = config.corsAllowedOrigins || [];
+  if (origins.includes("*")) {
+    errors.push("CORS_ALLOWED_ORIGINS nao pode conter '*'.");
+  }
+  if (!local && origins.some((origin) => /^http:\/\//i.test(origin))) {
+    errors.push("CORS_ALLOWED_ORIGINS contem origem http:// em ambiente externo.");
+  }
+
+  return { ok: errors.length === 0, local, errors, warnings };
+}
+
 module.exports = {
   env,
+  isLocalNodeEnv,
+  validateRuntimeConfig,
 };

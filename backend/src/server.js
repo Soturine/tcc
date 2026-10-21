@@ -1,7 +1,9 @@
+const fs = require("fs");
 const http = require("http");
+const path = require("path");
 
 const { createApp } = require("./app");
-const { env } = require("./config/env");
+const { env, validateRuntimeConfig } = require("./config/env");
 const { testConnection, pool } = require("./db/pool");
 const { checkRuntimeSchema } = require("./db/schemaHealth");
 const { startDeviceStatusJob } = require("./jobs/deviceStatusJob");
@@ -9,7 +11,33 @@ const { createMqttBridge } = require("./mqtt/client");
 const { createSocketServer } = require("./socket");
 const { logger } = require("./utils/logger");
 
+function assertSafeRuntimeConfig() {
+  const tlsCaReadable = env.mqtt.tlsCaFile
+    ? fs.existsSync(path.resolve(process.cwd(), env.mqtt.tlsCaFile))
+    : null;
+  const validation = validateRuntimeConfig({
+    ...env,
+    mqtt: { ...env.mqtt, tlsCaReadable },
+  });
+
+  for (const warning of validation.warnings) {
+    logger.warn("Configuracao insegura aceita somente em ambiente local.", {
+      nodeEnv: env.nodeEnv,
+      warning,
+    });
+  }
+
+  if (!validation.ok) {
+    const error = new Error(
+      `Configuracao insegura para NODE_ENV=${env.nodeEnv}: ${validation.errors.join(" ")}`,
+    );
+    error.code = "UNSAFE_RUNTIME_CONFIG";
+    throw error;
+  }
+}
+
 async function startServer() {
+  assertSafeRuntimeConfig();
   await testConnection();
   const schemaHealth = await checkRuntimeSchema();
 

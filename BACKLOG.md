@@ -19,7 +19,7 @@ Auditorias:
 - [x] Alinhar CI a Node 24 LTS.
 - [ ] Criar comandos canônicos cross-platform; PowerShell permanece wrapper opcional.
 - [ ] Criar Docker Compose de integração para MySQL + Mosquitto quando adequado.
-- [ ] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios.
+- [x] Criar `.env.example` sem secrets e configuração fail-fast em staging para secrets obrigatórios (`validateRuntimeConfig`, auditoria 2026-10-21 F-03/F-04).
 - [x] Trocar default de fábrica do firmware de `Demo` para `Normal`; Demo deve ser seleção explícita e identificável nos dados.
 - [x] Implementar CI remota mínima **antes de refatorações relevantes**:
   - backend check/test;
@@ -106,12 +106,12 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Criar transactional outbox backend para notificações.
 - [ ] Criar worker de notificações idempotente.
 - [ ] Reforçar testes de tenant/object authorization.
-- [ ] JWT secret ausente/fraco deve falhar em ambiente externo.
+- [x] JWT secret ausente/fraco deve falhar em ambiente externo.
 - [ ] Criar modelo de sessão mobile revogável com refresh rotation.
 - [ ] Rate limit em login/register/pairing/sync/rotas expostas.
 - [ ] Decidir se staging precisa de self-registration pública; caso contrário usar bootstrap/invite/admin controlado.
 - [ ] Reforçar política/validação de senha e e-mail antes de exposição pública.
-- [ ] CORS/Socket origins allowlist em staging.
+- [x] CORS/Socket origins allowlist em staging (`*` recusado; `http://` recusado fora do ambiente local).
 - [ ] Adicionar `/live` e `/ready` distintos.
 - [ ] Schema incompatível deixa readiness false/falha startup conforme ambiente.
 - [ ] Métricas/logs para MQTT, outbox, push, rejects e devices offline.
