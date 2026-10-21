@@ -27,6 +27,12 @@
 - `npm run test:e2e:critical`: 11 cenários de falha com virtual device e backend/MySQL/Mosquitto reais (emulação, não HIL), incluídos no CI
 - spike ESP-MQTT QoS 1 e ADR-020; budget do payload de evento revisado para 3.584 bytes
 
+### Segunda auditoria e documentação
+- MQTT recusa `device_uid` de device pareado usado em outro tópico antes de qualquer escrita (F-11)
+- arquivos da outbox nomeados pelo hash do `event_uuid`, eliminando sobrescrita entre boots com contador não persistido (F-25); idade de itens restaurados corrigida (F-26)
+- ACL de referência do Mosquitto torna o backend o único publisher de ACK; verificada contra broker real (F-27)
+- matriz de rastreabilidade requisito → implementação → evidência e objetivo → experimento → resultado; README, roadmap e fontes verificadas atualizados
+
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
 - medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA

@@ -14,14 +14,15 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 | ✓ | Contratos HTTP/MQTT | inventário real, OpenAPI, JSON Schemas, autoridade, identidade e tempo explícitos |
 | ✓ | Banco, migrations e identidade temporal | UUID explícito/UNIQUE, tempos separados, upgrade e concorrência MySQL validados |
 | ✓ | Lifecycle de dados | classificação, medição, retenção manual de telemetria e proteção de evidência implementadas; prazos permanecem decisão empírica/legal |
-| → | Confiabilidade crítica | contratos, identidade e lifecycle inicial definidos; transporte/outbox/ACK e evidência device-first são o próximo gate |
+| ✓ | Fundação experimental do TG1 (2026-10-21) | baseline A congelada, replay com detector real, adaptadores, métricas e protocolo; **sem resultados com dados reais** |
+| → | Confiabilidade crítica | outbox, identidade, ACK pós-commit e evidência device-first implementados e emulados (12/12); faltam HIL com ESP32 e QoS 1 no transporte (ADR-020) |
 | ○ | Backend hardening | fronteiras críticas caracterizadas |
 | ○ | Android | API e pipeline crítico estáveis |
 | ○ | Push e Protection Health | backend/outbox e app Android disponíveis |
 | ○ | Provisioning seguro | ameaça e fluxo mobile definidos |
 | ○ | Cloud e configuração remota | serviços reproduzíveis e contratos estáveis |
 | ○ | QA e failure testing | componentes integrados e observáveis |
-| ○ | Pesquisa experimental | protocolo e instrumentação definidos |
+| → | Pesquisa experimental | infraestrutura pronta; depende de acesso aos datasets, confirmação de conversão do SisFall e validação do protocolo com o orientador |
 | ○ | Wearable/ML | núcleo verde e hipótese/dataset compatíveis |
 | ○ | Entrega | evidência final reproduzível |
 
@@ -85,17 +86,21 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 
 **Estado:** mecanismo **implemented** e **validated** em testes unitários/MySQL descartável. O prazo não foi definido; staging contínuo, LGPD completa e replay tardio permanecem não validados.
 
-## Fase 3 — Confiabilidade de evento crítico (próxima etapa)
+## Fase 3 — Confiabilidade de evento crítico (em andamento)
 
-- spike ESP-MQTT ou transporte equivalente com QoS 1 real;
-- critical-event outbox persistente;
-- identidade de evento robusta a reboot;
-- ACK de aplicação depois de commit;
-- sessão/reconnect MQTT explicitamente testada;
-- offline fall evidence device-first;
-- testes de broker/backend offline, restart, duplicate, reorder e ACK perdido.
+- [x] spike ESP-MQTT: API QoS 1 e custo de memória comprovados em build (ADR-020);
+- [x] critical-event outbox persistente (LittleFS, CRC32, sem descarte silencioso);
+- [x] identidade de evento robusta a reboot e independente de NTP;
+- [x] ACK de aplicação depois de commit;
+- [x] offline fall evidence device-first (`local_evidence`, `evidence_source`);
+- [x] backend offline/restart, banco travado, duplicate, reorder e ACK perdido em emulação ([registro](../quality/critical-delivery-validation.md));
+- [ ] HIL com ESP32: queda controlada com objeto/manequim, Wi‑Fi derrubado, reboot com evento pendente;
+- [ ] transporte QoS 1 (ESP-MQTT) após HIL e decisão de partições (F-28);
+- [ ] broker indisponível e MySQL recusando conexão.
 
-**Saída:** perda temporária de Internet não perde nem duplica semanticamente a queda e não depende da telemetria SQL para gerar o alerta confirmado pelo edge.
+**Saída:** perda temporária de Internet não perde nem duplica semanticamente a queda e não depende da telemetria SQL para gerar o alerta confirmado pelo edge. **Estado:** provado em host e emulação; HIL pendente.
+
+**Próximo checkpoint de desenvolvimento:** HIL do caminho crítico com o ESP32 de bancada e ACL/TLS no broker local, seguido da decisão de partições e da troca de transporte.
 
 ## Fase 4 — Backend hardening e modularização
 
@@ -195,6 +200,8 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 - requisitos quantitativos derivados da medição.
 
 **Saída:** resultados de TCC sustentados por evidência real.
+
+**Estado (2026-10-21):** protocolo proposto ([experimental-protocol.md](../research/experimental-protocol.md)), datasets verificados ([datasets.md](../research/datasets.md)) e `tools/research` implementado. Depende de: download do SisFall e confirmação dos fatores de conversão; aprovação de acesso ao KFall; validação do recorte com o orientador; coleta segura própria com objeto/manequim.
 
 ## Fase 11 — Wearable e ML, se o núcleo estiver estável
 
