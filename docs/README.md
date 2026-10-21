@@ -2,6 +2,18 @@
 
 Este índice define quais documentos devem ser lidos como canônicos durante a implementação. Documentos futuros em `docs/legacy/` serão evidência histórica e não substituem decisões atuais.
 
+## Extensão acadêmica TG1 — pulso e laboratório (proposta 2026-10-21)
+
+- [Seleção do wearable, versões, compra brasileira e qualificação](hardware/wearable-selection-2026-10-21.md)
+- [Conectividade independente do celular, Android, gateway opcional](architecture/wearable-mobile-and-resilience.md)
+- [Registro de datasets de pulso, elegibilidade/licenças e cross-dataset](research/wrist-dataset-registry.md)
+- [MotionLab Live: seis eixos, HAR sentar/levantar, ground truth, streaming e relatórios](research/motionlab-live.md)
+- [Calibração opcional, personalização e feedback em modo shadow](research/personalization-feedback.md)
+- [Plano de QA/Gates do pulso e ML](quality/wrist-motionlab-verification.md)
+- [Estratégia acadêmica, artigo, TG1/TG2 e escopo](research/publication-and-scope.md)
+
+**Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos.
+
 ## Comece aqui
 
 1. [`../README.md`](../README.md) — visão geral e status.

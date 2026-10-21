@@ -159,3 +159,18 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 3. A adoção de ESP-MQTT QoS 1 fica como próximo passo de firmware, atrás de interface de transporte, com critério de aceite: HIL com broker TLS, perda de Wi‑Fi, reboot e medição de heap/stack em execução.
 
 **Consequências.** O backend já assina com QoS 1 e publica ACK com QoS 1. Do device para o broker a mensagem segue QoS 0; perdas nesse trecho são recuperadas por retry da outbox (maior latência de recuperação, não perda lógica). Sessão persistente continua otimização (F-13), não requisito de correção.
+
+## ADR-021 — Pulso + IMU completa como alvo de qualificação
+**Status: Proposed (2026-10-21);** refina o planejamento do ADR-011 **sem declará-lo implementado**. Elegibilidade principal: relógio ESP32 programável, Wi-Fi direto e IMU real 3D aceleração + 3D giroscópio, com montagem, energia, qualidade de dados e preço brasileiro documentáveis. Excluir acelerômetro-only. Shortlist: Waveshare S3 2.06 / S3 1.8 V2, LILYGO Ultra, M5Stack StopWatch e Waveshare C6 alternativo; nenhum é final. Observabilidade/energia/ergonomia/HIL decidem. [Matriz HW](../hardware/wearable-selection-2026-10-21.md).
+
+## ADR-022 — Android não é gateway crítico; BLE é local/opcional
+**Status: Proposed (2026-10-21).** Manter `wearable → Wi-Fi/MQTT/TLS → backend → FCM → Android` com SOS/outbox. Cuidador pode estar distante; BLE é para onboarding, diagnóstico, MotionLab e eventual hub **dedicado**. LoRa/Thread exigem gateway; 4G opcional não é característica implícita de nenhum relógio. Falha total de rede degrada o envio, registrada de forma explícita. Não sobrescrever ADR-005/020. [Detalhes](../architecture/wearable-mobile-and-resilience.md).
+
+## ADR-023 — Dataset registry e posição do sensor são fronteiras científicas
+**Status: Proposed (2026-10-21).** Arquivos originais imutáveis/fora do Git e por licença; pulso é corpus primário, cintura/lombar só avaliação separada, acelerômetro-only não alimenta FSM de 6 eixos; harmonização de unidades/eixos/frequência explícita, splits sujeito/sessão/fonte e holdout congelado. Nenhum resultado de dataset real produzido. [Dataset registry](../research/wrist-dataset-registry.md).
+
+## ADR-024 — MotionLab separado e subordinado à proteção crítica
+**Status: Proposed (2026-10-21).** Uma aquisição da IMU abastece FallDetector, recorder e classificador experimental; pipeline live limitado e descartável, gravação local auditável e GT independente; lab nunca bloqueia SOS/outbox; classificação `unknown` é válida; novo contrato/ACL/armazenamento segregados. [Especificação](../research/motionlab-live.md).
+
+## ADR-025 — Personalização é opcional, baseada em ADL e gated
+**Status: Proposed (2026-10-21).** Peso/altura opcionais sem fórmula arbitrária, calibração física != perfil individual; SOS não é prova de queda; feedback precisa de revisão humana; modelo começa em shadow, promoção mediante holdout/segurança/HIL e rollback. Falhar para baseline, sem supressão prematura de alertas críticos. [Protocolo](../research/personalization-feedback.md).

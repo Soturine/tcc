@@ -54,3 +54,14 @@ Detalhes no [protocolo experimental](../research/experimental-protocol.md).
 | O3 entrega crítica sob falhas | H2 | cenários 1–12 em emulação; HIL pendente | eventos/alertas lógicos por UUID, duplicatas, perdas | emulação: 12/12 cenários com 1 evento e no máximo 1 alerta lógico por UUID; **não é resultado experimental de hardware** |
 | O4 recuperação | — | HIL com Wi‑Fi derrubado e reboot | tempo até ACK; idade máxima na outbox | **não executado** (só uma observação isolada de 55 ms em emulação, sem valor estatístico) |
 | O5 calibração B sem vazamento | — | split por participante + comparação A × B | diferença de métricas no conjunto teste | **planned** |
+
+## Candidatos wearable/MotionLab (2026-10-21; **não implementados**)
+| ID | Especificação | Evidência futura | Estado |
+|---|---|---|---|
+| RF-W01/W02 | [HW selection](../hardware/wearable-selection-2026-10-21.md), [comunicação](../architecture/wearable-mobile-and-resilience.md) | HW/HIL + Android | proposed |
+| RF-W03/W04/W05 | [MotionLab](../research/motionlab-live.md) | ML-0..ML-7, resultados físicos | proposed |
+| RF-W06/W07 | [Personalização](../research/personalization-feedback.md) | CAL/shadow/rollback | proposed |
+| RF-W08 | [Datasets](../research/wrist-dataset-registry.md) | acesso/licenças/replays reais | proposed |
+| RNF-W01..03 | [Gates QA](../quality/wrist-motionlab-verification.md) | segurança/privacy/latência | proposed |
+
+A trilha é de planejamento; não acrescenta cobertura testada nem métricas validadas.

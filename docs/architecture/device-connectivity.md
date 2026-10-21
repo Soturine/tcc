@@ -324,3 +324,8 @@ Revalidar versões antes da implementação:
 - Protocomm/security: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/provisioning/protocomm.html
 - Android provisioning library: https://github.com/espressif/esp-idf-provisioning-android
 - Android BLE background: https://developer.android.com/develop/connectivity/bluetooth/ble/background
+
+## Adendo 2026-10-21 — seleção de pulso e transporte de laboratório
+Objetivo de wearable final: ESP programável com aceleração e giro de seis eixos, Wi-Fi próprio, bateria, pulseira e telemetria bruta acessível. **Não usar o telefone do cuidador como bridge necessária**; BLE é para onboarding e sessões locais. LoRa/Thread demandam gateway; 4G externo é futuro. [Matriz](../hardware/wearable-selection-2026-10-21.md) · [integração Android](wearable-mobile-and-resilience.md).
+
+Pipeline MotionLab proposto usa aquisição única, buffer circular, recorder local e stream controlado de 6 eixos em lotes: endpoint tópico e schema adicionais precisam de segurança/QA antes de implementar; não usar o tópico `telemetry` periódico existente para 50Hz de pesquisa. O evento crítico mantém prioridade; capacidade de recuperar offline e clock da amostra verificável. Nenhum driver de relógio físico foi portado.

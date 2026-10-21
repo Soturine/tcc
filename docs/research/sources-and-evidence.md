@@ -99,7 +99,18 @@ Consultadas diretamente para o inventário de datasets e para a auditoria de seg
 | Sucerquia, A.; López, J. D.; Vargas-Bonilla, J. F. SisFall: A Fall and Movement Dataset. *Sensors*, 17(1):198, 2017. DOI 10.3390/s17010198 | sensores, taxa, posição, população, atividades | https://pmc.ncbi.nlm.nih.gov/articles/PMC5298771/ |
 | Yu, X.; Jang, J.; Xiong, S. A Large-Scale Open Motion Dataset (KFall) and Benchmark Algorithms for Detecting Pre-impact Fall of the Elderly Using Wearable Inertial Sensors. *Frontiers in Aging Neuroscience*, 13:692865, 2021. DOI 10.3389/fnagi.2021.692865 | sensor, rótulos de onset/impacto | https://pmc.ncbi.nlm.nih.gov/articles/PMC8322729/ ; termos de acesso: https://sites.google.com/view/kfalldataset |
 | Mauldin, T. R. et al. SmartFall: A Smartwatch-Based Fall Detection System Using Deep Learning. *Sensors*, 18(10):3363, 2018. DOI 10.3390/s18103363 | dataset de pulso, somente acelerômetro | https://pmc.ncbi.nlm.nih.gov/articles/PMC6210545/ |
-| Marques, J.; Moreno, P. Online Fall Detection Using Wrist Devices. *Sensors*, 23(3):1146, 2023. DOI 10.3390/s23031146 | candidata a origem do WEDA-FALL (associação **não confirmada**) | metadados via busca; texto completo não acessado |
+| Marques, J.; Moreno, P. Online Fall Detection Using Wrist Devices. *Sensors*, 23(3):1146, 2023. DOI 10.3390/s23031146 | WEDA-FALL e pesquisa de pulso; associação confirmada por dataset/referência pública | https://github.com/joaojtmarques/WEDA-FALL ; https://www.mdpi.com/1424-8220/23/3/1146 ; **licença/arquivos ainda não validados** |
 | GitHub Advisories GHSA-2gc4-cqfq-p2gv, GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw, GHSA-jqcg-44mw-7w3h | correção de dependências (F-01) | saída de `npm audit` em 2026-10-21 |
 
 As referências acima ainda precisam ser formatadas em ABNT no documento acadêmico oficial; a formatação final não foi feita nesta rodada.
+
+## Complemento de fontes e pesquisa (2026-10-21)
+- Fula, V.; Moreno, P. *Wrist-Based Fall Detection: Towards Generalization across Datasets* (2024): https://www.mdpi.com/1424-8220/24/5/1679 ; pipeline associado: https://github.com/Vani-Fula/Combined-fall-dataset
+- SmartFallMM: https://github.com/txst-cs-smartfall/SmartFallMM-Dataset — direitos/termos de uso precisam ser validados antes de treinar/publicar.
+- BITS-2: https://zenodo.org/records/10013090 — ver metadados e licença específicos.
+- UP-Fall: https://sites.google.com/up.edu.mx/har-up
+- Waveshare QMI8658: https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-2.06
+- LILYGO Ultra/BHI260AP: https://wiki.lilygo.cc/products/t-watch-series/t-watch-ultra/
+- Bosch BHI260AP: https://www.bosch-sensortec.com/products/smart-sensor-systems/bhi260ap/
+- Espressif provisioning Android: https://github.com/espressif/esp-idf-provisioning-android
+Revisar licença do dado **separadamente da licença do artigo e do repositório**. Leituras da literatura são apenas evidências externas e não implicam que nosso sistema obtém a mesma acurácia.

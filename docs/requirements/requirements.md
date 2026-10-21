@@ -171,3 +171,20 @@ O core não deve ser declarado validado sem evidência de pelo menos:
 8. mismatch de identidade MQTT rejeitado;
 9. Protection Health sinalizando falha real induzida;
 10. backup/restore do banco no ambiente integrado antes da entrega final.
+
+## Requisitos candidatos 2026-10-21 — não ratificados/implementados
+| ID candidato | Requisito observável | Evidência requerida | Estado |
+|---|---|---|---|
+| RF-W01 | Qualificar smartwatch de pulso ESP32 com IMU 6 eixos (accel+gyro), firmware próprio, Wi-Fi, bateria e ergonomia | HW gates e HIL físico | proposed |
+| RF-W02 | Gerar alerta remoto via Wi-Fi sem telefone do cuidador como gateway | dispositivo e Android físicos separados + logs | proposed |
+| RF-W03 | Registrar IMU seis eixos em sessão de laboratório versionada com tempo/sequência/integridade | export/reimport HIL, hash e relatório | proposed |
+| RF-W04 | Permitir marcação observada/revisada de transições sentado/levantando e classificação incerta | UI, schemas, testes GT | proposed |
+| RF-W05 | Executar classificador HAR em shadow mode sem influenciar SOS/queda | compare outputs, fault injection | proposed |
+| RF-W06 | Criar perfil individual opcional por ADLs seguras, sem exigência de peso/altura | estudo aprovado e UX acessível | proposed |
+| RF-W07 | Registrar feedback do incidente sem inferir queda a partir de SOS | fluxo review, separação de rótulos | proposed |
+| RF-W08 | Comparar datasets de pulso com licença, splits e proveniência, sem misturar cintura/lombar | registry/manifests e runs reais | proposed |
+| RNF-W01 | Streaming de laboratório não pode bloquear entrega crítica/violar ACL | HIL/QA concorrência e limites | proposed |
+| RNF-W02 | Dados pessoais e amostras de voluntários com finalidade, retenção, acesso e revisão ética | revisão LGPD/CEP | proposed |
+| RNF-W03 | Modelos somente promovidos pós-holdout com versionamento/rollback | experimentos A/B e testes | proposed |
+
+IDs `-W` não alteram RF-001..030; integrar à numeração canônica somente quando ratificados com orientador. Ver [matriz](../hardware/wearable-selection-2026-10-21.md) e [gates](../quality/wrist-motionlab-verification.md).

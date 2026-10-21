@@ -4,6 +4,12 @@ Repositório oficial da evolução para Trabalho de Conclusão de Curso do proje
 
 > **Estado atual (2026-10-21):** baseline portada e validada, saneamento P1, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Entrega crítica com outbox persistente no ESP32, `event_uuid` robusto a reboot, ACK de aplicação pós-commit e alerta de queda offline por evidência local estão **implementados e verificados em testes host e emulação ponta a ponta**, ainda **sem validação em ESP32 físico** e com transporte device→broker em QoS 0 (ADR-020). A infraestrutura de avaliação do detector com datasets reais existe, mas **nenhum resultado com dados reais foi produzido**. Android, FCM, provisioning seguro e staging continuam planejados.
 
+## Linha TG1 — Wearable de pulso, MotionLab e pesquisa (planejada)
+
+A partir de 2026-10-21 o eixo de pesquisa prioriza **relógio ESP32 com acelerômetro e giroscópio triaxiais**; placas apenas com acelerômetro não são elegíveis. **Nenhum wearable foi comprado/portado/validado**, nenhum dataset externo foi processado com resultados próprios, nenhum perfil individual/ML foi implantado e `apps/android` ainda está ausente. O núcleo de entrega crítica foi verificado em host/emulação, **não HIL**.
+
+Documentos consolidados: [matriz hardware](docs/hardware/wearable-selection-2026-10-21.md), [Android/conectividade independente de cuidador](docs/architecture/wearable-mobile-and-resilience.md), [registry wrist de datasets](docs/research/wrist-dataset-registry.md), [MotionLab Live](docs/research/motionlab-live.md), [calibração e aprendizado seguro](docs/research/personalization-feedback.md), [gates QA](docs/quality/wrist-motionlab-verification.md), [recorte acadêmico e artigo](docs/research/publication-and-scope.md). Decisões propostas estão catalogadas nos ADRs; evolução executiva no roadmap/backlog. Não elevar documentação a implementação.
+
 ## Visão do projeto
 
 O TCC evolui o protótipo existente para uma plataforma **IoT edge-first, mobile-first e API-first**, com foco maior em confiabilidade ponta a ponta do que em quantidade de telas/tecnologias.
@@ -43,7 +49,7 @@ Backend Node/Express ───── MySQL
 - FCM resolve background/killed; Socket.IO resolve realtime com cliente ativo.
 - Provisioning seguro deve usar primeiro os mecanismos oficiais da Espressif; portal local permanece recovery/diagnóstico.
 - Infraestrutura cabe em VM simples, mas é provider-agnostic; free tier não é arquitetura.
-- Wearable e ML ficam depois do core confiável.
+- Wearable de pulso com IMU de 6 eixos é **direção de prototipação/estudo a qualificar**, sem substituir o core confiável; MotionLab/ML/personalização são extensões controladas com gates.
 - O projeto é protótipo acadêmico experimental, não dispositivo médico validado.
 
 ## Stack decidida neste estágio
@@ -180,7 +186,7 @@ O núcleo obrigatório é:
 9. Protection Health;
 10. segurança, tenant isolation, failure testing e Golden E2E.
 
-Novo wearable, BLE gateway, TinyML/ML, OTA, Health Connect e iOS são extensões condicionadas.
+Seleção de wearable de pulso, MotionLab e ML permanecem **planejados/condicionados**; BLE gateway, OTA, Health Connect e iOS são extensões.
 
 ## Golden E2E alvo
 

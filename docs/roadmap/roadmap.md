@@ -23,8 +23,26 @@ Legenda: `✓` concluído, `→` etapa atual, `○` planejado.
 | ○ | Cloud e configuração remota | serviços reproduzíveis e contratos estáveis |
 | ○ | QA e failure testing | componentes integrados e observáveis |
 | → | Pesquisa experimental | infraestrutura pronta; depende de acesso aos datasets, confirmação de conversão do SisFall e validação do protocolo com o orientador |
-| ○ | Wearable/ML | núcleo verde e hipótese/dataset compatíveis |
+| ○ | Wearable físico + ML/Personalização | HW gate, IMU 6 eixos, dados de pulso, aprovação científica; não comprado/implementado |
 | ○ | Entrega | evidência final reproduzível |
+
+## Trilha paralela nova (planejada; não substitui P2–P6)
+
+A escolha final do relógio permanece bloqueada por [HW-00..HW-09](../hardware/wearable-selection-2026-10-21.md). Objetivo físico: pulso, 6 eixos, Wi-Fi direto sem celular do cuidador. Trabalho offline científico pode avançar antes da compra, mas HIL/energia/autonomia/ergonomia/ML on-watch precisam do hardware.
+
+| Ordem/CP | Resultado exigido | Dependência |
+|---|---|---|
+| W0 — hardware study | SKU/revisão/IMU + marketplace BR + evidência de drivers, energia e pulseira | fontes e custo verificados |
+| R0 — wrist data registry | WEDA-FALL, UP-Fall, UMAFall, BITS-2, SmartFallMM com direitos/status, splits e adapters | termos/licença |
+| R1 — baseline pulso | FSM congelada em dataset wrist compatível + relatório por posição | dados reais autorizados; sem fabricar giroscópio |
+| ML0–ML4 — MotionLab host | schemas, recorder simulado, GT, classificação simples (RF) e métricas | datasets/fixtures corretos |
+| W1 — wearable HIL | portar MPU→QMI8658/BHI260AP/BMI270, Wi-Fi, SD, PMU, timing, watchdog | placa real |
+| A0 — Android REST+FCM | auth revogável, cuidadores, alerta, health, provisioning | backend seguro |
+| ML5–ML7 — live | stream com limites, gravação, anotação, Android/web, relatório e falha | W1+A0 |
+| PERS — optional shadow | calibração ADL, feedback revisado, perfis e A/B independente | R1+ML0–ML7 |
+| ACAD — artigo | metodologia, dados/results com SHA/IC, discussão, escopo/ética | experiência executada |
+
+Detalhes: [MotionLab](../research/motionlab-live.md) · [personalização](../research/personalization-feedback.md) · [QA](../quality/wrist-motionlab-verification.md) · [artigo](../research/publication-and-scope.md). Corte primeiro federated, DL sem ganho, LoRa/4G/Thread, OTA avançado, atividades granulares; nunca cortar detecção/SOS/evento crítico/Android de alerta. A sequência Projetos II → Pré-TG → **TG1 atual** → TG2/TCC é a referência acadêmica.
 
 ## Fase 1 — Porte rastreável, baseline e CI
 

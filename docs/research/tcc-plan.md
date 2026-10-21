@@ -257,3 +257,6 @@ Ver também [`comparable-systems-and-patterns.md`](comparable-systems-and-patter
 ## Rigor
 
 Nenhuma referência, DOI, autor, resultado, número, metodologia, equipamento, threshold, taxa de acerto ou conclusão pode ser inventada. Código implementado, comportamento validado e resultado científico são estados diferentes e devem continuar separados na redação.
+
+## Atualização de direção para TG1/TG2 (2026-10-21; pendente de orientador)
+Priorizar hardware no **pulso**, aquisição IMU completa e avaliação reprodutível com datasets wrist; usar Android para cuidadores remotos (nunca dependência BLE) e laboratório MotionLab para registrar ADLs, GT e exemplos adversariais. Calibração individual com feedback revisado é contribuição experimental, não dependência de SOS. TCC completo pode ser plataforma; artigo científico deve escolher um eixo/hipótese com resultados próprios. [Recorte/publicação](publication-and-scope.md) e [protocolo](experimental-protocol.md). Projetos II → Pré-TG → **TG1 atual** → TG2/TCC. Nada aqui altera status de implementação e resultados.
