@@ -4,7 +4,7 @@
 
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
-- medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB e cadências derivadas com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA
+- medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA
 - migration `002_telemetry_retention_index` adiciona o índice `(created_at, id)` sem alterar dados e é validada em schema vazio, upgrade, reexecução e rollback MySQL
 - job manual de retenção de telemetria opera em dry-run por padrão, exige cutoff ISO 8601 com timezone, falha fechado sem a migration, limita batches/transações e só aplica exclusão com `--apply`
 - telemetria já ligada por `events.evidence_telemetry_id` ou `event_telemetry_evidence.telemetry_log_id`, timestamps legados nulos, eventos, alertas, ações e auditoria permanecem protegidos
