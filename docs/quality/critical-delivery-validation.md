@@ -7,7 +7,7 @@
 | Testes host do firmware (`pio test -e native`) | `EventIdentity`, `CriticalEventOutbox`, codec CRC32, validação de ACK | **executado**: 40/40 em Linux/Docker |
 | Testes unitários/integração do backend (`npm test`) | política de evidência, instante de ocorrência, ACK pós-commit, falha de commit, contratos | **executado**: 121/121 |
 | Testes MySQL descartável | migrations 001–003 (upgrade, schema vazio, rollback, concorrência), retenção | **executado**: 4/4 e 1/1 |
-| Emulação ponta a ponta (`npm run test:e2e:critical`) | virtual device com semântica da outbox + backend + MySQL + Mosquitto reais e descartáveis | **executado**: 11/11 |
+| Emulação ponta a ponta (`npm run test:e2e:critical`) | virtual device com semântica da outbox + backend + MySQL + Mosquitto reais e descartáveis | **executado**: 12/12 localmente (cenário 12 adicionado no CP5) |
 | Build ESP32 | compilação do firmware com outbox | **executado**: SUCCESS, Flash 91,0%, RAM estática 16,9% |
 | ESP32 físico (HIL) | LittleFS real, reboot real, perda de Wi‑Fi, TLS, heap em execução | **pendente**: hardware indisponível nesta rodada |
 
@@ -38,6 +38,10 @@ Observação isolada: no cenário 1, o tempo entre publicação e recepção do 
 ### Achado durante o ensaio
 
 Na primeira execução do cenário 7, a asserção exigia `committed` na segunda tentativa e falhou. O log do backend mostrou que, com o MySQL pausado, a transação da 1ª tentativa ficou **bloqueada** (não recusada) e concluiu o commit após o `unpause`, publicando `committed`; a retransmissão recebeu `duplicate`. O comportamento respeita o invariante (nenhum ACK antes do commit); a asserção foi corrigida para verificar esse invariante. `docker pause` simula banco travado, não conexão recusada.
+
+### Achado no CI remoto
+
+No primeiro run remoto (`cac30cb`), os cenários 3 e 6 falharam porque o backend do step de smoke continuava vivo: o step iniciava `npm start &` e o `trap` matava só o `npm`, deixando o `node` órfão assinando o broker. Cada mensagem foi processada por **duas instâncias**; ainda assim houve um único evento e um único ACK `committed` por UUID (os demais foram `duplicate`), o que é evidência adicional de idempotência entre instâncias. Correção: o smoke inicia `node src/server.js` diretamente, e o ensaio publica um probe antes de começar e aborta se algum outro backend responder.
 
 ## Reprodução
 

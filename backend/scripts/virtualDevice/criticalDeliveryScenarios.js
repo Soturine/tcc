@@ -473,6 +473,18 @@ async function main() {
   let failed = 0;
 
   try {
+    // Pre-condicao: nenhum outro backend pode estar assinando o mesmo broker,
+    // senao ACKs "estrangeiros" invalidam os cenarios de indisponibilidade.
+    const probe = new VirtualDevice(`e2e-probe-${RUN_ID}`);
+    await probe.connect();
+    const probePayload = probe.buildFall();
+    await probe.publishRaw(probePayload);
+    const foreignAck = await probe.waitAck(probePayload.event_uuid, 0, 2500);
+    await probe.close();
+    if (foreignAck) {
+      throw new Error("outro backend respondeu ao probe antes do inicio; encerre-o antes do ensaio");
+    }
+
     await startBackend();
     for (const item of scenarios) {
       if (item.requiresEnv && !process.env[item.requiresEnv]) {
