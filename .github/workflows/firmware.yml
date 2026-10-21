@@ -30,8 +30,11 @@ jobs:
       - name: Build ESP32 firmware
         run: platformio run -e esp32dev
 
-      - name: Run native detector tests
+      - name: Run native detector and critical delivery tests
         run: platformio test -e native
+
+      - name: Build ESP-MQTT QoS 1 spike (ADR-020 evidence)
+        run: platformio run -d spikes/esp_mqtt_qos1
 
   research-replay:
     runs-on: ubuntu-latest

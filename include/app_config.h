@@ -12,7 +12,6 @@ constexpr uint8_t LOG_LEVEL_DEBUG = 3;
 constexpr uint8_t FIRMWARE_LOG_LEVEL = LOG_LEVEL_INFO;
 constexpr bool FIRMWARE_I2C_DEBUG_ENABLED = false;
 constexpr bool FIRMWARE_CONNECTIVITY_DEBUG_ENABLED = false;
-constexpr bool FIRMWARE_EVENT_BUFFER_DEBUG_ENABLED = false;
 constexpr bool FIRMWARE_MQTT_DIAGNOSTIC_ENABLED = true;
 constexpr bool FIRMWARE_TELEMETRY_DIAGNOSTIC_ENABLED = true;
 constexpr bool FIRMWARE_SENSOR_DIAGNOSTIC_ENABLED = true;
@@ -187,10 +186,16 @@ constexpr uint16_t MQTT_PACKET_BUFFER_SIZE = 4096;
 constexpr unsigned long SOS_HOLD_TIME_MS = 1500;
 
 // Buffer local para eventos criticos.
-constexpr size_t EVENT_BUFFER_CAPACITY = 10;
-constexpr bool EVENT_BUFFER_PERSISTENCE_ENABLED = true;
+// Outbox critica (CriticalEventOutbox + LittleFS). Itens so saem com ACK de
+// aplicacao pos-commit; quando cheia, o NOVO evento e recusado de forma observavel.
+constexpr size_t CRITICAL_OUTBOX_CAPACITY = 16;
+// Teto por payload serializado; cabe no buffer MQTT de 4096 bytes com o topico.
+constexpr size_t CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES = 3800;
+constexpr uint32_t CRITICAL_OUTBOX_RETRY_BASE_MS = 2000;
+constexpr uint32_t CRITICAL_OUTBOX_RETRY_MAX_MS = 60000;
+constexpr unsigned long CRITICAL_OUTBOX_PERSIST_RETRY_INTERVAL_MS = 5000;
+// Somente para migrar eventos gravados em NVS pelo buffer legado (<= v0.9.4).
 constexpr size_t PERSISTED_EVENT_BUFFER_CAPACITY = 4;
-constexpr unsigned long EVENT_BUFFER_PERSIST_INTERVAL_MS = 1500;
 
 // Suavizacao do sinal.
 constexpr float ACCEL_FILTER_ALPHA = 0.75f;
