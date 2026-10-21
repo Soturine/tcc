@@ -254,3 +254,33 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] release/tag;
 - [ ] resultados acadêmicos congelados e reproduzíveis;
 - [ ] artigo/monografia/apresentação alinhados ao software realmente entregue.
+
+## P13 — Wrist wearable qualification / aquisição (proposed 2026-10-21)
+- [ ] Confirmar SKU/revisão/pulseira/bateria/retorno/tributos/preço no checkout brasileiro; excluir accelerometer-only.
+- [ ] Produzir ficha HW-00..09 e evidências de pinout, 6 eixos, FIFO/IRQ, 20/50Hz, consumo e dimensão.
+- [ ] Criar HAL de sensor/energia/placa sem alterar baseline; portar QMI8658 (prioritário) e considerar Ultra/BHI260AP após spike.
+- [ ] Validar build PlatformIO, flash/OTA partition, microSD/LittleFS, outbox crítico, Wi-Fi/TLS e reboot em hardware.
+- [ ] HIL físico com logs, fotos, consumo, conforto e SDK efetivo; não afirmar autonomia 24h sem medida.
+
+## P14 — Dataset registry, HAR e MotionLab (proposed)
+- [ ] Catalogar WEDA-FALL, UP-Fall, UMAFall, FallAllD, BITS-2 e SmartFallMM com DOI/termos, checksum, posição e população; não baixar/publicar sem licença.
+- [ ] Adapters de IMU de pulso 6 eixos, ontologia de atividades e splits por sujeito/sessão/fonte; proibir labels inventados.
+- [ ] Executar baseline A e RF simples em dados reais wrist autorizados; registrar diferenças por dataset/hardware, sensibilidade e FP/h.
+- [ ] Construir sessão `MotionLab Live` sentando/levantando com recorder, batches, GT observado/revisado, `unknown` e quality.
+- [ ] Exportação raw/normalized/annotations/predictions/manifest+SHA, relatório HAR matching 1:1, erros de tempo, integração Android e autorização.
+- [ ] Testar offline, reconnect, SD full, IRQ perdido, bateria, reinicialização, overflow, priorização SOS/alertas.
+
+## P15 — Calibração/personalização segura (proposed)
+- [ ] Onboarding acessível e opcional (braço, ajuste, ADL segura, sem exigir queda ou tarefas arriscadas).
+- [ ] Peso/altura/faixa etária opcionais e justificados; nunca derivar thresholds arbitrários ou enviar PII em MQTT.
+- [ ] Separar calibração física IMU de perfil individual ADL; qualidade/manifest/versionamento.
+- [ ] SOS não é ground truth automático; revisão de incidentes e FP/FN vinculada a evidências disponíveis.
+- [ ] Model Registry, perfil em shadow mode, comparação frozen baseline/holdout, aprovação, política de rollback.
+- [ ] Verificar LGPD/CEP com orientador antes de qualquer coleta envolvendo voluntários.
+
+## P16 — Artigo/portfólio baseado em evidências (proposed)
+- [ ] Definir uma pergunta/hypótese principal e protocólo de estudo TG1/TG2 com orientador.
+- [ ] Congelar splits, baselines, software SHA, seeds, datasets/hashes e exclusões antes de medir.
+- [ ] Publicar métodos/scripts e resultados autorizados, não dados pessoais nem resultados simulados como reais.
+- [ ] Demonstrar wearable real → alerta Android e MotionLab Live com rastreabilidade/QA.
+- [ ] Preparar artigo/README showcase e limitações, sem alegar dispositivo médico.

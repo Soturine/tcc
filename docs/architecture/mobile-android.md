@@ -333,3 +333,10 @@ Não construir iOS no MVP. Manter regras/modelos desacoplados de Android onde is
 - FCM priority/Doze: https://firebase.google.com/docs/cloud-messaging/android-message-priority
 - Espressif Android provisioning: https://github.com/espressif/esp-idf-provisioning-android
 - Unified Provisioning: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/provisioning/provisioning.html
+
+## Adendo 2026-10-21 — wearable independente e MotionLab (proposed)
+Cuidador não é gateway Bluetooth. A cadeia crítica usa Wi-Fi do relógio → MQTT/TLS → backend → FCM → Android remoto. BLE somente onboarding protegido/diagnóstico/stream local de laboratório; gateway dedicado BLE/LoRa/4G é futuro, com energia/cobertura/bandas validadas. Arquitetura completa: [wearable-mobile-and-resilience.md](wearable-mobile-and-resilience.md).
+
+Módulo de pesquisa **separado** `motionlab`: tela Compose com stream IMU decimado, predição `unknown`, rótulo pretendido vs ground truth revisado, start/mark/pause/stop, gravação/exportação, status de bateria, qualidade e falhas; autorização de pesquisa distinta de acesso do cuidador. APIs REST + sala Socket.IO de sessão; processamento crítico independe da UI. Especificação: [MotionLab](../research/motionlab-live.md).
+
+Calibração guiada **opcional** e segura: braço/IMU, sentar/levantar somente quando viável, anotações de observador; peso/altura opcionais e nunca fórmulas arbitrárias de threshold. Perfis passam por shadow/holdout e podem ser restaurados. Nenhuma implementação Android ou validação do BLE físico foi realizada nesta atualização.

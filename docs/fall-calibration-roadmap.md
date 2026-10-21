@@ -119,3 +119,6 @@ Esta proposta ainda não deve ser aplicada ao schema principal. Ela serve como c
 3. Usar o botão SOS apenas como entrada física quando a sessão já estiver autorizada.
 4. Coletar pelo menos 10 runs por classe antes de ajustar thresholds.
 5. Implementar FFT leve offline ou em firmware por flag, validar replay e só então considerar uso na decisão.
+
+## Revisão proposta (2026-10-21) — substituir suposições por evidência
+O esquema SQL acima é **legado propositivo**, ainda não migration aprovada; não persistir raw IMU a 50Hz em linhas SQL operacionais indiscriminadas. Gravações científicas em arquivos segregados com manifests/hashes; SQL guarda metadados/autorização. Número "10 runs" acima é sugestão histórica, **não critério científico suficiente**; tamanho amostral derivado de protocolo/variabilidade e resultados. SOS não serve como rótulo de queda sem confirmação humana nem deve virar botão obrigatório de coleta. FFT é opcional e condicionada a ganho. Documento principal de [personalização](research/personalization-feedback.md), [MotionLab](research/motionlab-live.md) e [gates](quality/wrist-motionlab-verification.md). Estado de tudo isso: planned.

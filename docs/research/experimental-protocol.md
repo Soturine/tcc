@@ -127,3 +127,8 @@ Comandos: [tools/research/README.md](../../tools/research/README.md).
 | Execução sobre SisFall/KFall | pendente: aquisição dos dados e confirmação dos fatores de conversão |
 | Condições B e C | planned |
 | Estudo 2 | depende da outbox e do ACK (Checkpoints 3–4) |
+
+## Adendo 2026-10-21 — estudo prospectivo específico de pulso (proposed)
+O Estudo 1 histórico (SisFall/KFall, cintura/lombar) permanece congelado por rastreabilidade. Nova pergunta: desempenho da FSM original ao migrar para IMU6 de pulso vs RF/features simples; generalização entre datasets e possibilidade de calibrar ADLs pessoais, sem afetar caminho crítico. Não mesclar métricas e cohorts entre posições, não afirmar detecção de quedas reais de idosos quando datasets fornecem apenas ADLs idosos e quedas jovens em colchão. Ver [dataset registry](wrist-dataset-registry.md), [MotionLab](motionlab-live.md), [feedback](personalization-feedback.md).
+
+Pré-registro: hipótese, datas, SHAs, frequência, eixos, parâmetros, pipeline de normalização, divisões por participante/sessão/dataset, grupo holdout, matching temporal e limite de falso alarme/h; A baseline congelada, B ajuste global dev, C features+RF, D adaptação pessoal em shadow. Sem vazamento, sem seleção do melhor de muitas runs usando holdout como dev, separar dados sintéticos e físicos. Estudos com voluntários e coleta sensível requerem discussão e autorização institucional/ética. No momento **nenhum ensaio de pulso foi executado**.

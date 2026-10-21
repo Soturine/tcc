@@ -212,3 +212,12 @@ Usar como padrões/contraexemplos, não como alegação de equivalência:
 - SmartFall como referência acadêmica de wearable→Android→server.
 
 Fontes primárias e observações da auditoria estão em [`../audit/iot-fall-monitor-port-audit-2026-09-01.md`](../audit/iot-fall-monitor-port-audit-2026-09-01.md).
+
+## Linha de produto flagship (2026-10-21; proposta)
+- Wearable de pulso ESP32 com IMU accel+gyro 3D e interface acessível; escolha de modelo sujeita a HW gates.
+- Alertas remotos para cuidadores sem proximidade BLE; Wi-Fi próprio, FCM e fallback/estado degradado. SOS independente do classificador.
+- MotionLab **modo laboratório**, gravação de seis eixos, HAR observacional, ground truth revisável e relatórios; nunca confundir predição com fato.
+- Perfil de movimento opcional, calibração física/funcional distintas, feedback e modelos em shadow antes de aprovação.
+- Dataset registry/replay científico, split sujeito/sessão, recursos embarcados e evidência reproducível.
+- Cortes sob risco de prazo: DL/FFT sem ganho, autoaprendizado, LoRa/4G/Thread gateway, GNSS, OTA avançado, classes de atividade muito finas. Não cortar SOS/alerta crítico/Android/protection health.
+Documentos: [produto e ciência](../research/publication-and-scope.md) · [MotionLab](../research/motionlab-live.md) · [pesquisa](../research/wrist-dataset-registry.md). **Nenhum item acima foi implementado automaticamente por este adendo.**

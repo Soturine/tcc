@@ -339,3 +339,6 @@ Guardar resultados reproduzíveis de:
 - limitações/falhas/anomalias.
 
 Não registrar números/percentuais antes da medição real.
+
+## Extensão QA wearable / MotionLab / ML (2026-10-21)
+Plano de gates [wrist-motionlab-verification.md](wrist-motionlab-verification.md) cobre hardware (IMU/bateria/ergonomia/HIL), datasets (licença, posição, sem leakage), streaming (seq/jitter/reboot), observação GT vs predição, feedback (SOS não rotula automaticamente), Android/FCM/ACL, performance/energia e rollback. Critério de aceite **sempre evidência física/experimental correspondente**; CI de fixtures sintéticas não afirma acurácia em idosos ou ambiente real. Streaming de laboratório falha sem afetar critical-event outbox.
