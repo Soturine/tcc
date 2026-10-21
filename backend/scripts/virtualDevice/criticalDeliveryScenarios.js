@@ -430,6 +430,34 @@ scenario("11. device_id do payload divergente do topico: rejeitado sem ACK", asy
   await device.close();
 });
 
+scenario("12. device_uid de device pareado usado em outro topico: rejeitado sem remapear tenant", async (results) => {
+  const victim = new VirtualDevice(`e2e-victim-${RUN_ID}`);
+  await victim.connect();
+  const first = await victim.deliver(victim.buildFall());
+  check(results, Boolean(first.ack), "device vitima registrado");
+
+  const [[organization]] = await db.query("SELECT id FROM organizations ORDER BY id LIMIT 1");
+  await db.query(
+    "UPDATE devices SET claim_status = 'claimed', organization_id = ? WHERE device_uid = ?",
+    [organization.id, victim.deviceUid],
+  );
+
+  const attacker = new VirtualDevice(`e2e-attacker-${RUN_ID}`);
+  await attacker.connect();
+  const forged = { ...attacker.buildFall(), device_uid: victim.deviceUid };
+  const delivery = await attacker.deliver(forged, { attempts: 1 });
+  const [[victimRow]] = await db.query(
+    "SELECT device_identifier, organization_id FROM devices WHERE device_uid = ?",
+    [victim.deviceUid],
+  );
+  check(results, delivery.ack === null, "sem ACK para a mensagem forjada");
+  check(results, (await eventRows(forged.event_uuid)).length === 0, "nenhum evento atribuido a vitima");
+  check(results, victimRow.device_identifier === victim.deviceId, "identificador da vitima preservado");
+  check(results, Number(victimRow.organization_id) === Number(organization.id), "tenant da vitima preservado");
+  await victim.close();
+  await attacker.close();
+});
+
 // ---------------------------------------------------------------- execucao
 
 async function main() {

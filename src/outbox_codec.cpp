@@ -64,6 +64,16 @@ uint32_t crc32(const std::string& data) {
   return ~crc;
 }
 
+std::string fileStemFor(const std::string& uuid) {
+  uint64_t hash = 0xcbf29ce484222325ULL;
+  for (unsigned char byte : uuid) {
+    hash ^= byte;
+    hash *= 0x100000001b3ULL;
+  }
+  return "e" + EventIdentity::hex8(static_cast<uint32_t>(hash >> 32U)) +
+         EventIdentity::hex8(static_cast<uint32_t>(hash));
+}
+
 std::string encode(const OutboxEntry& entry) {
   std::string body = kMagic;
   body += "order=" + std::to_string(entry.order) + "\n";

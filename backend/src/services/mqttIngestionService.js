@@ -268,6 +268,7 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
           name: payload.device_name || payload.name || deviceIdentifier,
         },
         connection,
+        { rejectClaimedIdentifierChange: true },
       );
 
       const currentScope = {

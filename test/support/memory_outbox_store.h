@@ -15,7 +15,7 @@ class MemoryOutboxStore : public OutboxStore {
   bool failWrites = false;
   bool failRemoves = false;
   int writes = 0;
-  std::map<uint64_t, std::string> files;
+  std::map<std::string, std::string> files;
 
   bool available() const override {
     return isAvailable;
@@ -26,7 +26,7 @@ class MemoryOutboxStore : public OutboxStore {
     if (failWrites || !isAvailable) {
       return false;
     }
-    files[entry.order] = OutboxCodec::encode(entry);
+    files[OutboxCodec::fileStemFor(entry.uuid)] = OutboxCodec::encode(entry);
     return true;
   }
 
@@ -34,7 +34,7 @@ class MemoryOutboxStore : public OutboxStore {
     if (failRemoves || !isAvailable) {
       return false;
     }
-    files.erase(entry.order);
+    files.erase(OutboxCodec::fileStemFor(entry.uuid));
     return true;
   }
 

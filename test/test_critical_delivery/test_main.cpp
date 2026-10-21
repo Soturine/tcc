@@ -245,13 +245,47 @@ void testCorruptedFileIsCountedNotLoaded() {
     outbox.enqueue("e1", kTopic, payloadFor("e1"), 1, 0);
     outbox.enqueue("e2", kTopic, payloadFor("e2"), 2, 0);
   }
-  store.files[2].resize(store.files[2].size() - 7);  // escrita interrompida
+  std::string& file = store.files[OutboxCodec::fileStemFor("e2")];
+  file.resize(file.size() - 7);  // escrita interrompida
 
   CriticalEventOutbox afterReboot(smallConfig());
   afterReboot.begin(&store, 0);
   TEST_ASSERT_EQUAL_UINT32(1, afterReboot.stats().pending);
   TEST_ASSERT_EQUAL_UINT32(1, afterReboot.stats().corruptedOnLoad);
   TEST_ASSERT_EQUAL_UINT32(2, store.files.size());  // nao apagado silenciosamente
+}
+
+void testSameOrderAcrossBootsNeverOverwritesPendingEvent() {
+  // Contador de boot nao persistido: dois boots geram a mesma ordem (0<<32 | 1).
+  MemoryOutboxStore store;
+  {
+    CriticalEventOutbox firstBoot(smallConfig());
+    firstBoot.begin(&store, 0);
+    firstBoot.enqueue("dev:b00000000-0000000a:00000001", kTopic, payloadFor("a"), 1, 0);
+  }
+  CriticalEventOutbox secondBoot(smallConfig());
+  secondBoot.begin(&store, 0);
+  secondBoot.enqueue("dev:b00000000-0000000b:00000001", kTopic, payloadFor("b"), 1, 0);
+
+  TEST_ASSERT_EQUAL_UINT32(2, store.files.size());
+  CriticalEventOutbox thirdBoot(smallConfig());
+  thirdBoot.begin(&store, 0);
+  TEST_ASSERT_TRUE(thirdBoot.contains("dev:b00000000-0000000a:00000001"));
+  TEST_ASSERT_TRUE(thirdBoot.contains("dev:b00000000-0000000b:00000001"));
+  TEST_ASSERT_TRUE(OutboxCodec::fileStemFor("a") != OutboxCodec::fileStemFor("b"));
+  TEST_ASSERT_EQUAL_UINT32(17, OutboxCodec::fileStemFor("x").size());
+}
+
+void testRestoredItemAgeCountsFromRestoration() {
+  MemoryOutboxStore store;
+  {
+    CriticalEventOutbox beforeReboot(smallConfig());
+    beforeReboot.begin(&store, 0);
+    beforeReboot.enqueue("e1", kTopic, payloadFor("e1"), 1, 900000);
+  }
+  CriticalEventOutbox afterReboot(smallConfig());
+  afterReboot.begin(&store, 1500);
+  TEST_ASSERT_EQUAL_UINT32(1500, afterReboot.stats().oldestCreatedUptimeMs);
 }
 
 void testBackoffIsExponentialCappedAndJittered() {
@@ -309,6 +343,8 @@ int main(int, char**) {
   RUN_TEST(testStoreUnavailableStillKeepsEventsInRam);
   RUN_TEST(testStoreRemoveFailureStillAcknowledgesAndReappearsSafely);
   RUN_TEST(testCorruptedFileIsCountedNotLoaded);
+  RUN_TEST(testSameOrderAcrossBootsNeverOverwritesPendingEvent);
+  RUN_TEST(testRestoredItemAgeCountsFromRestoration);
   RUN_TEST(testBackoffIsExponentialCappedAndJittered);
   RUN_TEST(testRetrySchedulingSurvivesMillisWraparound);
   RUN_TEST(testBackoffOfOneEntryDoesNotBlockOthers);

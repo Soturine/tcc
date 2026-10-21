@@ -3,8 +3,6 @@
 #include <LittleFS.h>
 #include <Preferences.h>
 
-#include <cstdio>
-
 #include "app_logging.h"
 #include "outbox_codec.h"
 
@@ -16,10 +14,7 @@ constexpr char kBootNamespace[] = "tcc_boot";
 constexpr char kBootCounterKey[] = "count";
 
 String pathFor(const OutboxEntry& entry, const char* suffix) {
-  char name[48];
-  snprintf(name, sizeof(name), "%s/e%016llx%s", kDirectory,
-           static_cast<unsigned long long>(entry.order), suffix);
-  return String(name);
+  return String(kDirectory) + "/" + OutboxCodec::fileStemFor(entry.uuid).c_str() + suffix;
 }
 
 bool endsWith(const String& value, const char* suffix) {

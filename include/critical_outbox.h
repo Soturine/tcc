@@ -20,6 +20,7 @@ struct OutboxEntry {
   std::string topic;
   std::string payload;
   uint64_t order = 0;
+  // Uptime de criacao neste boot; itens restaurados usam o instante da restauracao.
   uint32_t createdUptimeMs = 0;
   uint16_t attempts = 0;
   uint32_t lastAttemptAtMs = 0;

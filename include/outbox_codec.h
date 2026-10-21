@@ -11,6 +11,9 @@
 namespace OutboxCodec {
 
 uint32_t crc32(const std::string& data);
+// Nome de arquivo estavel e unico por evento: "e" + FNV-1a 64 do event_uuid.
+// Nao usa a ordem, que pode repetir entre boots se o contador nao persistir.
+std::string fileStemFor(const std::string& uuid);
 std::string encode(const OutboxEntry& entry);
 bool decode(const std::string& data, OutboxEntry& entry);
 

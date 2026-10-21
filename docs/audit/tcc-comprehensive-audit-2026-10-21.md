@@ -87,7 +87,7 @@ O código é tratado como fonte de verdade; documentação foi usada como refer�
 - **Correção planejada:** Checkpoint 3 (capacidade persistida igual à capacidade lógica, overflow rejeita o novo evento de forma observável em vez de apagar um crítico já aceito).
 
 ### F-07 — `event_uuid` sem identidade de boot
-- **Evidência:** `src/main.cpp:63-67` usa `millis()/1000` sem NTP; `src/main.cpp:90-102` compõe `uid-tipo-segundos-millis-seq` com `criticalEventSeq` em RAM.
+- **Evidência:** `src/main.cpp:63-67` usa `millis()/1000` sem NTP; `src/main.cpp:90-102` compõe `uid-tipo-segundos-millis-`(boot << 32) OR seq` com `criticalEventSeq` em RAM.
 - **Cenário de colisão:** dois boots sem NTP com o mesmo tipo de evento no mesmo `millis()` e mesma sequência (ex.: `sensor_fault` determinístico no boot) geram UUID idêntico; o backend (corretamente) trataria o segundo como duplicata ou conflito → evento real descartado.
 - **Correção planejada:** Checkpoint 3 (`boot_id` persistido por contador NVS + aleatoriedade de hardware, sequência por boot; UUID gerado e persistido antes do primeiro envio).
 
@@ -167,10 +167,62 @@ O histórico de orientação enfatiza a diferenciação entre quedas e atividade
 | CP5 | F-11 e regressões das mudanças | P3 identidade/autorização |
 | CP6 | documentação, rastreabilidade, F-20, F-21 | P12 parcial |
 
-## 7. Registro de execução
+## 7. Segunda auditoria (Checkpoint 5)
 
-Atualizado a cada checkpoint (SHA, testes, estado). Ver seção 8.
+Revisão de integração após CP1–CP4, incluindo o código escrito nesta rodada. Classificação: `FIX_NOW`, `NEXT_PHASE`, `EXPERIMENT`, `NEEDS_MORE_EVIDENCE`, `DEFER`, `REJECT`.
 
-## 8. Resultado por checkpoint
+| ID | Sev. | Achado | Evidência | Classe | Estado |
+|---|---|---|---|---|---|
+| F-24 | P1 | `ConfigStore::savePendingEvents` ignorava o retorno de `putString` e sempre retornava `true` | `src/config_store.cpp` (antes de `008f304`) | FIX_NOW | RESOLVED: função removida; `clearPendingEvents` verifica a escrita; migração só limpa NVS se todos os itens foram gravados |
+| F-25 | P1 | Arquivo da outbox nomeado pela ordem `(boot << 32) OR seq`: com contador de boot não persistido, dois boots gerariam a mesma ordem e o novo evento **sobrescreveria** um pendente restaurado (defeito introduzido em `008f304`) | revisão de `src/critical_outbox_fs_store.cpp` | FIX_NOW | RESOLVED: nome = FNV-1a 64 do `event_uuid`; regressão `testSameOrderAcrossBootsNeverOverwritesPendingEvent` falharia com a chave antiga |
+| F-26 | P3 | `oldest_age_ms` usava uptime de criação gravado em boot anterior | `src/critical_outbox.cpp` | FIX_NOW | RESOLVED: idade conta da restauração; teste `testRestoredItemAgeCountsFromRestoration` |
+| F-27 | P1 | Sem ACL no broker, qualquer cliente publica ACK falso e faz o device descartar evento não persistido | análise do protocolo implementado | FIX_NOW (configuração) | RESOLVED na referência: ACL `infra/mqtt/mosquitto-acl.example` verificada contra Mosquitto real (5/5); aplicação em staging é P8 |
+| F-28 | P2 | Flash da aplicação em 91,0% (1.193.313 / 1.310.720 B) após outbox/LittleFS | build `esp32dev` | NEXT_PHASE | aberto: decidir layout de partições (OTA × tamanho) antes de ESP-MQTT/TLS adicionais |
+| F-29 | P2 | Evento rejeitado pelo backend (conflito/payload inválido) nunca recebe ACK e ocupa a outbox com retry a cada 60 s | protocolo `critical-event-ack-v1` só tem `committed`/`duplicate` | NEXT_PHASE | ACCEPTED_RISK: observável por `pending`/`oldest_age_ms`; aviso de rejeição exige contrato novo |
+| F-30 | P2 | Evento offline com relógio não sincronizado usa `received_at` como `event_time` | `resolveCriticalEventOccurrence` | NEXT_PHASE | ACCEPTED_RISK: `clock_quality=unsynced` registrado; mapear `device_uptime_ms` contra status de referência é melhoria futura |
+| F-31 | P2 | `fall_suspected` continua gerando alerta pelo mesmo caminho urgente | `ALERT_EVENT_TYPES` | DEFER | backlog P2 já registra; firmware atual emite o tipo apenas pelo motor experimental |
+| F-32 | P3 | Payload crítico repete os mesmos valores em `features`, raiz e `local_evidence` (3.469 B no exemplo) | `docs/contracts/mqtt/examples/event.current.json` | NEXT_PHASE | envelope compacto `critical-event-v1` reduziria tamanho e escrita em flash |
+| F-33 | P3 | Cenário de broker indisponível e conexão MySQL recusada não ensaiados | `docs/quality/critical-delivery-validation.md` | NEXT_PHASE | registrado como lacuna |
 
-_Preenchido ao longo da execução._
+Verificações de integração repetidas no CP5: backend 124/124, firmware nativo 42/42, build ESP32, frontend lint/build, E2E 12/12 (inclui F-11 em MySQL real).
+
+## 8. Estado final por finding
+
+| ID | Estado | Correção / commit | Regressão |
+|---|---|---|---|
+| F-01 | RESOLVED | `ae0d813` lockfile backend | `npm audit` 0; testes backend |
+| F-02 | RESOLVED (produção) / ACCEPTED_RISK (dev) | `ae0d813` lockfile web | `npm audit --omit=dev` 0; lint/build |
+| F-03 | RESOLVED | `ae0d813` `validateRuntimeConfig` | `tests/security/runtimeConfig.test.js` |
+| F-04 | RESOLVED (backend) | `ae0d813` | idem |
+| F-05 | RESOLVED (host + emulação; HIL pendente) | `008f304` outbox | `test_critical_delivery`, E2E 1–7 |
+| F-06 | RESOLVED (host; HIL pendente) | `008f304` | `testOverflowRejectsNewEventWithoutDroppingAccepted` |
+| F-07 | RESOLVED (host) | `008f304` `EventIdentity` | `testRebootWithoutClockDoesNotCollide`, `testCounterPersistenceFailureIsCoveredByNonce` |
+| F-08 | RESOLVED | `681b7ca` evidência local | `eventEvidence.test.js`, E2E 2 e 9 |
+| F-09 | RESOLVED | `681b7ca` ACK pós-commit | `mqttIngestionService.test.js`, contratos, E2E |
+| F-10 | RESOLVED pelo protocolo | `681b7ca` | E2E 6 e 7 |
+| F-11 | RESOLVED | CP5 | `deviceIdentityMismatch.test.js`, E2E 12 |
+| F-12 | RESOLVED (infraestrutura; sem resultados reais) | `6e67204` | `tools/research/tests` |
+| F-13 | DEFERRED (ADR-020) | — | — |
+| F-14, F-15, F-16, F-17 | DEFERRED (P3/P6/P8) | — | — |
+| F-18 | RESOLVED quando o relógio do device está sincronizado | `681b7ca` | `criticalEventTime.test.js`, E2E 8 |
+| F-19 | RESOLVED | `ae0d813` | — |
+| F-20 | ver relatório final (issue) | — | — |
+| F-21 | DEFERRED ao autor | — | — |
+| F-22 | RESOLVED | `6e67204` | build ESP32 |
+| F-23 | RESOLVED (contorno) | `6e67204` `scripts/pio-docker.sh` | — |
+| F-24 a F-33 | ver seção 7 | CP5 | — |
+
+## 9. Registro de execução
+
+Comandos e resultados detalhados: [validação da entrega crítica](../quality/critical-delivery-validation.md), [protocolo experimental](../research/experimental-protocol.md) e relatório final da rodada.
+
+## 10. Checkpoints
+
+| Checkpoint | Commits |
+|---|---|
+| CP0 | `9cad573` |
+| CP1 | `ae0d813` |
+| CP2 | `6e67204` |
+| CP3 | `e9011f0` (caracterização), `008f304` |
+| CP4 | `681b7ca` |
+| CP5 | este commit |

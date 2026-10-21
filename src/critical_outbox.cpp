@@ -44,6 +44,8 @@ void CriticalEventOutbox::begin(OutboxStore* store, uint32_t nowMs) {
     entry.lastAttemptAtMs = 0;
     entry.nextAttemptAtMs = nowMs;
     entry.persisted = true;
+    // O uptime gravado pertence a outro boot; a idade passa a contar da restauracao.
+    entry.createdUptimeMs = nowMs;
     entries_.push_back(entry);
     ++counters_.restored;
   }
