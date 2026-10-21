@@ -9,6 +9,14 @@
 - backend recusa iniciar fora de `NODE_ENV=development|test` com `JWT_SECRET` ausente, default ou curto, MQTT sem TLS verificado, CA ilegível, credenciais MQTT ausentes ou CORS permissivo; mensagens não expõem segredos
 - manifests do backend e do frontend alinhados à última versão publicada (0.9.4)
 
+### Fundação experimental do TG1
+- baseline A do detector congelada e identificada por hash semântico dos parâmetros efetivos (`docs/research/detector-baseline.md`)
+- filtro IIR e derivações de magnitude/pitch/roll extraídos para `src/sensor_signal.cpp`, compartilhados pelo driver do MPU e pelo replay, com testes nativos de caracterização
+- `tools/research/fallbench` (somente stdlib): adaptadores SisFall/KFall/normalizado, mapeamento de eixos explícito, reamostragem na cadência do firmware sem interpolação de lacunas, saturação na faixa do MPU, métricas por trial com IC de Wilson e valores indefinidos para denominador zero, falsos alarmes por hora, latência a partir de anotações, split por participante e proveniência
+- binário `fall_replay` compilado das fontes do firmware; CI `research-replay` compila e testa com fixtures sintéticas reprodutíveis
+- inventário de datasets verificado em fontes primárias e protocolo experimental com pergunta, objetivos O1–O5, hipóteses, ameaças à validade e coleta segura; nenhum resultado com dados reais foi produzido
+- plataforma `espressif32@7.1.3`, `native@1.2.1` e bibliotecas fixadas após a versão 8.0.0 quebrar o build; `scripts/pio-docker.sh` reproduz firmware e pesquisa em Linux
+
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
 - medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA

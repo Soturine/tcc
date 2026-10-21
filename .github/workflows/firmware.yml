@@ -32,3 +32,29 @@ jobs:
 
       - name: Run native detector tests
         run: platformio test -e native
+
+  research-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Build offline replay from firmware detector sources
+        run: bash tools/research/build_replay.sh
+
+      - name: Run research infrastructure tests (synthetic fixtures only)
+        working-directory: tools/research
+        env:
+          FALLBENCH_REQUIRE_REPLAY: "1"
+        run: python -m unittest discover -s tests -v
+
+      - name: Verify committed synthetic fixtures are reproducible
+        run: |
+          python tools/research/fixtures/make_synthetic.py
+          git diff --exit-code -- tools/research/fixtures/synthetic

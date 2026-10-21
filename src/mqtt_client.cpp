@@ -1,6 +1,7 @@
 #include "mqtt_client.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "app_config.h"
 #include "app_logging.h"

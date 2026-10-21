@@ -218,14 +218,14 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 
 - [ ] Revisão bibliográfica validada.
 - [ ] Incluir trabalhos de real-fall/long-term/cross-dataset na revisão, não apenas datasets laboratoriais.
-- [ ] Definir protocolo experimental antes da coleta final.
+- [x] Definir protocolo experimental antes da coleta final (proposta versionada em `docs/research/experimental-protocol.md`; pendente de validação do orientador).
 - [ ] Instrumentar t0..t5 e clock quality.
 - [ ] Executar baseline de latência/recovery.
 - [ ] Analisar p50/p95/p99.
 - [ ] Definir requisitos quantitativos a partir dos dados.
 - [ ] Ensaios seguros de detecção.
-- [ ] Scripts/dados reproduzíveis.
-- [ ] Separar métricas do detector de métricas do pipeline de entrega.
+- [x] Scripts reproduzíveis (`tools/research`: replay com detector real, métricas, split, proveniência). Execução com dados reais pendente.
+- [x] Separar métricas do detector de métricas do pipeline de entrega.
 
 ## P11 — Wearable / ML (somente após core verde)
 
@@ -235,7 +235,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] BLE gateway somente se necessário.
 - [ ] Validar background Android no hardware real.
 - [ ] Dataset compatível com posição/taxa do sensor.
-- [ ] Split de avaliação sem participant leakage.
+- [x] Infraestrutura de split por participante sem leakage (`fallbench split`).
 - [ ] Avaliar cross-dataset/real-fall generalization quando aplicável.
 - [ ] Comparar FSM com ML/TinyML somente com hipótese/baseline/métricas.
 - [ ] Avaliar Edge Impulse/ESP-DL apenas se justificarem o experimento.

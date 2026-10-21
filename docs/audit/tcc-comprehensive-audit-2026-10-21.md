@@ -48,6 +48,8 @@ O código é tratado como fonte de verdade; documentação foi usada como refer�
 | F-19 | P3 | Versionamento | `package.json` em 0.9.0, enquanto tags/CHANGELOG chegam a v0.9.4 | CONFIRMED |
 | F-20 | P3 | Rastreabilidade | Issue #1 (porte da baseline) segue aberta apesar do PR #2 mergeado e do backlog marcado | CONFIRMED |
 | F-21 | P3 | Documentação acadêmica | Duas revisões do artigo INIC versionadas (raiz e `docs/`) sem indicação de canônica | CONFIRMED |
+| F-22 | P0 | Reprodutibilidade/firmware | `platform = espressif32` sem versão: a resolução atual (8.0.0) quebra o build que passou no CI com 7.1.3 | CONFIRMED (descoberto no CP1) |
+| F-23 | P3 | Ambiente | Testes `native` exigem gcc/g++ no host; Windows do autor não tem toolchain | CONFIRMED |
 
 ## 4. Findings detalhados
 
@@ -139,6 +141,16 @@ O código é tratado como fonte de verdade; documentação foi usada como refer�
 ### F-21 — Revisões do artigo INIC
 - **Evidência:** `Artigo_INIC_2026_Rafael_Ryan.docx` (raiz, `f4ea7ed`, SHA-256 `6e36a9fc…`, 2.430 palavras extraídas) e `docs/Artigo_INIC_2026_Rafael_Ryan.docx` (`09ad767`, SHA-256 `8fc7bcf0…`, 2.664 palavras). O texto difere em resumo, metodologia e tabela de parâmetros; a cópia da raiz é a revisão mais recente.
 - **Decisão:** `DEFERRED` ao autor. Nenhum arquivo foi movido ou apagado; a escolha da versão canônica e o destino (`docs/academic/`) dependem de quem submeteu o artigo.
+
+### F-22 — Plataforma ESP32 não fixada
+- **Evidência:** `platformio.ini` com `platform = espressif32`; último Firmware verde (run 36911144666, 2026-10-01) registrou `espressif32@7.1.3`, ArduinoJson 6.21.6, PubSubClient 2.8.0. Em 2026-10-21 a resolução trouxe `espressif32@8.0.0` e o build falhou em `src/mqtt_client.cpp:156` (`'WiFi' was not declared`), pois o include de `WiFi.h` vinha transitivamente.
+- **Impacto:** o próximo push em `main` ficaria vermelho sem mudança de código; builds não reprodutíveis.
+- **Correção:** plataforma, `native` e bibliotecas fixadas nas versões validadas; `#include <WiFi.h>` explícito. Build ESP32 e 19 testes nativos verdes em Linux/Docker.
+- **Risco residual:** atualização de plataforma vira mudança deliberada com build/testes.
+
+### F-23 — Toolchain nativa ausente no Windows
+- **Evidência:** `pio test -e native` falha com `'gcc' não é reconhecido`.
+- **Correção:** `scripts/pio-docker.sh` reproduz firmware nativo, build ESP32 e testes de pesquisa no mesmo ambiente Linux do CI.
 
 ## 5. Coerência acadêmica
 

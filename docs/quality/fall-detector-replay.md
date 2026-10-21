@@ -81,3 +81,7 @@ platformio run -e esp32dev
 - sensor fusion, Madgwick/Mahony, DMP, ML e TinyML permanecem **deferred** até existir evidência compatível.
 
 Quando leituras reais forem capturadas com protocolo seguro, um parser separado poderá convertê-las em `SensorReading[]` e reutilizar o mesmo runner sem acoplar formatos de arquivo ao detector.
+
+## Replay com datasets (2026-10-21)
+
+O parser "futuro" do diagrama acima foi implementado fora do ambiente de teste do firmware, em [`tools/research`](../../tools/research/README.md): adaptadores SisFall, KFall e formato normalizado; reamostragem na cadência do firmware; filtro e derivações compartilhados com o driver (`src/sensor_signal.cpp`); binário `fall_replay` com o `FallDetector` real; métricas por trial com IC de Wilson; split por participante; proveniência. O CI (`Firmware / research-replay`) compila o binário e executa os testes com fixtures **sintéticas**. Nenhum resultado com dados reais existe ainda; ver [protocolo](../research/experimental-protocol.md).

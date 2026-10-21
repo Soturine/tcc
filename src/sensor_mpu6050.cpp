@@ -8,7 +8,6 @@
 
 namespace {
 
-constexpr float kRadiansToDegrees = 57.2957795f;
 constexpr uint8_t kMpu6050WhoAmIValue = 0x68;
 constexpr uint8_t kMpu6500WhoAmIValue = 0x70;
 constexpr uint8_t kMpu9250WhoAmIValue = 0x71;
@@ -366,7 +365,7 @@ bool SensorMPU6050::begin(TwoWire& wire, uint8_t address) {
   detectedModelName_ = "desconhecido";
   ready_ = false;
   reading_ = SensorReading();
-  filterInitialized_ = false;
+  lowPass_ = SensorSignal::LowPassState{};
   lastReadSucceeded_ = false;
   accelCalibrationApplied_ = false;
   scaleReadbackMismatchAccepted_ = false;
@@ -1043,52 +1042,10 @@ void SensorMPU6050::applyLowPass(float rawAccelX,
                                  float rawGyroX,
                                  float rawGyroY,
                                  float rawGyroZ) {
-  if (!filterInitialized_) {
-    filteredAccelXG_ = rawAccelX;
-    filteredAccelYG_ = rawAccelY;
-    filteredAccelZG_ = rawAccelZ;
-    filteredGyroXDegPerSec_ = rawGyroX;
-    filteredGyroYDegPerSec_ = rawGyroY;
-    filteredGyroZDegPerSec_ = rawGyroZ;
-    filterInitialized_ = true;
-  } else {
-    filteredAccelXG_ = AppConfig::ACCEL_FILTER_ALPHA * filteredAccelXG_ +
-                       (1.0f - AppConfig::ACCEL_FILTER_ALPHA) * rawAccelX;
-    filteredAccelYG_ = AppConfig::ACCEL_FILTER_ALPHA * filteredAccelYG_ +
-                       (1.0f - AppConfig::ACCEL_FILTER_ALPHA) * rawAccelY;
-    filteredAccelZG_ = AppConfig::ACCEL_FILTER_ALPHA * filteredAccelZG_ +
-                       (1.0f - AppConfig::ACCEL_FILTER_ALPHA) * rawAccelZ;
-
-    filteredGyroXDegPerSec_ = AppConfig::GYRO_FILTER_ALPHA * filteredGyroXDegPerSec_ +
-                              (1.0f - AppConfig::GYRO_FILTER_ALPHA) * rawGyroX;
-    filteredGyroYDegPerSec_ = AppConfig::GYRO_FILTER_ALPHA * filteredGyroYDegPerSec_ +
-                              (1.0f - AppConfig::GYRO_FILTER_ALPHA) * rawGyroY;
-    filteredGyroZDegPerSec_ = AppConfig::GYRO_FILTER_ALPHA * filteredGyroZDegPerSec_ +
-                              (1.0f - AppConfig::GYRO_FILTER_ALPHA) * rawGyroZ;
-  }
-
-  reading_.accelXG = filteredAccelXG_;
-  reading_.accelYG = filteredAccelYG_;
-  reading_.accelZG = filteredAccelZG_;
-  reading_.gyroXDegPerSec = filteredGyroXDegPerSec_;
-  reading_.gyroYDegPerSec = filteredGyroYDegPerSec_;
-  reading_.gyroZDegPerSec = filteredGyroZDegPerSec_;
+  SensorSignal::applyLowPass(
+      lowPass_, rawAccelX, rawAccelY, rawAccelZ, rawGyroX, rawGyroY, rawGyroZ, reading_);
 }
 
 void SensorMPU6050::computeDerivedValues() {
-  reading_.accelMagnitudeG = sqrtf(
-      (reading_.accelXG * reading_.accelXG) +
-      (reading_.accelYG * reading_.accelYG) +
-      (reading_.accelZG * reading_.accelZG));
-
-  reading_.gyroMagnitudeDegPerSec = sqrtf(
-      (reading_.gyroXDegPerSec * reading_.gyroXDegPerSec) +
-      (reading_.gyroYDegPerSec * reading_.gyroYDegPerSec) +
-      (reading_.gyroZDegPerSec * reading_.gyroZDegPerSec));
-
-  const float accelYZMagnitude =
-      sqrtf((reading_.accelYG * reading_.accelYG) + (reading_.accelZG * reading_.accelZG));
-
-  reading_.pitchDeg = atan2f(-reading_.accelXG, accelYZMagnitude) * kRadiansToDegrees;
-  reading_.rollDeg = atan2f(reading_.accelYG, reading_.accelZG) * kRadiansToDegrees;
+  SensorSignal::computeDerivedValues(reading_);
 }
