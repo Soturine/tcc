@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://soturine.local/contracts/mqtt/critical-event-v1.schema.json",
   "title": "Planned critical event envelope v1",
-  "$comment": "PLANNED: not emitted or accepted as a strict v1 contract yet.",
+  "$comment": "PLANNED: strict v1 envelope not emitted yet. Firmware sends the current payload (implicit profile 0) plus boot_id, device_uptime_ms, clock_quality, occurred_at_device and local_evidence.",
   "type": "object",
   "required": [
     "schema_version", "event_uuid", "device_id", "boot_id", "device_uptime_ms",

@@ -23,5 +23,23 @@
   "sensor_failures": 0,
   "i2c_error_count": 0,
   "i2c_recovery_count": 0,
-  "i2c_last_error": "none"
+  "i2c_last_error": "none",
+  "boot_id": "b0000002a-5f3c9e10",
+  "critical_outbox": {
+    "pending": 0,
+    "capacity": 16,
+    "not_persisted": 0,
+    "store_available": true,
+    "oldest_age_ms": 0,
+    "overflow_count": 0,
+    "too_large_count": 0,
+    "persist_failures": 0,
+    "corrupted_on_load": 0,
+    "acked": 3,
+    "duplicate_acks": 1,
+    "unknown_acks": 0,
+    "invalid_acks": 0,
+    "last_ack_age_ms": 41250,
+    "ack_subscribed": true
+  }
 }

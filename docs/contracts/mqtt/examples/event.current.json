@@ -2,8 +2,8 @@
   "device_uid": "esp32-A1B2C3D4E5F6",
   "device_id": "esp32_01",
   "event_type": "fall_detected",
-  "event_uuid": "esp32-A1B2C3D4E5F6-fall_detected-1788307200-12345-7",
-  "event_sequence": 7,
+  "event_uuid": "esp32-A1B2C3D4E5F6:b0000002a-5f3c9e10:00000001",
+  "event_sequence": 1,
   "sample_seq": 341,
   "timestamp": 1788307200,
   "event_uptime_ms": 12345,
@@ -117,5 +117,26 @@
     "experimental_gyro_dps": 120.0,
     "experimental_window_ms": 3600,
     "experimental_cooldown_ms": 10000
+  },
+  "boot_id": "b0000002a-5f3c9e10",
+  "boot_id_counter_persisted": true,
+  "device_uptime_ms": 12345,
+  "clock_quality": "synced",
+  "occurred_at_device": "2026-09-02T00:00:00Z",
+  "local_evidence": {
+    "version": 1,
+    "decision_source": "edge",
+    "algorithm_version": "threshold_fsm_v2_time_features_v1",
+    "detector_mode": "normal",
+    "impact_detected": true,
+    "orientation_change_detected": true,
+    "immobility_detected": true,
+    "peak_accel_g": 3.74,
+    "peak_gyro_dps": 182.5,
+    "orientation_delta_deg": 52.0,
+    "immobility_duration_ms": 2000,
+    "immobility_required_ms": 2000,
+    "analysis_window_ms": 3600,
+    "samples_considered": 64
   }
 }

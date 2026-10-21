@@ -17,6 +17,16 @@
 - inventário de datasets verificado em fontes primárias e protocolo experimental com pergunta, objetivos O1–O5, hipóteses, ameaças à validade e coleta segura; nenhum resultado com dados reais foi produzido
 - plataforma `espressif32@7.1.3`, `native@1.2.1` e bibliotecas fixadas após a versão 8.0.0 quebrar o build; `scripts/pio-docker.sh` reproduz firmware e pesquisa em Linux
 
+### Confiabilidade crítica (P2)
+- firmware: `CriticalEventOutbox` persistente em LittleFS (16 itens, CRC32, escrita atômica, quarentena de arquivo corrompido) remove eventos somente com ACK de aplicação; outbox cheia recusa o novo evento de forma observável; retry com backoff e mesmo UUID; migração dos eventos NVS legados
+- firmware: `event_uuid` com contador de boot persistido, nonce de hardware e sequência por boot, independente de NTP; payload crítico ganha `boot_id`, `device_uptime_ms`, `clock_quality`, `occurred_at_device` e `local_evidence` v1
+- firmware: diagnóstico `status.critical_outbox`; buffer legado removido após caracterização; falha de gravação NVS deixa de ser ignorada
+- backend: ACK de aplicação `critical-event-ack-v1` publicado somente após COMMIT (`committed`/`duplicate`), no tópico derivado da identidade do tópico; sem ACK para rollback, conflito ou rejeição
+- backend: queda confirmada pelo edge gera alerta sem depender de telemetria SQL; `evidence_source` (migration 003) distingue evidência local, do servidor, combinada ou insuficiente; `alert_test` nunca vira alerta real
+- backend: eventos entregues após período offline usam `occurred_at_device` sincronizado como instante de ocorrência, preservando `received_at`
+- `npm run test:e2e:critical`: 11 cenários de falha com virtual device e backend/MySQL/Mosquitto reais (emulação, não HIL), incluídos no CI
+- spike ESP-MQTT QoS 1 e ADR-020; budget do payload de evento revisado para 3.584 bytes
+
 ### Lifecycle de telemetria, evidência e auditoria
 - inventário canônico classifica dados operacionais, evidência crítica, resposta humana, auditoria, identidade/configuração, pesquisa e logs, com PII, finalidade, acesso e efeitos de exclusão explícitos
 - medição somente leitura registra contagens exatas, alocação do storage engine, estimativas do InnoDB, cadências derivadas e crescimento aproximado por device/dia com rótulos distintos; o snapshot local confirmou que `telemetry_logs` domina o recorte medido sem transformar poucas observações em SLA

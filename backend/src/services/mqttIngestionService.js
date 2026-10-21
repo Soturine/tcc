@@ -5,7 +5,11 @@ const {
 } = require("../utils/correlation");
 const { logger } = require("../utils/logger");
 const { toBoolean, toNullableNumber } = require("../utils/formatters");
-const { resolveRealtimeMqttTimestamp } = require("../utils/time");
+const {
+  resolveCriticalEventOccurrence,
+  resolveRealtimeMqttTimestamp,
+} = require("../utils/time");
+const { buildCriticalEventAckTopic } = require("../mqtt/topics");
 const {
   getDeviceBehaviorSnapshot,
   getOrCreateDeviceByIdentity,
@@ -69,6 +73,73 @@ function buildStatusUpdateFromPayload(payload, receivedAt, diagnostics = {}, bat
   };
 }
 
+/**
+ * ACK de aplicacao (critical-event-ack-v1). Chamado SOMENTE depois do commit.
+ * `duplicate` confirma um UUID que ja estava committed; o event_id e o mesmo.
+ */
+function buildCriticalEventAck(event) {
+  return {
+    schema_version: 1,
+    event_uuid: event.eventUuid,
+    event_id: Number(event.id),
+    status: event.deduplicated ? "duplicate" : "committed",
+    committed_at: event.persistedAt || new Date().toISOString(),
+  };
+}
+
+function publishCriticalEventAck({ publishAck, topicInfo, event, correlationId }) {
+  if (!event?.eventUuid) {
+    return null;
+  }
+
+  const ackTopic = buildCriticalEventAckTopic(topicInfo.deviceIdentifier);
+  const ack = buildCriticalEventAck(event);
+
+  if (typeof publishAck !== "function") {
+    logger.warn("ACK de aplicacao nao publicado: publisher MQTT indisponivel.", {
+      correlationId,
+      eventUuid: ack.event_uuid,
+      eventId: ack.event_id,
+      reason: "ack_publisher_missing",
+    });
+    return null;
+  }
+
+  try {
+    publishAck(ackTopic, ack, (error) => {
+      if (error) {
+        logger.error("Falha ao publicar ACK de aplicacao; o device retransmitira o mesmo UUID.", {
+          correlationId,
+          ackTopic,
+          eventUuid: ack.event_uuid,
+          eventId: ack.event_id,
+          message: error.message,
+          reason: "ack_publish_failed",
+        });
+      }
+    });
+  } catch (error) {
+    logger.error("Falha ao publicar ACK de aplicacao; o device retransmitira o mesmo UUID.", {
+      correlationId,
+      ackTopic,
+      eventUuid: ack.event_uuid,
+      eventId: ack.event_id,
+      message: error.message,
+      reason: "ack_publish_failed",
+    });
+    return null;
+  }
+
+  logger.info("ACK de aplicacao publicado apos commit.", {
+    correlationId,
+    ackTopic,
+    eventUuid: ack.event_uuid,
+    eventId: ack.event_id,
+    status: ack.status,
+  });
+  return { topic: ackTopic, ack };
+}
+
 function buildTelemetryLogSummary(payload) {
   return {
     ax: toNullableNumber(payload.ax),
@@ -87,7 +158,7 @@ function buildTelemetryLogSummary(payload) {
   };
 }
 
-async function handleMqttMessage({ topicInfo, payloadText, io }) {
+async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null }) {
   const correlationId = createCorrelationId("mqtt");
   const messageStartedAt = process.hrtime.bigint();
   const receivedAt = new Date();
@@ -156,7 +227,11 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
     return;
   }
 
-  const timestampResolution = resolveRealtimeMqttTimestamp(payload.timestamp, receivedAt);
+  // Eventos podem chegar atrasados apos periodo offline: o instante de ocorrencia
+  // declarado pelo device (relogio sincronizado) prevalece para correlacao.
+  const timestampResolution = topicInfo.channel === "events"
+    ? resolveCriticalEventOccurrence(payload, receivedAt)
+    : resolveRealtimeMqttTimestamp(payload.timestamp, receivedAt);
 
   if (timestampResolution.reason) {
     logger.info("Timestamp MQTT normalizado para hora de recebimento do backend.", {
@@ -360,7 +435,9 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
         sampleSeq: event.sampleSeq ?? null,
         deduplicated: Boolean(event.deduplicated),
         evidenceStatus: event.evidenceStatus,
+        evidenceSource: event.evidenceSource ?? null,
         evidenceSampleCount: event.evidenceSampleCount,
+        occurrenceSource: timestampResolution.source,
         alertCandidate: shouldCreateAlert(event.eventType),
         correlationId,
       });
@@ -396,6 +473,7 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
           eventId: event.id,
           eventType: event.eventType,
           evidenceStatus: event.evidenceStatus,
+          evidenceSource: event.evidenceSource ?? null,
           evidenceSampleCount: event.evidenceSampleCount,
         });
       }
@@ -484,6 +562,11 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
       return;
     }
 
+    if (result.channel === "events_duplicate" || result.channel === "events") {
+      // O commit ja ocorreu (transaction resolveu). Duplicatas recebem novo ACK.
+      publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
+    }
+
     if (result.channel === "events_duplicate") {
       logger.info("MQTT event duplicado ignorado sem criar alerta.", {
         topic: topicInfo.topic,
@@ -526,5 +609,6 @@ async function handleMqttMessage({ topicInfo, payloadText, io }) {
 }
 
 module.exports = {
+  buildCriticalEventAck,
   handleMqttMessage,
 };

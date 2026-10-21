@@ -320,6 +320,7 @@ CREATE TABLE IF NOT EXISTS events (
   evidence_sample_count INT UNSIGNED NOT NULL DEFAULT 0,
   evidence_window_seconds DECIMAL(8, 3) NULL,
   evidence_summary_json JSON NULL,
+  evidence_source ENUM('device', 'server_telemetry', 'both', 'none') NULL,
   event_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   occurred_at_device DATETIME(3) NULL,
   received_at DATETIME(3) NULL,

@@ -101,6 +101,10 @@ function createMqttBridge({ io }) {
       topicInfo,
       payloadText: payloadBuffer.toString(),
       io,
+      // QoS 1 e retain=false (critical-event-ack-v1). O callback informa falha;
+      // sem ACK o device retransmite o mesmo event_uuid e o backend deduplica.
+      publishAck: (ackTopic, ack, callback) =>
+        client.publish(ackTopic, JSON.stringify(ack), { qos: 1, retain: false }, callback),
     }).catch((error) => {
       logger.error("Falha ao processar mensagem MQTT.", {
         topic,

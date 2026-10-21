@@ -1,86 +1,72 @@
 # Identidade do evento crítico e ACK de aplicação
 
-## Estado atual
+## Estado atual (2026-10-21)
 
-O firmware cria `event_uuid` antes da primeira tentativa de publish em `buildCriticalEventUuid()`:
+### Firmware
+
+`event_uuid` é gerado por `EventIdentity::Generator` (`src/event_identity.cpp`) **antes** do payload ser montado e gravado na outbox:
 
 ```text
-{device_uid}-{event_type}-{timestamp_seconds}-{millis}-{event_sequence}
+event_uuid = {device_uid}:{boot_id}:{sequência hex8}
+boot_id    = b{contador de boot persistido hex8}-{nonce de hardware hex8}
 ```
 
-O mesmo payload, inclusive UUID, é preservado no buffer e nos retries. `event_sequence` é um contador RAM reiniciado no boot; `sample_seq` também é local ao boot. O UUID inclui eFuse UID, tipo, wall clock/fallback, uptime e sequência, mas **não possui `boot_id` persistente ou aleatório**. Portanto, a robustez contra colisão após reboot precoce/sem NTP não está demonstrada.
+- o contador de boot é incrementado e gravado em NVS no início de cada boot; falha de gravação é sinalizada em `boot_id_counter_persisted=false`;
+- o nonce vem de `esp_random()` e cobre boots com o mesmo contador (persistência falhou ou NVS apagada);
+- a sequência é por boot e nunca reutiliza 0;
+- não depende de NTP nem de `millis()` (ADR-017). Testes adversariais: `test/test_critical_delivery` (50 boots sem relógio, falha do contador, limite de 160 caracteres).
 
-O buffer atual:
+`CriticalEventOutbox` (`src/critical_outbox.cpp`) persiste cada evento em LittleFS antes da primeira tentativa e o mantém até o ACK de aplicação:
 
-- fila circular RAM com capacidade 10, política `drop_oldest`;
-- snapshot NVS de no máximo 4 eventos, com escrita adiada;
-- restauração do snapshot no boot;
-- remoção assim que `PubSubClient.publish()` retorna sucesso local.
+- capacidade 16 itens, payload ≤ 3.800 bytes; outbox cheia recusa o **novo** evento e incrementa `critical_outbox.overflow_count` (nada já aceito é descartado);
+- retry com backoff exponencial de 2 s a 60 s + jitter, por item (um item em backoff não bloqueia os demais);
+- reboot restaura os itens na ordem de criação e reenvia imediatamente com o mesmo UUID;
+- falha de gravação mantém o item em RAM (`not_persisted`) e é re-tentada; arquivo corrompido é detectado por CRC32 e quarentenado como `.bad`;
+- eventos gravados pelo buffer legado em NVS são migrados com o UUID original; as chaves antigas só são apagadas se todos forem gravados.
 
-Isso é uma fila persistida parcial, não a outbox confiável alvo. `publish()` não prova PUBACK nem commit no MySQL.
+Limitações: transporte device→broker ainda QoS 0 (ADR-020); sem validação em ESP32 físico (HIL pendente); capacidade física finita.
 
-No backend, `event_uuid` também é materializado em `events.event_uuid`, com unicidade global no banco. A ingestão valida o UUID recebido, persiste a identidade estruturada e trata a restrição `UNIQUE` como autoridade inclusive sob concorrência entre transações ou instâncias.
+### Backend
 
-Um retry com o mesmo UUID e a mesma identidade crítica retorna o evento lógico existente e não repete o alerta. Reutilizar o UUID com device, tipo ou evidência crítica divergente resulta em `EVENT_UUID_CONFLICT`; o evento anterior não é sobrescrito e o payload conflitante não é aceito como sucesso. Logs registram somente identificadores e nomes dos campos divergentes, sem despejar o payload completo.
+`event_uuid` é materializado em `events.event_uuid` com unicidade global. A constraint `UNIQUE` é a autoridade inclusive sob concorrência. Retry com o mesmo UUID e a mesma identidade crítica retorna o evento lógico existente sem repetir alerta; reutilização com dados críticos divergentes resulta em `EVENT_UUID_CONFLICT` e o evento anterior não é sobrescrito.
 
-Eventos legados sem UUID continuam aceitos com `event_uuid = NULL` e não recebem garantia de deduplicação. A migration `001_event_identity` recupera somente UUIDs legados válidos e únicos; ausentes ou inválidos permanecem nulos, sem identidade fabricada. O procedimento operacional está em [`database/migrations/README.md`](../../database/migrations/README.md).
+Eventos legados sem UUID continuam aceitos com `event_uuid = NULL`, sem garantia de deduplicação e sem ACK.
+
+## ACK de aplicação (implementado)
+
+Tópico: `queda/devices/{device_id}/critical-event-acks`. Payload: [critical-event-ack-v1.schema.json](mqtt/critical-event-ack-v1.schema.json).
+
+```text
+device persiste event(event_uuid) na outbox
+  -> publish
+  -> backend valida tópico/identidade/UUID
+  -> transação: evento + alerta (idempotentes)
+  -> COMMIT MySQL
+  -> backend publica ACK {event_uuid, event_id, status, committed_at} (QoS 1, retain=false)
+  -> device valida tópico/schema e remove o item da outbox
+```
+
+| Situação | Comportamento verificado |
+|---|---|
+| primeira persistência | ACK `committed` |
+| retry / MQTT duplicado | nenhum novo evento ou alerta; ACK `duplicate` com o mesmo `event_id` |
+| ACK perdido | device retransmite o mesmo UUID e recebe `duplicate` |
+| ACK duplicado / UUID desconhecido | device ignora de forma idempotente e conta em diagnóstico |
+| rollback, banco indisponível, falha de commit | nenhum ACK; device retransmite |
+| payload conflitante, UUID inválido, `device_id` divergente do tópico | nenhum ACK; nada é sobrescrito |
+| backend fora do ar ou reiniciado | mensagem pode se perder (sessão limpa); retry da outbox entrega após o retorno |
+| ACK de outro device/tópico | firmware rejeita (`wrong_topic`) |
+
+O tópico do ACK é derivado do `device_id` do **tópico** de origem, nunca do payload (ADR-015). Evidência: `backend/tests/mqtt/mqttIngestionService.test.js`, `backend/tests/contracts/contracts.test.js`, `test/test_critical_ack`, `test/test_critical_delivery` e o ensaio `npm run test:e2e:critical` ([registro](../quality/critical-delivery-validation.md)).
 
 ## Contrato v1 planejado
 
-O schema [critical-event-v1.schema.json](mqtt/critical-event-v1.schema.json) é uma direção imediatamente necessária, não um payload já emitido. Ele exige:
-
-- `schema_version: 1`;
-- `event_uuid` opaco e estável;
-- `device_id` redundante ao tópico;
-- `boot_id` para distinguir boots;
-- `device_uptime_ms` monotônico;
-- `event_type` crítico;
-- `occurred_at_device` nullable;
-- `clock_quality` explícito;
-- `detector_version`, `mode` e evidência compacta;
-- `confidence_status`, sem probabilidade fabricada.
-
-`event_uuid` deve nascer uma vez, ser persistido antes da primeira transmissão e nunca mudar em retry, reconnect ou reboot. A materialização e unicidade no backend estão **implemented** e cobertas por testes; a geração robusta a reboot e a outbox persistente do device continuam **planned**.
-
-## ACK de aplicação planejado
-
-Topic proposto e reservado nesta formalização:
-
-```text
-queda/devices/{device_id}/critical-event-acks
-```
-
-Fluxo obrigatório:
-
-```text
-device event(event_uuid)
-  -> broker
-  -> backend valida identidade/schema
-  -> transação persiste evento e efeitos idempotentes
-  -> COMMIT MySQL
-  -> backend publica ACK(event_uuid)
-  -> device valida tópico/UUID e remove da outbox
-```
-
-O payload está em [critical-event-ack-v1.schema.json](mqtt/critical-event-ack-v1.schema.json). Semântica:
-
-- publisher: backend;
-- subscriber: somente o device autorizado;
-- condição: ACK apenas depois do commit bem-sucedido;
-- correlação: `event_uuid` obrigatório; `event_id` identifica o registro server-side;
-- status: `committed` para primeira persistência ou `duplicate` quando o mesmo UUID já estava committed;
-- duplicata de evento: backend não repete efeitos, mas republica ACK com o mesmo `event_id` lógico;
-- ACK perdido: device mantém evento e retransmite o mesmo UUID; não cria UUID novo;
-- ACK duplicado: device trata idempotentemente;
-- ACK desconhecido ou de outro tópico/device: device ignora e registra diagnóstico;
-- retain: false; QoS alvo 1, a validar com o transporte futuro.
-
-Este contrato não está implementado nesta etapa. Não existe subscriber de ACK no firmware nem publisher correspondente no backend.
+O schema [critical-event-v1.schema.json](mqtt/critical-event-v1.schema.json) continua sendo a direção para um envelope estrito e compacto. O firmware atual envia o payload current (perfil implícito 0) acrescido de `boot_id`, `device_uptime_ms`, `clock_quality`, `occurred_at_device` e `local_evidence`, que o backend já interpreta.
 
 ## Compatibilidade
 
 - ausência de `schema_version` continua significando payload current/legacy implícito 0 durante a migração;
-- eventos antigos sem `event_uuid` continuam ingestíveis, mas não recebem a garantia v1;
+- eventos antigos sem `event_uuid` continuam ingestíveis, mas não recebem a garantia v1 nem ACK;
 - campos novos opcionais podem ser adicionados a v1 sem mudar significado;
 - remover/renomear campo obrigatório ou mudar unidade/semântica exige nova versão;
 - versão desconhecida deve ser rejeitada/quarentenada de forma observável.

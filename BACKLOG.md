@@ -67,37 +67,39 @@ Detector baseline deve ter semântica honesta e regressões básicas; contratos 
 
 ## P2 — Critical Event Reliability
 
-- [ ] Criar testes de caracterização do buffer/retry atual.
-- [ ] Fazer spike do firmware com ESP-MQTT (`esp_mqtt_client`) ou alternativa que prove QoS 1 real.
-- [ ] Registrar decisão da biblioteca em ADR se o spike alterar a direção atual.
-- [ ] Criar `CriticalEventOutbox` persistente/testável.
-- [ ] Gerar `event_uuid` robusto a reboot e independente de wall clock.
-- [ ] Publicar evento crítico QoS 1.
-- [ ] Backend persiste evento de forma idempotente.
-- [ ] Backend emite ACK de aplicação **somente após commit**.
-- [ ] Device remove da outbox somente após ACK correspondente.
-- [ ] ACK duplicado deve ser seguro.
-- [ ] Reenvio após timeout/reboot deve preservar UUID.
-- [ ] Avaliar sessão MQTT persistente como otimização de recovery/latência; não depender dela para correção ponta a ponta.
+- [x] Criar testes de caracterização do buffer/retry atual (`e9011f0`).
+- [x] Fazer spike do firmware com ESP-MQTT (`esp_mqtt_client`): API QoS 1 e custo de memória comprovados em build; execução em hardware pendente.
+- [x] Registrar decisão da biblioteca em ADR (ADR-020).
+- [x] Criar `CriticalEventOutbox` persistente/testável (LittleFS + testes host).
+- [x] Gerar `event_uuid` robusto a reboot e independente de wall clock.
+- [ ] Publicar evento crítico QoS 1 — adiado por ADR-020 até HIL; entrega garantida pela outbox + ACK de aplicação.
+- [x] Backend persiste evento de forma idempotente.
+- [x] Backend emite ACK de aplicação **somente após commit**.
+- [x] Device remove da outbox somente após ACK correspondente (host; HIL pendente).
+- [x] ACK duplicado deve ser seguro.
+- [x] Reenvio após timeout/reboot deve preservar UUID (host; HIL pendente).
+- [x] Avaliar sessão MQTT persistente como otimização de recovery/latência — avaliada e adiada (F-13, ADR-020); correção não depende dela.
 - [ ] Testar broker temporariamente offline.
-- [ ] Testar backend temporariamente offline/restart.
-- [ ] Testar duplicata, reorder e ACK perdido.
-- [ ] Instrumentar fila: quantidade, item mais antigo, overflow/drop.
-- [ ] Definir comportamento de overflow sem `drop oldest` silencioso para críticos.
+- [x] Testar backend temporariamente offline/restart (emulação E2E).
+- [x] Testar duplicata, reorder e ACK perdido (emulação E2E).
+- [x] Instrumentar fila: quantidade, item mais antigo, overflow, falhas de persistência e ACKs (`status.critical_outbox`).
+- [x] Definir comportamento de overflow sem `drop oldest` silencioso para críticos (novo evento recusado e contado).
 
 ### Offline fall evidence
 
 - [ ] Separar evidence bundle grande/raw do evento crítico se a pesquisa exigir janela maior.
 - [ ] `fall_suspected` não deve seguir o mesmo caminho urgente de uma queda confirmada por default.
-- [ ] Remover dependência exclusiva de `telemetry_logs` para criar alerta de `fall_detected` confirmado pelo edge.
-- [ ] Definir evidência local versionada no evento/bundle.
-- [ ] Adicionar `evidence_source = device/server_telemetry/both/none`.
-- [ ] Testar queda offline → reconexão → **um alerta lógico** mesmo sem telemetria SQL da janela original.
-- [ ] Garantir que evento antigo não seja reclassificado como ocorrido no momento da reconexão.
+- [x] Remover dependência exclusiva de `telemetry_logs` para criar alerta de `fall_detected` confirmado pelo edge.
+- [x] Definir evidência local versionada no evento (`local_evidence.version = 1`).
+- [x] Adicionar `evidence_source = device/server_telemetry/both/none` (migration 003).
+- [x] Testar queda offline → reconexão → **um alerta lógico** mesmo sem telemetria SQL da janela original (emulação E2E; HIL pendente).
+- [x] Garantir que evento antigo não seja reclassificado como ocorrido no momento da reconexão quando o relógio do device está sincronizado; sem sincronização, `event_time` usa `received_at` e `clock_quality=unsynced` fica registrado.
 
 ### Gate P2
 
 Antes do app ser chamado de interface principal, CUJ de perda de Internet deve provar persistência e criação correta de alerta.
+
+**Estado (2026-10-21):** provado em testes host do firmware e em emulação ponta a ponta com backend/MySQL/Mosquitto reais ([registro](docs/quality/critical-delivery-validation.md)). Falta HIL com ESP32 físico e o teste com broker indisponível; o gate permanece **parcial**.
 
 ## P3 — Hardening backend, portal e modularização conservadora
 

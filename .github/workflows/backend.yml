@@ -127,3 +127,16 @@ jobs:
             cat backend-ci.log
             exit 1
           fi
+
+      - name: Run critical delivery failure scenarios (virtual device emulation)
+        working-directory: backend
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ""
+          MYSQL_DATABASE: queda_monitor
+          MQTT_BROKER_URL: mqtt://127.0.0.1:1883
+          MQTT_TOPIC_BASE: queda/devices
+          E2E_BACKEND_PORT: 4100
+        run: npm run test:e2e:critical

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://soturine.local/contracts/mqtt/critical-event-ack-v1.schema.json",
-  "title": "Planned post-commit critical event ACK v1",
-  "$comment": "PLANNED: no backend publisher or firmware subscriber exists yet.",
+  "title": "Post-commit critical event ACK v1",
+  "$comment": "IMPLEMENTED 2026-10-21: backend publishes (QoS 1, retain=false) only after COMMIT; firmware validates topic and payload before removing the outbox item. See ADR-020.",
   "type": "object",
   "required": ["schema_version", "event_uuid", "event_id", "status", "committed_at"],
   "properties": {

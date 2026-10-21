@@ -1114,6 +1114,9 @@ components:
         immobility: { type: boolean }
         message: { type: string }
         evidenceStatus: { type: string, enum: [none, partial, linked] }
+        evidenceSource:
+          description: Origem da evidência da decisão de alerta (ADR-016). null em registros anteriores à migration 003.
+          enum: [device, server_telemetry, both, none, null]
         eventUuid: { type: [string, 'null'] }
         eventTime: { type: [string, 'null'], format: date-time }
         occurredAtDevice: { type: [string, 'null'], format: date-time }

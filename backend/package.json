@@ -26,6 +26,7 @@
     "mqtt:test": "node scripts/testMqttConnection.js",
     "stress:dry": "node scripts/stress/runStressSuite.js --mode=dry",
     "stress:real": "node scripts/stress/runRealStressSuite.js",
+    "test:e2e:critical": "node scripts/virtualDevice/criticalDeliveryScenarios.js",
     "stress:alerts": "npm run stress:dry",
     "stress:cleanup": "node scripts/stress/cleanupStressData.js",
     "db:init": "node scripts/initDb.js",
