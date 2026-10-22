@@ -284,3 +284,21 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 - [ ] Publicar métodos/scripts e resultados autorizados, não dados pessoais nem resultados simulados como reais.
 - [ ] Demonstrar wearable real → alerta Android e MotionLab Live com rastreabilidade/QA.
 - [ ] Preparar artigo/README showcase e limitações, sem alegar dispositivo médico.
+
+
+## P17 — Correções pós-auditoria P2.1 e gates transversais (proposed 2026-10-22)
+
+**Não implementado por esta documentação.** Seguir [plano integral](docs/roadmap/tg1-execution-gates-2026-10-22.md) e [matriz F-17/F-27..F-33](docs/quality/critical-reliability-remediation-2026-10-22.md).
+
+- [ ] F-29 e capacidade da outbox: resultados versionados e não confirmatórios, quarentena/retry seguro, SOS sob overflow e estado de proteção degradada; compatibilidade v1, anti-spoof e testes de reboot/flash.
+- [ ] F-17/F-27: broker TLS e ACL por device efetivas, dispositivo não publica ACK, teste intruso e credencial inválida; provisioning seguro sem broker público em caminho real.
+- [ ] F-28: definir e testar partições e migração LittleFS/NVS/OTA, medir budget do ESP32 bancada e S3 conforme device físico, nenhum erase destrutivo ou OTA desprotegida.
+- [ ] F-30: clock quality, evento offline, monotonic+boot, receivedAt separados, sincronização ancorada e regressões de deduplicação.
+- [ ] F-31: política de suspeita vs queda confirmada/SOS, risco de falsos negativos e testes de matriz de severidade/ações.
+- [ ] F-32: somente após design: envelope compacto versionado, golden contracts antigos intactos, métricas reais de tamanho/CPU.
+- [ ] F-33: broker indisponível, DB connection refused versus pause, ACK perdido/forjado e múltiplos processos; suíte de negativos e logs reproduzíveis.
+- [ ] HIL com ESP32 físico (quando disponível); se ausente, marcar blocked e preparar roteiro, **não** declarar green.
+- [ ] Research/Wrist: verificar licenças WEDA e segunda base, replay real da FSM congelada, splits sem leakage, protocolos Nyquist e energia; distinguir condições sintéticas.
+- [ ] MotionLab offline antes de live; Android REST/FCM fundacional em paralelo após backend crítico, com testes de notificações em dispositivo físico.
+- [ ] QA de PR: sem skip de checks, execução em SHA final, testes regressivos, ADR atualizado, evidência de bloqueios, sem release até gate validado.
+
