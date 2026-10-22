@@ -55,3 +55,57 @@ Aquisição no sensor em ODR real, com gravador no dispositivo, comparando 20/31
 `SIG-0` bibliografia, metadados/ODR/licenças auditados; `SIG-1` filtro e conversões reproduzíveis com sinais sintéticos conhecidos (incluindo frequências acima de Nyquist); `SIG-2` teste não vazado por participante; `SIG-3` detector original sem mudanças furtivas; `SIG-4` dataset pulso real importado legalmente, com hash e run; `SIG-5` ensaio físico do ODR, jitter e energia; `SIG-6` análise de incerteza, FN/FP e limitações assinada antes de conclusão.
 
 **Leituras de apoio:** [Espressif docs IMU/dedicated hardware](https://docs.espressif.com/), [WEDA-FALL original](https://pmc.ncbi.nlm.nih.gov/articles/PMC9920426/), [WEDA-FALL código/dados](https://github.com/joaojtmarques/WEDA-FALL), [Fula & Moreno 2024](https://www.mdpi.com/1424-8220/24/5/1679), [SensorLib](https://github.com/lewisxhe/SensorLib). Fontes sustentam o contexto; números sobre nosso desempenho permanecem desconhecidos.
+
+
+## 7. Adendo didático e experimental — sequência da professora Virgínia: sinal analógico → Fourier → banda → ADC → Nyquist (2026-10-22)
+
+**Origem do requisito:** comentário transmitido em aula: caracterizar a maior frequência do sinal por Fourier e escolher uma taxa de amostragem pelo menos duas vezes superior à banda antes da conversão A/D. Essa é uma **formulação didática correta como objetivo de projeto**, com uma sutileza física importante: **para computar FFT numericamente, já precisamos de uma aquisição digital de referência** (ou um analisador de espectro/oscópio com capacidade própria de amostragem). Não é possível analisar a FFT no ESP32 de um sinal analógico ainda não amostrado. A caracterização prévia pode vir de literatura, osciloscópio/analisador, sensor de referência ou aquisição inicial em taxa suficientemente alta com anti-aliasing conhecido; essa primeira taxa também precisa ser justificada, sem raciocínio circular. FFT/DFFT de um fluxo já subamostrado **não revela** frequências perdidas por aliasing. Separar a explicação de graduação da engenharia real do wearable.
+
+### Cadeia completa de sinal para a instrumentação
+
+```text
+Movimento físico (aceleração e velocidade angular contínuas)
+  → MEMS transdutor e eletrônica analógica do sensor
+  → filtros front-end / anti-aliasing conforme datasheet, configurados ou fixos
+  → ADC interno da IMU + ODR interna selecionada (não é ADC do ESP32)
+  → filtros e processamento interno/FIFO da IMU conforme configuração real
+  → leitura I²C/SPI por driver QMI8658/MPU6050
+  → timestamp monotônico + seq/gaps + transformação de eixos/unidades
+  → registro digital bruto disponível (antes do filtro do nosso algoritmo)
+  → análise espectral DFT/FFT com janela, frequências e energia
+  → hipóteses de banda relevante e taxa mínima com margem de transição
+  → escolha de ODR e BW da IMU + validação física
+  → filtro antialias digital e decimação, se reduzir taxa de stream
+  → features/FSM/ML → medição de recall/FP/h/energia/latência
+```
+
+**Dois domínios distintos:** anti-alias analógico/pre-ADC deve existir na cadeia de aquisição e ser conhecido **antes** da conversão; filtragem digital pós-ADC pode prevenir **novo aliasing ao decimar** dados já válidos, mas não reparar aliasing ocorrido dentro da IMU. O ADC está embutido no QMI8658/MPU6050; `analogRead()` do ESP32 não é a maneira de coletar `ax/ay/az/gx/gy/gz` dessas placas digitais. O software não consegue inserir arbitrariamente um filtro analógico antes do ADC integrado: deve usar a configuração e a documentação oferecidas pelo sensor, ou um sistema de aquisição independente de referência.
+
+### Matemática para o relatório
+
+Se `x(t)` é o sinal contínuo, sua transformada é `X(f)=∫_{-∞}^{∞} x(t)e^{-j2πft}dt`. A aquisição gera `x[n]=x(nT_s)`, com `f_s=1/T_s`. Para uma banda base efetivamente limitada a `B` Hz, a condição ideal é `f_s>2B`. O limite digital observável é `f_N=f_s/2`. Com `N` amostras registradas por `f_s`, a FFT estima bins `f_k=k f_s/N`, com espaçamento `Δf=f_s/N` e duração `T=N/f_s`. O pico de amplitude de um bin **não** é necessariamente a maior frequência relevante do evento; ruído, transientes, vazamento espectral, filtros e janelamento importam. Para evitar afirmar que a banda é sempre infinita por ruído, definir `B` operacionalmente com critério de energia/PSD acumulada **e** preservação de impactos/jerk e detecção, sempre declarando o critério e as exceções. Analisar aceleração **e** giro por eixo e magnitude, além de segmentos por classe.
+
+**Exemplo ilustrativo, não medido do TCC:** se instrumentação confiável indicar conteúdo relevante até `B=18 Hz`, o limite teórico exige `f_s>36 Hz`; adotar 40 Hz dá apenas 2 Hz de margem, possivelmente insuficiente para filtro físico real. 50 ou 62,5 Hz são candidatos a avaliar **se o ODR e a banda interna do sensor forem compatíveis**. Não concluir `B=18Hz` sem evidência. O dobro da **banda útil** não é o dobro da maior frequência que o ruído bruto consegue criar.
+
+### Atenção especial: QMI8658 em modo 6DOF
+
+O datasheet `QMI8658A` distingue ODR com **somente acelerômetro** da ODR de **acelerômetro+giroscópio**; em 6DOF, valores como **28,025; 56,05; 112,1; 224,2 Hz** aparecem na tabela de referência do sensor. A API de alto nível da biblioteca SensorLib usa nomes como `ACC_ODR_31_25Hz`, `ACC_ODR_62_5Hz`, `ACC_ODR_125Hz` e enums próprios do giro. Portanto, **não tratar um nome de enum como taxa efetiva simultânea dos seis eixos**. Conferir o chip físico/revisão, modos 6DOF, ranges, registros, configuração de filtro/bandwidth, datasheet e timestamps medidos. `polling` do firmware a 20/50 Hz não muda automaticamente a ODR ou filtro interno. Caso use FIFO/IRQ, instrumentar overflow e agrupamento; atraso de leitura não deve ser confundido com instante de conversão.
+
+### Protocolo guiado pelo comentário da professora
+
+1. **Referência de entrada e segurança:** escolher ADLs seguras e ensaios instrumentados com objeto/manequim; classificar pulso direito/esquerdo, ajuste de pulseira, sensor, revisão, filtros e limites do espectro analisável. Não pedir quedas de idosos.
+2. **Caracterização de alta taxa:** obter dados com IMU/configuração/ADC/antialias conhecidos; se possível, comparar instrumento externo. Relatar `fs_ref`, `B_analógica` documentada ou desconhecida, filtro, ODR e perda. *Sem referência suficiente, marcar estimativa de banda como inconclusiva*.
+3. **FFT e estimativa da banda:** separar episódios de caminhar, sentar/levantar, braço brusco, repouso, impacto controlado e SOS; remover DC/gravidade apenas quando apropriado e conservar original; usar janela Hann quando pertinente, espectro/PSD por eixo e giroscópio, potência cumulativa, resoluções, ruído e intervalo de incerteza; avaliar componentes impulsivas e espectro dependente do tempo (STFT/PSD em janelas) em vez de FFT única de toda sessão.
+4. **Critério de banda útil:** pré-definir procedimento de seleção, por exemplo vários percentis de energia (não um corte arbitrário único) e `band edge` onde detector/peaks deixam de ser preservados; registrar limites e testar se pico de impacto desaparece. Não escolher a banda após olhar o holdout.
+5. **Dimensionamento:** aplicar `fs>2B` + faixa de transição do filtro + ODR realmente suportada. Considerar margem operacional, jitter, latência e limite de consumo; distinguir taxas nativas e taxa de processamento depois da decimação.
+6. **Comparação justa:** produzir condições de 20/40/50 Hz a partir da referência apenas quando ela suporta, com filtro digital antialias antes de downsampling, versões e atraso anotados; repetir captura física nas taxas/ODRs nativas para medir consumo, picos e impacto no detector. Não usar upsampling para alegar informação recuperada.
+7. **Resultados em conjunto:** para cada taxa/configuração registrar espectro e bandas, percentil do jerk/pico, `TP/FN/FP/h`, latência, jitter, duração, perdas, memória, energia e eficiência. Não otimizar a frequência exclusivamente pela acurácia; uso assistivo exige avaliação de falhas e autonomia.
+8. **Reprodução:** script de FFT com fixture sintética (por exemplo soma de 4 e 17 Hz adquirida a 125 Hz e degradada com/sem anti-alias), teste de aliasing, manifest de hardware, datasheet+driver+SHA e gráficos com eixos/Hz; relatório deve ter seção de "limitações da banda observada".
+
+### O que é justificável escrever na monografia
+
+> A banda espectral dos sinais inerciais será caracterizada a partir de registros de referência adquiridos sob uma configuração conhecida de taxa e filtragem, utilizando estimativas espectrais baseadas em DFT/FFT. A partir da banda relevante e das restrições de resposta dos filtros, serão propostas taxas de amostragem que satisfaçam Nyquist-Shannon, seguidas de experimentos com ODRs nativas da IMU para verificar perda de eventos, falsos alarmes, latência e consumo. As taxas de amostragem e as diferenças de desempenho serão reportadas com suas limitações de instrumentação.
+
+Não afirmar que a banda biológica é fixa em todas as pessoas/movimentos ou que a FFT demonstra frequência que a ADC já perdeu.
+
+**Fontes:** [NI — filtros antialiasing, revisão 2026](https://www.ni.com/en/shop/data-acquisition/measurement-fundamentals/analog-fundamentals/anti-aliasing-filters-and-their-usage-explained.html); [NI — banda e taxa de amostragem](https://www.ni.com/en/shop/data-acquisition/measurement-fundamentals/analog-fundamentals/acquiring-an-analog-signal--bandwidth--nyquist-sampling-theorem-.html); [Analog Devices — bandlimited sampling](https://www.analog.com/en/resources/technical-articles/basics-of-bandlimited-sampling-and-aliasing.html); [QMI8658A datasheet](https://files.waveshare.com/wiki/common/QMI8658A_Datasheet_Rev_A.pdf); [SensorLib](https://github.com/lewisxhe/SensorLib/blob/master/src/SensorQMI8658.hpp).
