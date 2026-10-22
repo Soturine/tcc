@@ -4,7 +4,7 @@ Você vai trabalhar no repositório **Soturine/tcc**, que já possui baseline ES
 
 ## 0. Instruções e condições iniciais
 
-1. Atualize `origin/main` antes de começar e registre seu SHA; confirme os PRs integrados #8, #9 e o PR documental de 2026-10-22 (link no log remoto). **Não use SHAs históricos como HEAD presumido.** Crie `fix/p2-1-critical-assurance-wrist-foundation` a partir da main atual, *nunca* commit diretamente em main. Se já existir uma branch de implementação em andamento, inspecione-a antes de criar outra.
+1. Faça fetch e confira `origin/main` e a branch já existente `origin/tcc/tg1-wrist-motionlab-research-foundation`, registrando SHAs; confirme os PRs integrados #8, #9 e #10. **Não use SHAs históricos como HEAD presumido nem crie outra branch.** **CONTINUE O TRABALHO NA BRANCH EXISTENTE `tcc/tg1-wrist-motionlab-research-foundation`. NÃO CRIE NOVA BRANCH.** Essa branch foi sincronizada com a `main` depois dos PRs #9 e #10. Confira o HEAD, faça fetch/checkout da branch existente e continue com commits/push nela, sem force push; não trabalhe diretamente na `main`. Não reimplemente documentos já integrados.
 2. Faça inventário de alterações, builds, testes e files, dos contratos atuais e issues; cruze o plano de 22/10 com o código e os achados. Os documentos canônicos são:
    - `docs/quality/critical-reliability-remediation-2026-10-22.md`
    - `docs/hardware/wearable-qualification-protocol-2026-10-22.md`
@@ -68,9 +68,15 @@ Você vai trabalhar no repositório **Soturine/tcc**, que já possui baseline ES
 
 - Ao final de cada CP rodar comandos de testes correspondentes, registrar env/versões/SHA/time/fixtures. Fazer segunda auditoria para detectar bugs **introduzidos** pela rodada e gaps remanescentes, com testes novos sempre que reproduzíveis; não mover status para `resolved` sem prova.
 - Revisar `README.md`, `BACKLOG.md`, `docs/README.md`, ADRs (020/026–028), contratos JSON/OpenAPI, arquitetura de dispositivos/Android, QA, threat model, dados/retention, protocolos científicos e rastreabilidade. Evitar duplicar documentos canônicos; links resolvendo e requisitos sem renomeação furtiva.
-- Commit/push contínuos de checkpoints em branch, crie PR com diff legível, impacto de migração, matriz de status `FIXED/PARTIAL/DEFERRED/BLOCKED`, evidências e comandos. Corrigir CI sem usar skips ou editar testes para parecerem verdes. Exigir **Backend, Firmware, Web e Security** no SHA final do PR, e revisão dos diffs. **Só então merge na main**, respeitando branch protection; conferir workflows da main depois do merge. Se checks ainda executando/falhando, deixe PR aberto com bloqueios reais, sem alegar merge.
+- Commit/push contínuos de checkpoints na mesma branch, crie PR com diff legível, impacto de migração, matriz de status `FIXED/PARTIAL/DEFERRED/BLOCKED`, evidências e comandos. Corrigir CI sem usar skips ou editar testes para parecerem verdes. Exigir **Backend, Firmware, Web e Security** no SHA final do PR, e revisão dos diffs. **Só então merge na main**, respeitando branch protection; conferir workflows da main depois do merge. Se checks ainda executando/falhando, deixe PR aberto com bloqueios reais, sem alegar merge.
 - **Não gerar tag/release** sem milestone funcional e físico realmente validado. Não rodar deploy produtivo não autorizado.
 
 ## Relatório final obrigatório
 
 Inclua branch, PR, HEAD original e final, SHAs/commit/merge, alterações por arquivo, testes executados (pass/fail/skipped com contagem), HIL/real-data/CI separados, métricas realmente medidas com método, regressões, findings F-13/14/15/16/17/27–33, pendências, comandos reproduzíveis, efeitos sobre TG1/TG2, próximos gates e um resumo honesto do que o sistema **ainda não faz**. Não enviar somente um sumário promocional.
+
+## Obrigatório: aprofundamento pedido pela professora Virgínia
+
+Aplique explicitamente `docs/research/wrist-sampling-nyquist-protocol.md` seção 7, que detalha **analógico → transformada de Fourier/FFT de medição de referência → determinação justificável da banda → antialias/filtro antes do ADC → ODR nativa e amostragem com fs>2B → comparação experimental**. Explique que FFT numérica pressupõe sinal digital de referência; o QMI8658 integra ADC, os filtros analógicos não são inseríveis via `analogRead` do ESP32, ODR do accelerômetro no modo 6DOF pode diferir do enum nominal (datasheet: 28,025/56,05/112,1 Hz etc). Implemente fixtures sintéticas e artefatos espectrais reprodutíveis com testes; dados reais/HIL apenas com fonte e instrumento comprovados.
+
+**Branch explícita:** `tcc/tg1-wrist-motionlab-research-foundation`. A etapa de docs PR #10 está integrada; este prompt não deve mandar repetir esse PR nem criar branches adicionais.
