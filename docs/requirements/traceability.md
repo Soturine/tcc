@@ -65,3 +65,21 @@ Detalhes no [protocolo experimental](../research/experimental-protocol.md).
 | RNF-W01..03 | [Gates QA](../quality/wrist-motionlab-verification.md) | segurança/privacy/latência | proposed |
 
 A trilha é de planejamento; não acrescenta cobertura testada nem métricas validadas.
+
+
+## Complemento de rastreabilidade — 2026-10-22, **planned**
+
+| Grupo | Requisito / risco | Código/evidência atual | Evidência requerida para aprovação | Status |
+|---|---|---|---|---|
+| P2.1 | F-29 rejeição permanente, SOS e outbox cheia | `CriticalEventOutbox`/ACK v1 | contrato v2, testes host/E2E adversariais e HIL | planned |
+| Segurança | F-17/27 MQTT TLS/ACL por device | `infra/mqtt/*example*` | broker staging real e testes cruzados de identidade | planned |
+| Firmware | F-28 flash/partições/OTA | `platformio.ini`, build 91% na partição antiga | build/memória/migração/recovery e HIL do modelo escolhido | planned |
+| Tempo | F-30 clock sem sincronização | eventos com clock_quality | replay offline e âncoras temporais com incerteza | planned |
+| Alertas | F-31 `fall_suspected` / evidência insuficiente | `alertService.js` | matriz severidade e testes FNs | planned |
+| Payload | F-32 envelope MQTT redundante | `event.current.json` | schema versionado e testes compatibilidade v1/v2 | planned |
+| Falhas | F-33 broker down/DB refused | E2E com DB pause | nova matriz E2E + HIL | planned |
+| Pesquisa | pulso, Nyquist, ML offline | `tools/research` synthetic | licenças/hash real, splits e medições SIG00–06 | planned |
+| Produto | Android push/Protection Health | docs de arquitetura | apps Android, FCM real, RBAC e notificação testada | planned |
+
+[Plano detalhado](../roadmap/tg1-execution-gates-2026-10-22.md) · [P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
+
