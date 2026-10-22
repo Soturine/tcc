@@ -174,3 +174,14 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 
 ## ADR-025 — Personalização é opcional, baseada em ADL e gated
 **Status: Proposed (2026-10-21).** Peso/altura opcionais sem fórmula arbitrária, calibração física != perfil individual; SOS não é prova de queda; feedback precisa de revisão humana; modelo começa em shadow, promoção mediante holdout/segurança/HIL e rollback. Falhar para baseline, sem supressão prematura de alertas críticos. [Protocolo](../research/personalization-feedback.md).
+
+
+## ADR-026 — Resultados negativos de ingestão crítica não equivalem a ACK de persistência
+**Status: Proposed (2026-10-22).** `critical-event-ack-v1` continua significando apenas `committed/duplicate` após COMMIT. Tratar F-29 via *resultado versionado* e política persistente de retry/quarentena, com semântica e limites explícitos. Nunca remover evento em resposta a rejeição como se tivesse sido persistido. Resolver `outbox full` com observabilidade e decisão de risco, sem promessa impossível de armazenamento ilimitado. [Protocolo P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
+
+## ADR-027 — Flash/energia, taxa de amostragem e qualificação de wearable são gates físicos
+**Status: Proposed (2026-10-22).** Não promover smartwatch a hardware final, mudança de partição/OTA ou amostragem 50/100 Hz por documentação, demonstração do fornecedor ou build de bancada. Requer BOM/SKU revisados, drivers e eixos reais, HIL para outbox/flash e medidas de jitter/energia. O algoritmo baseline A permanece congelado; trocar taxa/filtro exige nova condição experimental. [Hardware](../hardware/wearable-qualification-protocol-2026-10-22.md) · [Nyquist](../research/wrist-sampling-nyquist-protocol.md).
+
+## ADR-028 — Foco de TG1 e dependências de Android/FCM sem inflar escopo
+**Status: Proposed (2026-10-22).** CP1 confiabilidade, CP3 dataset real de pulso e CP4 Nyquist podem evoluir com gates independentes; Android Kotlin/Compose/FCM pode ser iniciado após contratos críticos estabilizados, mesmo antes de comprar relógio. A demonstração mínima TG2 deve usar evidência física da cadeia `SOS/IMU→persistência→alerta→Android`, respeitando indisponibilidade de rede e sem promessa clínica. MotionLab/ML/personalização são extensões estritamente isoladas da proteção. [Plano](../roadmap/tg1-execution-gates-2026-10-22.md).
+

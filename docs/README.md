@@ -14,6 +14,16 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 
 **Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos.
 
+## Plano de execução e remediação — 2026-10-22
+
+A complementação pós-PR #8/#9 **não implementa** os itens restantes: mantém `main` como fonte do código efetivamente testado e especifica as próximas entregas com bloqueios e critérios.
+
+- [P2.1: rejeições/overflow de eventos, ACK, ACL/TLS, flash, clocks e cenários negativos](quality/critical-reliability-remediation-2026-10-22.md)
+- [Qualificação prática do wearable, HAL, consumo, OTA/partições e HIL](hardware/wearable-qualification-protocol-2026-10-22.md)
+- [Protocolo Nyquist e amostragem IMU: antialiasing, splits e medição](research/wrist-sampling-nyquist-protocol.md)
+- [Plano executivo integrado TG1→TG2, dependências, entregas e gates](roadmap/tg1-execution-gates-2026-10-22.md)
+- [Prompt de implementação de remediações para Claude](../prompts/claude-p2-1-remediation.md)
+
 ## Comece aqui
 
 1. [`../README.md`](../README.md) — visão geral e status.

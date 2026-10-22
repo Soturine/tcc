@@ -10,6 +10,8 @@ A partir de 2026-10-21 o eixo de pesquisa prioriza **relógio ESP32 com acelerô
 
 Documentos consolidados: [matriz hardware](docs/hardware/wearable-selection-2026-10-21.md), [Android/conectividade independente de cuidador](docs/architecture/wearable-mobile-and-resilience.md), [registry wrist de datasets](docs/research/wrist-dataset-registry.md), [MotionLab Live](docs/research/motionlab-live.md), [calibração e aprendizado seguro](docs/research/personalization-feedback.md), [gates QA](docs/quality/wrist-motionlab-verification.md), [recorte acadêmico e artigo](docs/research/publication-and-scope.md). Decisões propostas estão catalogadas nos ADRs; evolução executiva no roadmap/backlog. Não elevar documentação a implementação.
 
+> **Próxima execução planejada (2026-10-22):** após PR #8 (código, host/E2E) e PR #9 (fundação TG1), foram aprofundadas as **pendências**, não uma nova implementação física: [plano CP0–CP9](docs/roadmap/tg1-execution-gates-2026-10-22.md), [correções críticas P2.1](docs/quality/critical-reliability-remediation-2026-10-22.md), [qualificação HW](docs/hardware/wearable-qualification-protocol-2026-10-22.md), [amostragem/Nyquist](docs/research/wrist-sampling-nyquist-protocol.md). Wearable, app Android, datasets reais e HIL continuam planejados/bloqueados conforme evidência. Ver também [prompt para Claude](prompts/claude-p2-1-remediation.md).
+
 ## Visão do projeto
 
 O TCC evolui o protótipo existente para uma plataforma **IoT edge-first, mobile-first e API-first**, com foco maior em confiabilidade ponta a ponta do que em quantidade de telas/tecnologias.
