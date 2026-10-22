@@ -271,3 +271,9 @@ detecção edge
 → Android
 → ação/auditoria
 ```
+
+
+## Revisão de execução 2026-10-22 — os gaps não foram fechados por docs
+
+O estado prévio de testes host/E2E **não** é HIL. Os riscos F-17/F-27 (TLS/ACL), F-28 (partições/flash), F-29 (rejeição permanente e fila cheia), F-30 (tempo), F-31 (suspeita/urgência), F-32 (payload redundante) e F-33 (broker/DB recusada) foram detalhados; **permanecem em aberto** até código/teste de cada gate. HIL, WEDA-FALL real, Nyquist físico, Android, FCM, MotionLab e modelos personalizados também seguem pendentes. Ordem executiva CP0–CP9 e corte TG1/TG2: [plano integrado](tg1-execution-gates-2026-10-22.md). Subplano de confiabilidade: [P2.1](../quality/critical-reliability-remediation-2026-10-22.md). Separar status de PR documental dos checks de implementação.
+
