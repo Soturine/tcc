@@ -82,6 +82,7 @@ jobs:
           npm run db:audit:event-identity
           npm run test:mysql:migrations
           npm run test:mysql:retention
+          npm run test:mysql:sessions
 
       # Mosquitto 2.1.2 fixado por digest (2026-09-17); per_listener_settings e legado nessa linha.
       - name: Start Mosquitto integration broker

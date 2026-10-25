@@ -16,6 +16,10 @@ const { module: appModule, restore } = loadWithMocks("src/app.js", {
       };
       next();
     },
+    // Montado pela rota de logout movel; nao participa destes testes.
+    optionalSession(_req, _res, next) {
+      next();
+    },
   },
   "src/services/alertService.js": {
     async updateAlertStatus(alertId, actionType, userId, note) {

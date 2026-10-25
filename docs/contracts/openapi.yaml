@@ -85,6 +85,86 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/mobile/login:
+    post:
+      operationId: mobileLogin
+      tags: [Auth]
+      summary: Authenticate and open a revocable mobile session
+      description: >-
+        Same credential and organization rules as /api/auth/login, but returns a
+        short-lived access token bound to a server-side session (`sid`) plus an opaque
+        rotating refresh token. Only the SHA-256 of the refresh token is stored.
+      security: []
+      x-contract-state: active
+      x-known-consumers: [android]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MobileLoginRequest' }
+      responses:
+        '200':
+          description: Session opened
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MobileSessionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/mobile/refresh:
+    post:
+      operationId: mobileRefresh
+      tags: [Auth]
+      summary: Rotate the refresh token and issue a new access token
+      description: >-
+        Atomic rotation. Reusing a refresh token that was already rotated revokes the
+        whole session family. Any failure (unknown, reused, revoked, expired) is the same
+        401 without details. Clients must serialize refresh calls.
+      security: []
+      x-contract-state: active
+      x-known-consumers: [android]
+      parameters:
+        - $ref: '#/components/parameters/OptionalOrganizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Rotated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MobileSessionResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/mobile/logout:
+    post:
+      operationId: mobileLogout
+      tags: [Auth]
+      summary: Revoke the mobile session (idempotent)
+      description: >-
+        Revokes the session family identified by the refresh token in the body, or by the
+        `sid` of the Bearer token when no body is sent. Always 204; does not reveal whether
+        the token existed. Access tokens of a revoked session are rejected immediately.
+      security: []
+      x-contract-state: active
+      x-known-consumers: [android]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204': { description: Session revoked (or nothing to revoke) }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /api/pairing/claim:
     post:
       operationId: claimDevice
@@ -937,6 +1017,32 @@ components:
       properties:
         user: { $ref: '#/components/schemas/User' }
         token: { type: string }
+    MobileLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        organizationId: { type: [integer, 'null'] }
+        deviceLabel: { type: [string, 'null'], maxLength: 80 }
+      additionalProperties: false
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20, maxLength: 200 }
+      additionalProperties: false
+    MobileSessionResponse:
+      type: object
+      required: [user, tokenType, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, sessionId]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        tokenType: { type: string, const: Bearer }
+        accessToken: { type: string }
+        accessTokenExpiresAt: { type: string, format: date-time }
+        refreshToken: { type: string }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+        sessionId: { type: string, format: uuid }
     Device:
       type: object
       required: [id, deviceUid, deviceIdentifier, name, claimStatus, status]
