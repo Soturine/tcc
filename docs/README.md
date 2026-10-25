@@ -24,6 +24,8 @@ A complementação pós-PR #8/#9 **não implementa** os itens restantes: mantém
 - [Plano executivo integrado TG1→TG2, dependências, entregas e gates](roadmap/tg1-execution-gates-2026-10-22.md)
 - [Prompt de implementação de remediações para Claude](../prompts/claude-p2-1-remediation.md)
 
+- [Versões, componentes, marcos e gates de release](roadmap/version-milestones.md)
+
 ## Comece aqui
 
 1. [`../README.md`](../README.md) — visão geral e status.

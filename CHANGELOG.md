@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Próxima versão em desenvolvimento — 0.9.5-dev.0 (2026-10-25)
+
+A versão **0.9.5-dev.0** identifica a árvore de desenvolvimento posterior à tag histórica v0.9.4 e ao merge do PR #11 (513157c). É **pré-release interna proposta**, sem tag nem GitHub Release. Os itens já integrados desde v0.9.4 permanecem registrados neste bloco Unreleased para auditoria; não são reclassificados como releases publicadas retroativamente. O primeiro marco de release deve reconciliar estes registros e concluir os gates de docs/release-rules.md.
+
+**Escopo atual medido:** P2/P2.1 da entrega crítica em host/emulação, broker TLS/ACL de referência, dataset WEDA-FALL offline, Nyquist sintético e espectral, MotionLab offline ML-0/ML-1, auditoria dos testes com Assertiva. **Limites:** sem HIL de firmware/outbox em ESP32, sem smartwatch qualificado, Android/FCM, cloud staging ou validação clínica. Não confundir versão de produto, de componente, de protocolo MQTT (schemas v0/v1) ou versão de algoritmo congelado.
+
+**Próximas etapas:** A1/A2 Android/REST e arquitetura de sessão com autenticação segura; HIL ESP32/outbox; FCM/notification outbox; wearable + QMI8658; ampliação de estudos de pulso. Fechar uma versão estável apenas quando a matriz de gates e o SHA alvo justificarem. [Política](docs/release-rules.md) · [Mapa de versões](docs/roadmap/version-milestones.md).
+
+
 ### Auditoria 2026-10-21 e hardening da baseline
 - auditoria canônica em `docs/audit/tcc-comprehensive-audit-2026-10-21.md` classifica 21 findings com evidência de código, impacto e checkpoint
 - advisories de produção do backend corrigidos somente no lockfile: `engine.io` 6.6.11 (GHSA-2gc4-cqfq-p2gv), `ip-address` 10.7.4 (GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw) e `proxy-addr` 2.0.8 (GHSA-jqcg-44mw-7w3h); `npm audit` do backend sem vulnerabilidades

@@ -14,6 +14,10 @@ Documentos consolidados: [matriz hardware](docs/hardware/wearable-selection-2026
 
 > **Próxima execução planejada (2026-10-22):** após PR #8 (código, host/E2E) e PR #9 (fundação TG1), foram aprofundadas as **pendências**, não uma nova implementação física: [plano CP0–CP9](docs/roadmap/tg1-execution-gates-2026-10-22.md), [correções críticas P2.1](docs/quality/critical-reliability-remediation-2026-10-22.md), [qualificação HW](docs/hardware/wearable-qualification-protocol-2026-10-22.md), [amostragem/Nyquist](docs/research/wrist-sampling-nyquist-protocol.md). Wearable, app Android, datasets reais e HIL continuam planejados/bloqueados conforme evidência. Ver também [prompt para Claude](prompts/claude-p2-1-remediation.md).
 
+## Versão de desenvolvimento
+
+**0.9.5-dev.0** — versão de trabalho após v0.9.4, **não é uma release publicada**. Código e CI de host/emulação devem ser interpretados separados de HIL e deployment. A matriz de versões, componentes e evidências está em [Version Milestones](docs/roadmap/version-milestones.md). O [CHANGELOG](CHANGELOG.md) preserva o histórico 0.9.4 e o delta ainda não lançado.
+
 ## Visão do projeto
 
 O TCC evolui o protótipo existente para uma plataforma **IoT edge-first, mobile-first e API-first**, com foco maior em confiabilidade ponta a ponta do que em quantidade de telas/tecnologias.
