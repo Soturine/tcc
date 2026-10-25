@@ -152,5 +152,32 @@ class WindowedMetricTest(unittest.TestCase):
         self.assertEqual(result["by_population"]["young"], {"tp": 1, "fn": 0, "fp": 0, "tn": 0})
 
 
+class SubjectBootstrapTest(unittest.TestCase):
+    def outcomes(self):
+        items = []
+        # S1 detecta tudo, S2 nada: o IC por participante tem de ser largo.
+        for subject, detected in (("S1", 1), ("S2", 0)):
+            for _ in range(10):
+                items.append({"label": "fall", "detections": detected, "subject_id": subject})
+                items.append({"label": "adl", "detections": 0, "subject_id": subject})
+        return items
+
+    def test_deterministic_and_wider_than_trial_independence(self):
+        first = metrics.subject_bootstrap(self.outcomes(), resamples=500)
+        second = metrics.subject_bootstrap(self.outcomes(), resamples=500)
+        self.assertEqual(first, second)
+        low, high = first["recall_ci95"]
+        self.assertLessEqual(low, 0.0 + 1e-9)
+        self.assertGreaterEqual(high, 1.0 - 1e-9)
+        wilson = metrics.wilson_interval(10, 20)
+        self.assertGreater(high - low, wilson[1] - wilson[0])
+        self.assertEqual(first["specificity_ci95"], [1.0, 1.0])
+        self.assertEqual(first["fall_subjects"], 2)
+
+    def test_no_falls_gives_undefined_recall_interval(self):
+        result = metrics.subject_bootstrap([{"label": "adl", "detections": 0, "subject_id": "S1"}])
+        self.assertIsNone(result["recall_ci95"])
+
+
 if __name__ == "__main__":
     unittest.main()

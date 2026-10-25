@@ -179,6 +179,55 @@ def windowed_confusion(outcomes: Iterable[Dict]) -> Dict:
     return summary
 
 
+BOOTSTRAP_RESAMPLES = 2000
+BOOTSTRAP_SEED = "tg1-2026"
+
+
+def subject_bootstrap(outcomes: List[Dict], resamples: int = BOOTSTRAP_RESAMPLES,
+                      seed: str = BOOTSTRAP_SEED) -> Dict:
+    """IC 95% percentil reamostrando PARTICIPANTES (cluster), nao trials.
+
+    Trials do mesmo participante sao correlacionados; reamostrar sujeitos inteiros da um
+    intervalo menos otimista que Wilson. Recall usa sujeitos com quedas; especificidade
+    usa sujeitos com ADL. Semente fixa: resultado deterministico.
+    """
+    import random
+
+    by_subject: Dict[str, Dict[str, int]] = defaultdict(lambda: {"tp": 0, "fn": 0, "fp": 0, "tn": 0})
+    for outcome in outcomes:
+        cell = by_subject[outcome["subject_id"]]
+        detected = outcome["detections"] > 0
+        if outcome["label"] == "fall":
+            cell["tp" if detected else "fn"] += 1
+        else:
+            cell["fp" if detected else "tn"] += 1
+
+    def interval(subjects: List[str], positive: str, negative: str):
+        if not subjects:
+            return None
+        rng = random.Random(f"{seed}:{positive}")
+        values = []
+        for _ in range(resamples):
+            pick = [subjects[rng.randrange(len(subjects))] for _ in subjects]
+            hits = sum(by_subject[s][positive] for s in pick)
+            total = hits + sum(by_subject[s][negative] for s in pick)
+            values.append(hits / total)
+        values.sort()
+        return [values[int(0.025 * (resamples - 1))], values[int(0.975 * (resamples - 1))]]
+
+    fall_subjects = sorted(s for s, c in by_subject.items() if c["tp"] + c["fn"] > 0)
+    adl_subjects = sorted(s for s, c in by_subject.items() if c["fp"] + c["tn"] > 0)
+    return {
+        "method": "percentile bootstrap over participants",
+        "resamples": resamples,
+        "seed": seed,
+        "recall_ci95": interval(fall_subjects, "tp", "fn"),
+        "specificity_ci95": interval(adl_subjects, "tn", "fp"),
+        "fall_subjects": len(fall_subjects),
+        "adl_subjects": len(adl_subjects),
+    }
+
+
 def _population(outcome: Dict) -> str:
     for note in outcome.get("notes") or []:
         if note.startswith("population="):
@@ -193,6 +242,7 @@ def evaluate(outcomes: List[Dict]) -> Dict:
         "trial_level": summarize_confusion(confusion_from_outcomes(outcomes)),
         "trial_windowed": windowed_confusion(outcomes),
         "by_population": breakdown(outcomes, "population"),
+        "subject_cluster_bootstrap": subject_bootstrap(outcomes),
         "false_alarms": false_alarm_rate(outcomes),
         "latency": latency_summary(outcomes),
         "by_subject": breakdown(outcomes, "subject_id"),
