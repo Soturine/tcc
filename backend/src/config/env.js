@@ -108,6 +108,13 @@ const env = {
       true,
     ),
     tlsCaFile: toTrimmed(process.env.MQTT_TLS_CA_FILE, ""),
+    // Migracao (ADR-026): device com critical-event-result-v1 tambem recebe o ACK v1
+    // para eventos persistidos. Evita retry infinito se a ACL ainda nao libera a
+    // leitura de critical-event-results. Desligar somente apos a ACL nova estar ativa.
+    legacyAckForResultDevices: toBoolean(
+      process.env.MQTT_LEGACY_ACK_FOR_RESULT_DEVICES,
+      true,
+    ),
   },
   deviceOfflineThresholdSeconds: toNumber(
     process.env.DEVICE_OFFLINE_THRESHOLD_SECONDS,

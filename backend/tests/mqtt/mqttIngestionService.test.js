@@ -773,12 +773,16 @@ test("F-29 reproducao: sem ingest_result_version uma rejeicao permanente continu
   });
 });
 
-test("device com resultado v1 recebe committed pos-commit com hash dos bytes recebidos e sem ACK legado", async () => {
+test("device com resultado v1 recebe committed pos-commit com hash dos bytes recebidos (+ ACK v1 de migracao)", async () => {
   await withHarness({}, async ({ calls, handleMqttMessage }) => {
     const payloadText = resultCapablePayload();
     await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText, io: {} });
 
-    assert.equal(calls.acks.length, 1);
+    // Resultado v1 primeiro; ACK v1 legado de compatibilidade (MQTT_LEGACY_ACK_FOR_RESULT_DEVICES=true).
+    assert.equal(calls.acks.length, 2);
+    assert.equal(calls.acks[1].topic, "queda/devices/esp32_01/critical-event-acks");
+    assert.equal(calls.acks[1].ack.status, "committed");
+    assert.equal(calls.acks[1].transactionsAtPublish, 1);
     const [{ topic, ack, transactionsAtPublish }] = calls.acks;
     assert.equal(topic, "queda/devices/esp32_01/critical-event-results");
     assert.equal(transactionsAtPublish, 1);
@@ -911,5 +915,13 @@ test("telemetria com ingest_result_version nao gera resultado critico", async ()
       io: {},
     });
     assert.equal(calls.acks.length, 0);
+  });
+});
+
+test("resultado negativo nunca gera ACK v1 legado, mesmo com compatibilidade ligada", async () => {
+  await withHarness({ recordEventError: codedError("EVENT_UUID_CONFLICT") }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: resultCapablePayload(), io: {} }));
+    assert.equal(calls.acks.length, 1);
+    assert.equal(calls.acks[0].topic, "queda/devices/esp32_01/critical-event-results");
   });
 });

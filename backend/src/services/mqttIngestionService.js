@@ -1,3 +1,4 @@
+const { env } = require("../config/env");
 const { transaction } = require("../db/pool");
 const {
   createCorrelationId,
@@ -699,6 +700,10 @@ async function handleMqttMessage({
             payloadSha256: receivedPayloadSha256,
           }),
         });
+        if (env.mqtt.legacyAckForResultDevices) {
+          // Mesma semantica (persistido); cobre ACL ainda sem critical-event-results.
+          publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
+        }
       } else {
         publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
       }

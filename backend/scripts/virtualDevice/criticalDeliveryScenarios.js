@@ -624,7 +624,9 @@ scenario("13. firmware com resultado v1: committed correlacionado por hash, sem 
   check(results, delivery.ack?.payload_sha256 === sha256(JSON.stringify(payload)), "payload_sha256 = hash dos bytes enviados");
   check(results, delivery.ack?.device_id === device.deviceId, "device_id do resultado = device do topico");
   check(results, delivery.ack?.event_id === Number(rows[0]?.id), "event_id corresponde ao registro");
-  check(results, device.legacyAcks.length === 0, "nenhum critical-event-ack-v1 para device com resultado v1");
+  // Migracao (MQTT_LEGACY_ACK_FOR_RESULT_DEVICES=true): ACK v1 com o mesmo event_id cobre ACL antiga.
+  check(results, device.legacyAcks.length === 1 && device.legacyAcks[0].ack.event_id === delivery.ack?.event_id,
+    `ACK v1 de compatibilidade com o mesmo event_id (${device.legacyAcks.length})`);
   check(results, rows.length === 1 && Number(rows[0].alert_count) === 1, "1 evento e 1 alerta");
   await device.close();
 });
@@ -645,6 +647,8 @@ scenario("14. F-29: payload conflitante com mesmo UUID recebe rejected_permanent
   check(results, delivery.quarantined?.event_id === null, "rejeicao sem event_id");
   check(results, rows.length === 1 && rows[0].event_type === "fall_detected", "evento original preservado");
   check(results, device.quarantine.has(original.event_uuid), "evidencia mantida na quarentena do device");
+  check(results, device.legacyAcks.filter((entry) => entry.ack.event_uuid === original.event_uuid).length === 1,
+    "o conflito nao gera ACK v1 (apenas o do original persistido)");
   await device.close();
 });
 
