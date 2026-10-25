@@ -59,11 +59,22 @@ docker run -d --name "$NAME" \
     chmod 0700 /mosquitto/config/passwd /mosquitto/config/acl /mosquitto/config/certs/server.key
     exec mosquitto -c /mosquitto/config/mosquitto.conf' >/dev/null
 
+# Pronto = listener TLS em escuta dentro do container (o perfil nao loga "version ... running").
+ready=false
 for _ in $(seq 1 30); do
-  if docker logs "$NAME" 2>&1 | grep -q "running"; then break; fi
+  if docker exec "$NAME" sh -c "netstat -ltn 2>/dev/null | grep -q ':8883 '" 2>/dev/null; then
+    ready=true
+    break
+  fi
   sleep 1
 done
-docker exec "$NAME" mosquitto -h 2>&1 | head -1 | sed 's/^/broker: /'
+if [ "$ready" != "true" ]; then
+  echo "broker nao iniciou:"
+  docker logs "$NAME" 2>&1 | tail -20 || true
+  exit 1
+fi
+version="$(docker exec "$NAME" sh -c "mosquitto -h 2>&1 | sed -n 1p" || true)"
+echo "broker: ${version}"
 
 export BROKER_HOST=127.0.0.1 PORT_TLS PORT_PLAIN
 export CA_FILE="$WORK_MOUNT/ca.crt" ROGUE_CA_FILE="$WORK_MOUNT/rogue-ca.crt"
