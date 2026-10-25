@@ -294,3 +294,23 @@ test("MotionLab: frame e anotacao validam; predicao de modelo nao e ground truth
   delete withoutUncertainty.uncertainty_us;
   assert.equal(annotation(withoutUncertainty), false);
 });
+
+test("buildCriticalEventResult descarta reason_code/retry_after em resultado persistido (mutante B2)", () => {
+  const { buildCriticalEventResult } = require("../../src/mqtt/criticalEventResult");
+  const validate = buildAjv().compile(readJson("critical-event-result-v1.schema.json"));
+  for (const status of ["committed", "duplicate"]) {
+    const result = buildCriticalEventResult({
+      deviceIdentifier: "esp32_01",
+      eventUuid: "u-1",
+      payloadSha256: "0".repeat(64),
+      status,
+      reasonCode: "internal_error",
+      retryAfterMs: 5000,
+      event: { id: 3, persistedAt: "2026-10-25T00:00:00.000Z" },
+    });
+    assert.equal(result.reason_code, null);
+    assert.equal(result.retry_after_ms, null);
+    assert.equal(result.event_id, 3);
+    assert.equal(validate(result), true, JSON.stringify(validate.errors));
+  }
+});
