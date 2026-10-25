@@ -4,6 +4,7 @@ import br.tcc.quedamonitor.core.session.SessionManager
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.Authenticator
+import okhttp3.ConnectionPool
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -64,6 +65,24 @@ class SessionAuthenticator(private val session: SessionManager) : Authenticator 
     }
 }
 
+/**
+ * Uma nova tentativa SOMENTE para GET quando a conexao falha antes de haver resposta
+ * (ex.: conexao do pool fechada pelo servidor por keep-alive). Nunca para POST/PATCH
+ * (refresh repetido revogaria a familia; acao repetida e decidida pelo usuario) e nunca
+ * apos timeout (dobraria a espera e mascararia lentidao real).
+ */
+class IdempotentGetRetryInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        return try {
+            chain.proceed(request)
+        } catch (error: java.io.IOException) {
+            if (request.method != "GET" || error is java.io.InterruptedIOException || chain.call().isCanceled()) throw error
+            chain.proceed(request)
+        }
+    }
+}
+
 data class NetworkTimeouts(
     val connectSeconds: Long = 10,
     val readSeconds: Long = 15,
@@ -71,6 +90,8 @@ data class NetworkTimeouts(
 )
 
 object NetworkFactory {
+    const val IDLE_CONNECTION_KEEP_ALIVE_SECONDS = 4L
+
     fun baseClient(log: NetworkLog?, timeouts: NetworkTimeouts = NetworkTimeouts()): OkHttpClient.Builder {
         val builder = OkHttpClient.Builder()
             .connectTimeout(timeouts.connectSeconds, TimeUnit.SECONDS)
@@ -78,7 +99,11 @@ object NetworkFactory {
             .callTimeout(timeouts.callSeconds, TimeUnit.SECONDS)
             // Sem retry silencioso de POSTs mutaveis em caso de falha de conexao.
             .retryOnConnectionFailure(false)
+            // Conexao ociosa descartada antes do keep-alive padrao do Node (5 s), para que
+            // POSTs nao reutilizem um socket ja fechado pelo servidor.
+            .connectionPool(ConnectionPool(5, IDLE_CONNECTION_KEEP_ALIVE_SECONDS, TimeUnit.SECONDS))
         if (log != null) builder.addInterceptor(SanitizedLogInterceptor(log))
+        builder.addInterceptor(IdempotentGetRetryInterceptor())
         return builder
     }
 

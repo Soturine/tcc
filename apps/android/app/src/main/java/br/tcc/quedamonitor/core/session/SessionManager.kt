@@ -12,6 +12,9 @@ import br.tcc.quedamonitor.core.network.dto.MobileSessionDto
 import br.tcc.quedamonitor.core.network.dto.RefreshRequest
 import br.tcc.quedamonitor.core.network.safeApiCall
 import br.tcc.quedamonitor.core.network.safeApiCallNoBody
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +41,8 @@ class SessionManager(
     private val store: TokenStore,
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val deviceLabel: String = "android",
+    /** Escrita/limpeza do armazenamento protegido (Keystore + disco) nunca na main thread. */
+    private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val _state = MutableStateFlow<SessionState>(SessionState.Restoring)
     val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -166,7 +171,7 @@ class SessionManager(
     /** Encerramento sem chamar o servidor (ex.: 401 irrecuperavel detectado por um repositorio). */
     suspend fun expire() = mutex.withLock { clearLocal(SignOutReason.EXPIRED) }
 
-    private fun adopt(dto: MobileSessionDto, user: UserSession, organizationId: Long?) {
+    private suspend fun adopt(dto: MobileSessionDto, user: UserSession, organizationId: Long?) {
         val cached = user.toCached().copy(organizationId = organizationId ?: user.organization?.id)
         val stored = StoredSession(
             sessionId = dto.sessionId,
@@ -180,7 +185,7 @@ class SessionManager(
         )
         current = stored
         cachedUser = cached
-        persist(stored, cached)
+        withContext(storageDispatcher) { persist(stored, cached) }
         _state.value = SessionState.SignedIn(user, persisted)
     }
 
@@ -195,10 +200,10 @@ class SessionManager(
         }
     }
 
-    private fun clearLocal(reason: SignOutReason) {
+    private suspend fun clearLocal(reason: SignOutReason) {
         current = null
         cachedUser = null
-        store.clear()
+        withContext(storageDispatcher) { store.clear() }
         _state.value = SessionState.SignedOut(reason)
     }
 

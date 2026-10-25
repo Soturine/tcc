@@ -88,8 +88,34 @@ class ApiClientTest {
     fun timeoutAndDroppedConnectionAreDistinguished() = runBlocking {
         server.enqueue(Fixtures.response("patients").setHeadersDelay(5, TimeUnit.SECONDS))
         assertEquals(ApiError.Timeout, (repository.patients() as ApiResult.Failure).error)
+        // GET tenta de novo uma vez; as duas conexoes caem => erro de rede.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
         assertEquals(ApiError.Network, (repository.patients() as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun getRecoversFromConnectionClosedByServerButTimeoutIsNotRetried() = runBlocking {
+        // Caso real no emulador: socket do pool fechado pelo keep-alive do Node.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        server.enqueue(Fixtures.response("patients"))
+        assertTrue(repository.patients() is ApiResult.Success)
+        assertEquals(3, server.requestCount) // login + falha + nova tentativa
+
+        server.enqueue(Fixtures.response("patients").setHeadersDelay(5, TimeUnit.SECONDS))
+        server.enqueue(Fixtures.response("patients"))
+        assertEquals(ApiError.Timeout, (repository.patients() as ApiResult.Failure).error)
+        assertEquals("timeout nao gera segunda requisicao", 4, server.requestCount)
+    }
+
+    @Test
+    fun alertActionPostIsNeverResentAfterDroppedConnection() = runBlocking {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        server.enqueue(Fixtures.response("alert_detail"))
+        val outcome = repository.act(42, br.tcc.quedamonitor.core.model.AlertActionType.ACKNOWLEDGE)
+        // Desfecho desconhecido: o app nao finge sucesso nem repete a acao sozinho.
+        assertTrue("$outcome", outcome is br.tcc.quedamonitor.core.data.ActionOutcome.Unknown)
+        assertEquals("login + uma unica tentativa do POST", 2, server.requestCount)
     }
 
     @Test

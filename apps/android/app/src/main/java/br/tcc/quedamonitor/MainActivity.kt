@@ -7,6 +7,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import br.tcc.quedamonitor.ui.AppRoot
 import br.tcc.quedamonitor.ui.theme.QuedaMonitorTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class QuedaMonitorApp : Application() {
     lateinit var container: AppDependencies
@@ -15,8 +19,11 @@ class QuedaMonitorApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        container.session.restore()
+        // Keystore + arquivo cifrado fora da main thread; a UI mostra "Restaurando sessão…".
+        appScope.launch(Dispatchers.IO) { container.session.restore() }
     }
+
+    private val appScope = CoroutineScope(SupervisorJob())
 }
 
 class MainActivity : ComponentActivity() {
