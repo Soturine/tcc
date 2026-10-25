@@ -12,8 +12,11 @@ data class UserSession(
     val organization: Organization?,
     val organizations: List<Organization>,
 ) {
-    /** Espelha o servidor (alertService.updateAlertStatus); a decisao final e sempre do backend. */
-    val canActOnAlerts: Boolean get() = role in setOf("organization_admin", "caregiver", "operator")
+    /**
+     * Espelha o servidor (alertService.updateAlertStatus + hasRole, que libera platform_admin);
+     * so decide se os botoes aparecem. A decisao final e sempre do backend.
+     */
+    val canActOnAlerts: Boolean get() = role in setOf("organization_admin", "caregiver", "operator", "platform_admin")
 }
 
 data class Patient(

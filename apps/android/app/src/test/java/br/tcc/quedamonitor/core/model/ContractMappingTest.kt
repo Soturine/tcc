@@ -124,4 +124,12 @@ class ContractMappingTest {
         val resolved = base.copy(status = AlertStatus.RESOLVED)
         AlertActionType.entries.forEach { assertFalse(resolved.allows(it)) }
     }
+
+    @Test
+    fun onlyRolesTheServerAllowsSeeAlertActions() {
+        // Mesmo conjunto de alertService.updateAlertStatus + hasRole (platform_admin liberado); o servidor decide.
+        fun user(role: String?) = UserSession(1, "n", "e", role, null, emptyList())
+        listOf("organization_admin", "caregiver", "operator", "platform_admin").forEach { assertTrue(it, user(it).canActOnAlerts) }
+        listOf("viewer", null, "papel_desconhecido").forEach { assertFalse("$it", user(it).canActOnAlerts) }
+    }
 }
