@@ -194,6 +194,19 @@ constexpr size_t CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES = 3800;
 constexpr uint32_t CRITICAL_OUTBOX_RETRY_BASE_MS = 2000;
 constexpr uint32_t CRITICAL_OUTBOX_RETRY_MAX_MS = 60000;
 constexpr unsigned long CRITICAL_OUTBOX_PERSIST_RETRY_INTERVAL_MS = 5000;
+// Reservas de admissao (ADR-026): 4 slots so para SOS e mais 4 so para SOS/queda.
+// Eventos de menor prioridade (suspeita, falha de sensor, teste) usam no maximo 8.
+// Nenhum evento aceito e despejado para abrir espaco.
+constexpr size_t CRITICAL_OUTBOX_SOS_RESERVE = 4;
+constexpr size_t CRITICAL_OUTBOX_FALL_RESERVE = 4;
+// Rejeitados permanentes (critical-event-result-v1) ficam fora da fila ativa.
+// Orcamento de flash: (16 + 8) x <= 3,8 KB ~= 92 KB na particao LittleFS.
+constexpr size_t CRITICAL_OUTBOX_QUARANTINE_CAPACITY = 8;
+// O evento declara suporte a critical-event-result-v1.
+constexpr int CRITICAL_INGEST_RESULT_VERSION = 1;
+// Compatibilidade com backend anterior (somente critical-event-ack-v1, sem hash).
+// Com backend >= esta versao e ACL efetiva, pode ser desligado para exigir o hash.
+constexpr bool CRITICAL_ACCEPT_LEGACY_ACK = true;
 // Somente para migrar eventos gravados em NVS pelo buffer legado (<= v0.9.4).
 constexpr size_t PERSISTED_EVENT_BUFFER_CAPACITY = 4;
 

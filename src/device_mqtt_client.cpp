@@ -118,14 +118,25 @@ bool DeviceMqttClient::publish(const String& topic, const String& payload, bool 
 }
 
 void DeviceMqttClient::setSubscription(const String& topic, uint8_t qos) {
-  if (topic == subscriptionTopic_ && qos == subscriptionQos_) {
+  setSubscriptions(topic, String(), qos);
+}
+
+void DeviceMqttClient::setSubscriptions(const String& primary, const String& secondary, uint8_t qos) {
+  const uint8_t normalizedQos = qos > 1U ? 1U : qos;
+  if (primary == subscriptionTopics_[0] && secondary == subscriptionTopics_[1] &&
+      normalizedQos == subscriptionQos_) {
     return;
   }
-  if (subscribed_ && client_.connected() && !subscriptionTopic_.isEmpty()) {
-    client_.unsubscribe(subscriptionTopic_.c_str());
+  if (subscribed_ && client_.connected()) {
+    for (const String& topic : subscriptionTopics_) {
+      if (!topic.isEmpty()) {
+        client_.unsubscribe(topic.c_str());
+      }
+    }
   }
-  subscriptionTopic_ = topic;
-  subscriptionQos_ = qos > 1U ? 1U : qos;
+  subscriptionTopics_[0] = primary;
+  subscriptionTopics_[1] = secondary;
+  subscriptionQos_ = normalizedQos;
   subscribed_ = false;
   if (client_.connected()) {
     subscribeIfConfigured();
@@ -145,17 +156,21 @@ bool DeviceMqttClient::isSubscribed() const {
 }
 
 void DeviceMqttClient::subscribeIfConfigured() {
-  if (subscriptionTopic_.isEmpty()) {
-    return;
+  bool anyTopic = false;
+  bool allSubscribed = true;
+  for (const String& topic : subscriptionTopics_) {
+    if (topic.isEmpty()) {
+      continue;
+    }
+    anyTopic = true;
+    if (client_.subscribe(topic.c_str(), subscriptionQos_)) {
+      AppLog::infof("[mqtt] subscribed topic=%s qos=%u\n", topic.c_str(), static_cast<unsigned>(subscriptionQos_));
+    } else {
+      allSubscribed = false;
+      AppLog::warnf("[mqtt] subscribe failed topic=%s\n", topic.c_str());
+    }
   }
-  subscribed_ = client_.subscribe(subscriptionTopic_.c_str(), subscriptionQos_);
-  if (subscribed_) {
-    AppLog::infof("[mqtt] subscribed topic=%s qos=%u\n",
-                  subscriptionTopic_.c_str(),
-                  static_cast<unsigned>(subscriptionQos_));
-  } else {
-    AppLog::warnf("[mqtt] subscribe failed topic=%s\n", subscriptionTopic_.c_str());
-  }
+  subscribed_ = anyTopic && allSubscribed;
 }
 
 bool DeviceMqttClient::isConnected() {

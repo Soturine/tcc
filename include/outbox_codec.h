@@ -17,4 +17,13 @@ std::string fileStemFor(const std::string& uuid);
 std::string encode(const OutboxEntry& entry);
 bool decode(const std::string& data, OutboxEntry& entry);
 
+// Recuperacao de um ".tmp" encontrado no boot. A escrita grava e fecha o ".tmp",
+// remove o ".evt" antigo e so entao renomeia. Logo:
+// - ".evt" presente: o corte ocorreu antes da troca; o ".evt" vale, descarta o ".tmp";
+// - ".evt" ausente e ".tmp" integro (CRC ok): corte entre remove e rename de uma
+//   regravacao (ex.: mudanca para quarentena) -> PROMOVER, senao o evento se perde;
+// - ".evt" ausente e ".tmp" corrompido: primeira escrita interrompida, nunca aceita.
+enum class TmpRecovery { DiscardTmp, PromoteTmp };
+TmpRecovery decideTmpRecovery(bool finalExists, const std::string& tmpContent);
+
 }  // namespace OutboxCodec
