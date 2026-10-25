@@ -9,11 +9,16 @@
  *
  * Uso: npm run test:e2e:critical
  * Variaveis: MYSQL_*, MQTT_BROKER_URL, E2E_BACKEND_PORT (4100),
- *            E2E_DB_CONTAINER (opcional: habilita o cenario de banco indisponivel via docker pause).
+ *            E2E_DB_CONTAINER (opcional: habilita o cenario de banco congelado via docker pause),
+ *            E2E_BROKER_CONTAINER (opcional: habilita o cenario de broker parado via docker stop/start).
+ *
+ * O backend fala com o MySQL atraves de um proxy TCP local (TcpFaultProxy) que permite
+ * injetar "connection refused" e "TCP reset" de forma distinta de "banco congelado".
  */
 const { spawn, execFileSync } = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
+const net = require("net");
 const path = require("path");
 const mqtt = require("mqtt");
 const mysql = require("mysql2/promise");
@@ -34,6 +39,84 @@ const dbConfig = {
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sha256 = (text) => crypto.createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
+
+// ---------------------------------------------------------------- proxy de falhas MySQL
+
+class TcpFaultProxy {
+  constructor(targetHost, targetPort) {
+    this.targetHost = targetHost;
+    this.targetPort = targetPort;
+    this.mode = "pass";
+    this.sockets = new Set();
+    this.server = null;
+    this.port = null;
+  }
+
+  async listen(port = 0) {
+    this.server = net.createServer((client) => this.onClient(client));
+    await new Promise((resolve, reject) => {
+      this.server.once("error", reject);
+      this.server.listen(port, "127.0.0.1", resolve);
+    });
+    this.port = this.server.address().port;
+  }
+
+  track(socket) {
+    this.sockets.add(socket);
+    socket.once("close", () => this.sockets.delete(socket));
+    socket.on("error", () => socket.destroy());
+  }
+
+  onClient(client) {
+    this.track(client);
+    if (this.mode === "reset") {
+      client.resetAndDestroy();
+      return;
+    }
+    const upstream = net.connect(this.targetPort, this.targetHost);
+    this.track(upstream);
+    client.pipe(upstream);
+    upstream.pipe(client);
+    client.once("close", () => upstream.destroy());
+    upstream.once("close", () => client.destroy());
+  }
+
+  resetAll() {
+    for (const socket of this.sockets) {
+      socket.resetAndDestroy();
+    }
+  }
+
+  // Novas conexoes recebem RST (TCP reset) e as existentes sao resetadas.
+  async resetMode() {
+    this.mode = "reset";
+    this.resetAll();
+  }
+
+  // Porta fechada: novas conexoes recebem ECONNREFUSED; existentes sao resetadas.
+  async refuse() {
+    this.mode = "refuse";
+    this.resetAll();
+    await new Promise((resolve) => this.server.close(() => resolve()));
+  }
+
+  async restore() {
+    if (this.mode === "refuse") {
+      await this.listen(this.port);
+    }
+    this.mode = "pass";
+  }
+
+  async close() {
+    this.resetAll();
+    if (this.server?.listening) {
+      await new Promise((resolve) => this.server.close(() => resolve()));
+    }
+  }
+}
+
+let mysqlProxy = null;
 
 // ---------------------------------------------------------------- backend
 
@@ -54,6 +137,9 @@ async function startBackend() {
       MQTT_CLIENT_ID: `queda-backend-e2e-${RUN_ID}`,
       MQTT_TOPIC_BASE: TOPIC_BASE,
       ALERT_DELIVERY_DRY_RUN: "true",
+      // Todo trafego SQL do backend passa pelo proxy de falhas.
+      MYSQL_HOST: "127.0.0.1",
+      MYSQL_PORT: String(mysqlProxy.port),
     },
     stdio: ["ignore", log, log],
   });
@@ -93,28 +179,48 @@ async function stopBackend() {
 // ---------------------------------------------------------------- virtual device
 
 class VirtualDevice {
-  constructor(deviceId) {
+  // resultCapable=true emula o firmware com critical-event-result-v1 (ADR-026);
+  // false emula o firmware anterior (somente critical-event-ack-v1).
+  constructor(deviceId, { resultCapable = false } = {}) {
     this.deviceId = deviceId;
     this.deviceUid = `e2e-${RUN_ID}-${deviceId}`;
     this.eventTopic = `${TOPIC_BASE}/${deviceId}/events`;
     this.ackTopic = `${TOPIC_BASE}/${deviceId}/critical-event-acks`;
+    this.resultTopic = `${TOPIC_BASE}/${deviceId}/critical-event-results`;
+    this.resultCapable = resultCapable;
     this.acks = [];
+    this.legacyAcks = [];
+    this.results = [];
+    this.quarantine = new Map();
     this.sequence = 0;
     this.bootId = `b${crypto.randomBytes(4).toString("hex")}-${crypto.randomBytes(4).toString("hex")}`;
   }
 
   async connect() {
-    this.client = mqtt.connect(BROKER_URL, { clientId: `${this.deviceUid}-${Date.now()}`, clean: true });
+    this.client = mqtt.connect(BROKER_URL, {
+      clientId: `${this.deviceUid}-${Date.now()}`,
+      clean: true,
+      reconnectPeriod: 500,
+    });
     await new Promise((resolve, reject) => {
       this.client.once("connect", resolve);
       this.client.once("error", reject);
     });
     await new Promise((resolve, reject) => {
-      this.client.subscribe(this.ackTopic, { qos: 1 }, (error) => (error ? reject(error) : resolve()));
+      this.client.subscribe([this.ackTopic, this.resultTopic], { qos: 1 }, (error) => (error ? reject(error) : resolve()));
     });
     this.client.on("message", (topic, buffer) => {
+      const entry = { receivedAt: Date.now(), ack: JSON.parse(buffer.toString()) };
       if (topic === this.ackTopic) {
-        this.acks.push({ receivedAt: Date.now(), ack: JSON.parse(buffer.toString()) });
+        this.legacyAcks.push(entry);
+        if (!this.resultCapable) {
+          this.acks.push(entry);
+        }
+      } else if (topic === this.resultTopic) {
+        this.results.push(entry);
+        if (this.resultCapable) {
+          this.acks.push(entry);
+        }
       }
     });
   }
@@ -144,6 +250,9 @@ class VirtualDevice {
       accel_magnitude: 3.2,
       gyro_magnitude: 210,
     };
+    if (this.resultCapable) {
+      payload.ingest_result_version = 1;
+    }
     if (localEvidence) {
       payload.local_evidence = {
         version: 1,
@@ -169,6 +278,30 @@ class VirtualDevice {
     });
   }
 
+  // Como o firmware: sem conexao, a tentativa falha localmente e o evento fica pendente.
+  async tryPublish(payload) {
+    if (!this.client.connected) {
+      return false;
+    }
+    await Promise.race([this.publishRaw(payload), sleep(ACK_TIMEOUT_MS)]);
+    return true;
+  }
+
+  // Aplica a mesma regra da outbox do firmware a um resultado recebido.
+  classify(entry, payload) {
+    const { ack } = entry;
+    if (!this.resultCapable) {
+      return "persisted";
+    }
+    if (ack.device_id !== this.deviceId || ack.payload_sha256 !== sha256(JSON.stringify(payload))) {
+      return "ignored";
+    }
+    if (ack.status === "committed" || ack.status === "duplicate") {
+      return "persisted";
+    }
+    return ack.status;
+  }
+
   async waitAck(eventUuid, afterIndex = 0, timeoutMs = ACK_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -181,24 +314,36 @@ class VirtualDevice {
     return null;
   }
 
-  // Semantica da outbox: retransmite o mesmo UUID ate o ACK (ou esgotar tentativas).
+  // Semantica da outbox: retransmite o mesmo UUID ate a confirmacao de persistencia.
+  // Com resultado v1: rejected_permanent => quarentena (para de reenviar, nao conta
+  // como entregue); retryable => continua pendente.
   async deliver(payload, { attempts = 6, ignoreFirstAcks = 0, beforeRetry = null } = {}) {
     const startedAt = Date.now();
     let ignored = 0;
+    const negative = [];
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       const before = this.acks.length;
-      await this.publishRaw(payload);
-      const ack = await this.waitAck(payload.event_uuid, before);
-      if (ack && ignored < ignoreFirstAcks) {
+      const sent = await this.tryPublish(payload);
+      const entry = sent ? await this.waitAck(payload.event_uuid, before) : null;
+      if (!sent) {
+        await sleep(ACK_TIMEOUT_MS);
+      }
+      const disposition = entry ? this.classify(entry, payload) : null;
+      if (disposition === "persisted" && ignored < ignoreFirstAcks) {
         ignored += 1; // ACK "perdido": o device nao o processa e retransmite.
-      } else if (ack) {
-        return { ack: ack.ack, attempts: attempt, elapsedMs: ack.receivedAt - startedAt };
+      } else if (disposition === "persisted") {
+        return { ack: entry.ack, attempts: attempt, elapsedMs: entry.receivedAt - startedAt, negative };
+      } else if (disposition === "rejected_permanent") {
+        this.quarantine.set(payload.event_uuid, entry.ack.reason_code);
+        return { ack: null, quarantined: entry.ack, attempts: attempt, elapsedMs: entry.receivedAt - startedAt, negative };
+      } else if (disposition === "retryable") {
+        negative.push(entry);
       }
       if (beforeRetry) {
         await beforeRetry(attempt);
       }
     }
-    return { ack: null, attempts, elapsedMs: Date.now() - startedAt };
+    return { ack: null, attempts, elapsedMs: Date.now() - startedAt, negative };
   }
 }
 
@@ -458,10 +603,177 @@ scenario("12. device_uid de device pareado usado em outro topico: rejeitado sem 
   await attacker.close();
 });
 
+// ------------------------------------------- critical-event-result-v1 e falhas de infraestrutura
+
+function noPersistedResultBefore(device, eventUuid, instant) {
+  return device.acks
+    .filter((entry) => entry.ack.event_uuid === eventUuid)
+    .filter((entry) => ["committed", "duplicate"].includes(entry.ack.status))
+    .every((entry) => entry.receivedAt >= instant);
+}
+
+scenario("13. firmware com resultado v1: committed correlacionado por hash, sem ACK legado", async (results) => {
+  const device = new VirtualDevice(`e2e-result-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const payload = device.buildFall();
+  const delivery = await device.deliver(payload);
+  const rows = await eventRows(payload.event_uuid);
+  check(results, delivery.ack?.status === "committed", `resultado committed (${delivery.ack?.status})`);
+  check(results, delivery.ack?.payload_sha256 === sha256(JSON.stringify(payload)), "payload_sha256 = hash dos bytes enviados");
+  check(results, delivery.ack?.device_id === device.deviceId, "device_id do resultado = device do topico");
+  check(results, delivery.ack?.event_id === Number(rows[0]?.id), "event_id corresponde ao registro");
+  check(results, device.legacyAcks.length === 0, "nenhum critical-event-ack-v1 para device com resultado v1");
+  check(results, rows.length === 1 && Number(rows[0].alert_count) === 1, "1 evento e 1 alerta");
+  await device.close();
+});
+
+scenario("14. F-29: payload conflitante com mesmo UUID recebe rejected_permanent e vai para quarentena", async (results) => {
+  const device = new VirtualDevice(`e2e-f29-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const original = device.buildFall();
+  const first = await device.deliver(original);
+  const conflicting = { ...original, event_type: "sos_pressed" };
+  const delivery = await device.deliver(conflicting, { attempts: 3 });
+  const rows = await eventRows(original.event_uuid);
+  check(results, first.ack?.status === "committed", "original committed");
+  check(results, delivery.ack === null, "conflito nunca e confirmado como persistido");
+  check(results, delivery.quarantined?.reason_code === "event_uuid_conflict",
+    `rejected_permanent event_uuid_conflict (${delivery.quarantined?.reason_code})`);
+  check(results, delivery.attempts === 1, `sem retry infinito: quarentena na 1a resposta (tentativas=${delivery.attempts})`);
+  check(results, delivery.quarantined?.event_id === null, "rejeicao sem event_id");
+  check(results, rows.length === 1 && rows[0].event_type === "fall_detected", "evento original preservado");
+  check(results, device.quarantine.has(original.event_uuid), "evidencia mantida na quarentena do device");
+  await device.close();
+});
+
+scenario("15. identidade topico/payload divergente: rejected_permanent identity_rejected, nada persistido", async (results) => {
+  const device = new VirtualDevice(`e2e-idrej-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const payload = { ...device.buildFall(), device_id: `outro-${RUN_ID}` };
+  const delivery = await device.deliver(payload, { attempts: 2 });
+  check(results, delivery.quarantined?.reason_code === "identity_rejected", `identity_rejected (${delivery.quarantined?.reason_code})`);
+  check(results, !JSON.stringify(delivery.quarantined || {}).includes(`outro-${RUN_ID}`), "resultado nao ecoa o id alheio");
+  check(results, (await eventRows(payload.event_uuid)).length === 0, "nada persistido");
+  await device.close();
+});
+
+scenario("16. MySQL connection refused: retryable sem confirmacao ate o banco voltar", async (results) => {
+  const device = new VirtualDevice(`e2e-refused-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const payload = device.buildFall();
+  await mysqlProxy.refuse();
+  let restoredAt = null;
+  let delivery;
+  try {
+    delivery = await device.deliver(payload, {
+      attempts: 6,
+      beforeRetry: async (attempt) => {
+        if (attempt === 2) {
+          restoredAt = Date.now();
+          await mysqlProxy.restore();
+        }
+      },
+    });
+  } finally {
+    await mysqlProxy.restore();
+  }
+  const rows = await eventRows(payload.event_uuid);
+  check(results, delivery.negative.length >= 1 && delivery.negative.every((entry) => entry.ack.status === "retryable"),
+    `resultado(s) retryable durante a recusa (${delivery.negative.map((entry) => entry.ack.reason_code).join(",")})`);
+  check(results, restoredAt !== null && noPersistedResultBefore(device, payload.event_uuid, restoredAt),
+    "nenhuma confirmacao de persistencia antes do banco voltar");
+  check(results, Boolean(delivery.ack) && ["committed", "duplicate"].includes(delivery.ack.status),
+    `confirmado apos o retorno (tentativas=${delivery.attempts})`);
+  check(results, rows.length === 1 && Number(rows[0].alert_count) === 1, "1 evento e 1 alerta");
+  await device.close();
+  return { attempts: delivery.attempts, retryableResults: delivery.negative.length };
+});
+
+scenario("17. MySQL TCP reset: retryable/sem resposta, sem perda logica nem duplicata", async (results) => {
+  const device = new VirtualDevice(`e2e-reset-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const payload = device.buildFall();
+  await mysqlProxy.resetMode();
+  let restoredAt = null;
+  let delivery;
+  try {
+    delivery = await device.deliver(payload, {
+      attempts: 6,
+      beforeRetry: async (attempt) => {
+        if (attempt === 2) {
+          restoredAt = Date.now();
+          await mysqlProxy.restore();
+        }
+      },
+    });
+  } finally {
+    await mysqlProxy.restore();
+  }
+  const rows = await eventRows(payload.event_uuid);
+  check(results, delivery.negative.every((entry) => entry.ack.status === "retryable"), "somente retryable durante o reset");
+  check(results, restoredAt !== null && noPersistedResultBefore(device, payload.event_uuid, restoredAt),
+    "nenhuma confirmacao de persistencia durante o reset");
+  check(results, Boolean(delivery.ack), `confirmado apos o retorno (tentativas=${delivery.attempts})`);
+  check(results, rows.length === 1 && Number(rows[0].alert_count) === 1, "1 evento e 1 alerta");
+  await device.close();
+  return { attempts: delivery.attempts, retryableResults: delivery.negative.length };
+});
+
+scenario("18. broker parado e reiniciado: evento pendente entregue uma vez apos o retorno", async (results) => {
+  const container = process.env.E2E_BROKER_CONTAINER;
+  const device = new VirtualDevice(`e2e-broker-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  const payload = device.buildFall();
+  execFileSync("docker", ["stop", container], { stdio: "ignore" });
+  let startedAt = null;
+  let delivery;
+  try {
+    delivery = await device.deliver(payload, {
+      attempts: 10,
+      beforeRetry: async (attempt) => {
+        if (attempt === 1) {
+          startedAt = Date.now();
+          execFileSync("docker", ["start", container], { stdio: "ignore" });
+        }
+      },
+    });
+  } finally {
+    try {
+      execFileSync("docker", ["start", container], { stdio: "ignore" });
+    } catch {
+      // ja iniciado
+    }
+  }
+  const rows = await eventRows(payload.event_uuid);
+  check(results, startedAt !== null && noPersistedResultBefore(device, payload.event_uuid, startedAt),
+    "nenhuma confirmacao com o broker parado");
+  check(results, Boolean(delivery.ack), `confirmado apos o broker voltar (tentativas=${delivery.attempts})`);
+  check(results, rows.length === 1 && Number(rows[0].alert_count) === 1, "1 evento e 1 alerta");
+  await device.close();
+  return { attempts: delivery.attempts, recoveryMs: delivery.elapsedMs };
+}, { requiresEnv: "E2E_BROKER_CONTAINER" });
+
+scenario("19. upgrade/downgrade: device antigo e novo convivem no mesmo backend", async (results) => {
+  const legacy = new VirtualDevice(`e2e-legacy-${RUN_ID}`);
+  const modern = new VirtualDevice(`e2e-modern-${RUN_ID}`, { resultCapable: true });
+  await legacy.connect();
+  await modern.connect();
+  const legacyDelivery = await legacy.deliver(legacy.buildFall());
+  const modernDelivery = await modern.deliver(modern.buildFall());
+  check(results, legacyDelivery.ack?.schema_version === 1 && legacyDelivery.ack?.committed_at && !("payload_sha256" in legacyDelivery.ack),
+    "device antigo recebe critical-event-ack-v1 inalterado");
+  check(results, legacy.results.length === 0, "device antigo nao recebe resultado v1");
+  check(results, modernDelivery.ack?.payload_sha256?.length === 64, "device novo recebe resultado v1");
+  await legacy.close();
+  await modern.close();
+});
+
 // ---------------------------------------------------------------- execucao
 
 async function main() {
   db = await mysql.createConnection({ ...dbConfig, timezone: "Z" });
+  mysqlProxy = new TcpFaultProxy(dbConfig.host, dbConfig.port);
+  await mysqlProxy.listen();
   const report = {
     kind: "emulation",
     disclaimer: "Virtual device sobre backend, MySQL e Mosquitto reais e descartaveis; nao e ensaio com ESP32.",
@@ -516,6 +828,7 @@ async function main() {
     }
   } finally {
     await stopBackend();
+    await mysqlProxy.close();
     await db.end();
   }
 
