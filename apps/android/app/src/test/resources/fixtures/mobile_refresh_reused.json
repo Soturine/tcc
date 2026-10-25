@@ -1,0 +1,6 @@
+{
+  "message": "Sessão inválida ou expirada.",
+  "details": {
+    "code": "SESSION_INVALID"
+  }
+}
