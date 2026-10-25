@@ -84,12 +84,13 @@ function buildAjv() {
   return ajv;
 }
 
-test("OpenAPI e valido e cobre exatamente as 35 operacoes registradas", async () => {
+// 38 = 35 anteriores + /api/auth/mobile/{login,refresh,logout} (CP4 Android, 2026-10-25).
+test("OpenAPI e valido e cobre exatamente as 38 operacoes registradas", async () => {
   const api = await SwaggerParser.validate(openApiPath);
   const implemented = implementedOperations();
   const documented = documentedOperations(api);
 
-  assert.equal(implemented.length, 35);
+  assert.equal(implemented.length, 38);
   assert.deepEqual(documented, implemented);
   assert.equal(new Set(documented).size, documented.length);
 });

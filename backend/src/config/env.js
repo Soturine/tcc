@@ -116,6 +116,11 @@ const env = {
       true,
     ),
   },
+  // Sessao movel (CP4): access token curto + refresh rotativo revogavel.
+  mobileAuth: {
+    accessTokenTtlSeconds: toNumber(process.env.MOBILE_ACCESS_TOKEN_TTL_SECONDS, 900),
+    refreshTokenTtlDays: toNumber(process.env.MOBILE_REFRESH_TOKEN_TTL_DAYS, 30),
+  },
   deviceOfflineThresholdSeconds: toNumber(
     process.env.DEVICE_OFFLINE_THRESHOLD_SECONDS,
     120,

@@ -1,0 +1,91 @@
+{
+  "organization": {
+    "id": 1,
+    "name": "Familia Demo",
+    "type": "family",
+    "status": "active",
+    "createdAt": "2026-10-25T15:43:26.000Z",
+    "updatedAt": "2026-10-25T15:43:26.000Z"
+  },
+  "metrics": {
+    "totalDevices": 6,
+    "totalPatients": 1,
+    "onlineDevices": 1,
+    "offlineDevices": 0,
+    "activeAlerts": 1,
+    "criticalAlerts": 1,
+    "eventsLast24h": 1,
+    "telemetryLastHour": 0
+  },
+  "systemStatus": {
+    "state": "critical",
+    "lastSeenAt": "2026-10-25T15:43:26.000Z",
+    "generatedAt": "2026-10-25T21:13:00.816Z"
+  },
+  "recentEvents": [
+    {
+      "id": 1,
+      "organizationId": 1,
+      "patientId": 1,
+      "assignmentHistoryId": 1,
+      "eventType": "fall_detected",
+      "severity": "critical",
+      "intensity": 3.74,
+      "immobility": true,
+      "message": "Queda simulada para demonstracao multi-organizacao.",
+      "evidenceStatus": "linked",
+      "evidenceTelemetryId": 1,
+      "evidenceSampleCount": 2,
+      "evidenceWindowSeconds": 0,
+      "evidenceSummary": {
+        "confidence": null,
+        "lastSampleAt": "2026-10-25 15:43:26.000000",
+        "firstSampleAt": "2026-10-25 15:43:26.000000",
+        "decisionSource": "firmware",
+        "algorithmVersion": "seed_threshold_fsm_v2_time_features_v1",
+        "confidenceStatus": "not_available",
+        "firmwareDecision": {
+          "reason": "impact_orientation_immobility",
+          "confidence": null,
+          "peakAccelG": 3.74,
+          "peakGyroDps": 182.5,
+          "sampleCount": 72,
+          "decisionSource": "firmware",
+          "algorithmVersion": "seed_threshold_fsm_v2_time_features_v1",
+          "confidenceStatus": "not_available",
+          "featuresTimeDomain": {
+            "available": true,
+            "peak_jerk": 8.4,
+            "sample_count": 64,
+            "window_duration_ms": 3200
+          },
+          "immobilityConfirmed": true,
+          "activityStateEstimate": "queda_confirmada",
+          "featuresFrequencyDomain": {
+            "reason": "fft_experimental_disabled",
+            "available": false,
+            "experimental": true
+          }
+        },
+        "maxGyroMagnitude": 182.5,
+        "maxAccelMagnitude": 3.74,
+        "immobilityConfirmed": true
+      },
+      "eventTime": "2026-10-25T15:43:26.000Z",
+      "rawPayloadJson": null,
+      "createdAt": "2026-10-25T15:43:26.000Z",
+      "device": {
+        "id": 1,
+        "deviceUid": "legacy:esp32_01",
+        "deviceIdentifier": "esp32_01",
+        "name": "Pulseira ESP32 Principal",
+        "patientName": "Paciente Demo"
+      },
+      "patient": {
+        "id": 1,
+        "fullName": "Paciente Demo"
+      },
+      "alert": null
+    }
+  ]
+}

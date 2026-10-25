@@ -24,6 +24,12 @@ const authRateLimit = buildRateLimit({
   limit: 10,
 });
 
+// Refresh legitimo acontece a cada ~15 min por app; limite separado do login.
+const refreshRateLimit = buildRateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+});
+
 const pairingRateLimit = buildRateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -34,4 +40,5 @@ module.exports = {
   authRateLimit,
   buildRateLimit,
   pairingRateLimit,
+  refreshRateLimit,
 };

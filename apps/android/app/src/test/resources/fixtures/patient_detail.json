@@ -1,0 +1,32 @@
+{
+  "patient": {
+    "id": 1,
+    "organizationId": 1,
+    "fullName": "Paciente Demo",
+    "birthDate": "1948-08-18T00:00:00.000Z",
+    "weightKg": 72.5,
+    "heightCm": 168,
+    "notes": "Paciente inicial para demonstracao multi-tenant.",
+    "status": "active",
+    "createdAt": "2026-10-25T15:43:26.000Z",
+    "updatedAt": "2026-10-25T15:43:26.000Z",
+    "currentDevice": {
+      "id": 1,
+      "deviceUid": "legacy:esp32_01",
+      "deviceIdentifier": "esp32_01",
+      "name": "Pulseira ESP32 Principal",
+      "claimStatus": "claimed"
+    },
+    "assignedCaregivers": [
+      {
+        "organizationMemberId": 1,
+        "role": "organization_admin",
+        "user": {
+          "id": 1,
+          "name": "Administradora Demo",
+          "email": "admin@queda.local"
+        }
+      }
+    ]
+  }
+}

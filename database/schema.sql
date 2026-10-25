@@ -457,3 +457,29 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (user_id) REFERENCES users (id)
     ON DELETE SET NULL
 );
+
+-- Sessoes moveis revogaveis (migration 004_auth_sessions). Somente o hash do refresh token.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  session_uuid CHAR(36) NOT NULL,
+  family_uuid CHAR(36) NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  client_type ENUM('mobile') NOT NULL DEFAULT 'mobile',
+  device_label VARCHAR(80) NULL,
+  refresh_token_hash CHAR(64) NOT NULL,
+  status ENUM('active', 'rotated', 'revoked') NOT NULL DEFAULT 'active',
+  revoked_reason VARCHAR(40) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used_at DATETIME NULL,
+  expires_at DATETIME NOT NULL,
+  rotated_at DATETIME NULL,
+  revoked_at DATETIME NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_auth_sessions_session_uuid (session_uuid),
+  UNIQUE KEY uq_auth_sessions_refresh_hash (refresh_token_hash),
+  KEY idx_auth_sessions_family_status (family_uuid, status),
+  KEY idx_auth_sessions_user_status (user_id, status),
+  CONSTRAINT fk_auth_sessions_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON DELETE CASCADE
+);

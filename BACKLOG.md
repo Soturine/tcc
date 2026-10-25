@@ -123,19 +123,21 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 
 ## P4 — Bootstrap Android REST MVP
 
-- [ ] Criar projeto Kotlin + Jetpack Compose.
-- [ ] Definir package/application ID.
-- [ ] Configurar build variants `local` e `staging`.
-- [ ] Implementar design system/accessibility baseline.
-- [ ] Networking/auth/session revogável.
-- [ ] Organização ativa.
-- [ ] Home.
-- [ ] Alerts list/detail/actions.
-- [ ] Patients.
-- [ ] Devices.
-- [ ] Telemetry/diagnostics.
-- [ ] Cache/offline last-known-state com indicação de staleness.
-- [ ] Deep-link routing preparado.
+> Estado em 0.10.0-dev.0 (2026-10-25): testado em JVM/Robolectric, integração real no CI e emulador Android 14; **não** em aparelho físico. Ver [auditoria A1/A2](docs/audit/android-a1-a2-audit-2026-10-25.md).
+
+- [x] Criar projeto Kotlin + Jetpack Compose (`apps/android`).
+- [x] Definir package/application ID (`br.tcc.quedamonitor`).
+- [ ] Configurar build variants `local` e `staging` — parcial: `debug` (URL por `-PquedaApiBaseUrl`, cleartext só emulador/loopback) e `release` (HTTPS obrigatório); sem flavor `staging` porque não há staging.
+- [x] Implementar design system/accessibility baseline — tema Material 3, chips de estado com texto + ícone (não só cor) e semântica mesclada; sem auditoria com TalkBack em aparelho.
+- [x] Networking/auth/session revogável (sessões móveis, migration 004, Keystore).
+- [x] Organização ativa (troca em Ajustes; o servidor revalida `X-Organization-Id`).
+- [x] Home.
+- [x] Alerts list/detail/actions (confirmação, sem sucesso otimista, 409 reconciliado).
+- [x] Patients.
+- [x] Devices.
+- [ ] Telemetry/diagnostics — parcial: sinais do Protection Health no detalhe do dispositivo; sem histórico de telemetria.
+- [x] Cache/offline last-known-state com indicação de staleness (em memória; sem Room).
+- [ ] Deep-link routing preparado — rotas tipadas (`AlertRoute(id)`) prontas; sem intent filter de deep link, que depende do FCM (P5).
 
 ## P5 — Push, realtime e Protection Health
 
@@ -205,7 +207,7 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 ## P9 — QA, fault injection e virtual device
 
 - [ ] Backend CI com MySQL/Mosquitto reais em integração.
-- [ ] Android CI ampliada.
+- [ ] Android CI ampliada — parcial: `android.yml` com wrapper, lint, JVM/Robolectric, release minificado e integração real; instrumentados em emulador ainda fora do CI.
 - [ ] Web component tests + CI.
 - [ ] Firmware host/native tests + build ESP32.
 - [ ] Contract compatibility checks.

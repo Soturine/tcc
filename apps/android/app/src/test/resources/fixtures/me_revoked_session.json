@@ -1,0 +1,6 @@
+{
+  "message": "Sessão revogada ou expirada.",
+  "details": {
+    "code": "SESSION_REVOKED"
+  }
+}

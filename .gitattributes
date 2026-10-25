@@ -1,2 +1,5 @@
 # Scripts executados em Linux/Docker/CI precisam de LF mesmo em checkout Windows.
 *.sh text eol=lf
+# Gradle wrapper do app Android: script POSIX em LF, wrapper Windows em CRLF.
+apps/android/gradlew text eol=lf
+*.bat text eol=crlf

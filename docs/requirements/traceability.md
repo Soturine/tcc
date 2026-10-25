@@ -1,6 +1,6 @@
 # Matriz de rastreabilidade
 
-Snapshot de 2026-10-21 (branch `tcc/audit-tg1-p2`). Um requisito só aparece como coberto quando há teste ou ensaio que verifica o comportamento prometido; nome parecido de teste não conta.
+Snapshot de 2026-10-21 (branch `tcc/audit-tg1-p2`), com linhas Android/sessões atualizadas em 2026-10-25 (0.10.0-dev.0). Um requisito só aparece como coberto quando há teste ou ensaio que verifica o comportamento prometido; nome parecido de teste não conta.
 
 **Estados:** `implemented` (código existe) · `tested` (teste automatizado verifica) · `emulated` (ensaio ponta a ponta com virtual device e serviços reais) · `hw-validated` (ESP32 físico) · `exp-validated` (resultado experimental) · `partial` · `planned` · `blocked` · `deferred` · `not reassessed` (não reavaliado nesta rodada; nenhuma afirmação feita).
 
@@ -16,7 +16,17 @@ Nenhum item está `hw-validated` ou `exp-validated` nesta data.
 | RF-024 alerta para queda confirmada no edge sem telemetria da janela | backend + firmware | `local_evidence` v1; `resolveLocalEvidence`, `shouldCreateAlertForEvent` | `eventEvidence.test.js` (offline com evidência local; evidência incompleta não confirma); E2E 2 e 9 | implemented, tested, emulated |
 | RF-025 rejeitar identidade do payload que contradiz o tópico | backend | `device_id` vs tópico; `rejectClaimedIdentifierChange` | `mqttIngestionService.test.js`, `deviceIdentityMismatch.test.js`; E2E 11 e 12 | implemented, tested, emulated |
 | RF-027 teste de alerta sem queda física | backend | `alert_test` persistido, confirmado, sem alerta | `eventEvidence.test.js`; E2E 10 | partial: backend apenas; app/push (P5) planned |
-| RF-001 a RF-020, RF-026, RF-028 a RF-030 | web/backend/Android | — | — | not reassessed / planned (Android, FCM, provisioning) |
+| RF-001 autenticar e manter sessão com segurança | backend + Android | `/api/auth/mobile/*`, `sessionService.js`, migration 004; `SessionManager`, `KeystoreTokenStore` | `authSessionsMysql.test.js` (rotação, reuso revoga família, expiração, logout, sessão revogada); `SessionManagerTest`; `LiveBackendTest` no CI | implemented, tested (MySQL real + CI); Keystore só verificado manualmente em emulador |
+| RF-002 operar dentro de organização autorizada | backend + Android | `loadAccessContext` revalida `X-Organization-Id`; troca em Ajustes | `authScopeMysql.test.js` (cabeçalho alheio 403, IDs alheios 404 sem efeito); `LiveBackendTest` (403) | implemented, tested |
+| RF-004 detalhe do alerta, dispositivo, pessoa e evidência | Android | `AlertDetailScreen`, `DeviceDetailScreen`, `PatientDetailScreen` | `ContractMappingTest` (fixtures reais), `ComposeUiTest`, `AlertPresentationTest`; captura em emulador | implemented, tested (JVM); emulador observado |
+| RF-005 reconhecer/cancelar/resolver com transições autorizadas e idempotentes | backend + Android | `updateAlertStatus` (`assertRole`, `FOR UPDATE`, 409); `QuedaRepository.act` | `authScopeMysql.test.js` (409 na repetição; viewer 403 nas três ações); `ApiClientTest` (POST derrubado não é reenviado → desconhecido); `FeatureViewModelTest`; `LiveBackendTest` | implemented, tested |
+| RF-006 listar/consultar pacientes autorizados | backend + Android | `PatientsScreen`/`PatientDetailScreen` | `LiveBackendTest`; `authScopeMysql.test.js` (404 alheio) | implemented, tested |
+| RF-007 dispositivos, online/offline e última comunicação | Android | `DevicesScreen`, Protection Health | `ProtectionHealthTest` (silêncio → sem comunicação), `FeatureViewModelTest` | implemented, tested |
+| RF-013 cache do último estado e aviso de desatualização | Android | `QuedaRepository` (cache com `fetchedAt`), `StaleBanner` | `ApiClientTest.staleCacheIsKeptWithAgeAfterFailure`, `FeatureViewModelTest` | implemented, tested; cache só em memória |
+| RF-026 Protection Health com causas observáveis | Android | `core/health/ProtectionHealth.kt` | `ProtectionHealthTest` (transições e desconhecido ≠ saudável) | partial: outbox/ACK do device não exposto pelo backend (mostrado como desconhecido); FCM não configurado |
+| RF-028 revogar/rotacionar sessão mobile | backend + Android | logout revoga a família; reuso revoga | `authSessionsMysql.test.js`; `LiveBackendTest` (access token antigo recusado após logout) | implemented, tested; tokens de device fora do escopo |
+| RF-003 alerta no Android | Android | apenas com o app aberto (pull) | — | partial: sem FCM/background (P5) |
+| RF-008 a RF-012, RF-014 a RF-020, RF-029, RF-030 | web/backend/Android | — | — | not reassessed / planned (FCM, provisioning, configuração remota) |
 | RNF-SEC-003 secrets fora do Git | repo/CI | workflow `secret-patterns`; senhas de teste geradas em runtime | CI Security | implemented, tested (CI) |
 | RNF-SEC-004 credencial por device e ACL mínima | broker | `infra/mqtt/mosquitto-acl.example`, `infra/mqtt/mosquitto-staging.conf` | `infra/mqtt/run-security-verification.sh` (19 casos: TLS/CA/hostname, anônimo, revogação, forja cruzada, auto-ACK, curinga, retained) no CI; histórico `verify-acl.js` (5/5) | partial: referência verificada; staging implantado e credencial por device no ESP pendentes |
 | RNF-SEC-006 segredo JWT default/fraco não inicia ambiente externo | backend | `validateRuntimeConfig` | `tests/security/runtimeConfig.test.js` | implemented, tested |

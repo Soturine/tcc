@@ -2,7 +2,61 @@
 
 ## [Unreleased]
 
-### Próxima versão em desenvolvimento — 0.9.5-dev.0 (2026-10-25)
+### Versão em desenvolvimento — 0.10.0-dev.0 (2026-10-25)
+
+**0.10.0-dev.0** abre a linha Android A1/A2 sobre a árvore 0.9.5-dev.0 (PR #12, `1ef3478`). É versão de desenvolvimento: **sem tag, sem GitHub Release, sem APK assinado e sem afirmação de v0.10.0 estável**. Nada desta versão foi validado em hardware físico, com pessoas ou em ambiente clínico; dados de telas e testes são sintéticos (seed "Familia Demo"/"Paciente Demo").
+
+#### Adicionado
+- `apps/android`: app nativo Kotlin 2.2 + Jetpack Compose (Material 3), Gradle 8.14 com checksum do wrapper fixado, AGP 8.13, `compileSdk`/`targetSdk` 36, `minSdk` 26, pacote `br.tcc.quedamonitor`; `versionName` lido do `package.json` da raiz e `versionCode` crescente derivado dele (0.10.0-dev.0 → 1000000).
+- Telas: login, visão geral, pessoas, detalhe da pessoa, dispositivos, dispositivo com Protection Health, alertas com filtros, ocorrência com horários/evidência/histórico, ações com confirmação e ajustes; estados de carregamento, vazio, erro, timeout, offline com cache e idade dos dados.
+- Cliente REST tipado (Retrofit 3 + OkHttp 4 + kotlinx.serialization) com mapeamento de erros distintos (rede, timeout, 401, 403, 404, 409, 400, 429, 5xx, resposta fora do contrato) e log de rede sanitizado somente em debug.
+- Backend: sessões móveis revogáveis — `POST /api/auth/mobile/{login,refresh,logout}`, migration `004_auth_sessions`, access token curto (900 s) com `sid` verificado em toda requisição HTTP e Socket.IO, refresh token opaco de 30 dias armazenado só como SHA-256, rotação por família com detecção de reuso (revoga a família), rate limit próprio do refresh; login web legado inalterado. Contratos no OpenAPI.
+- Sessão no aparelho cifrada com AES-256-GCM e chave não exportável do Android Keystore em `noBackupFilesDir`, backup desligado; refresh serializado por mutex e `Authenticator` do OkHttp.
+- Protection Health como função pura: OPERATIONAL, DEGRADED, NEEDS_ATTENTION, UNKNOWN e NO_COMMUNICATION, distinguindo app offline, servidor fora, dados antigos, dispositivo silencioso, sensor com falha/desconhecido, bateria e relógio; outbox do dispositivo "desconhecido" e notificações "não configuradas nem verificadas".
+- Interfaces futuras sem implementação: push (FCM), provisioning local (BLE) e MotionLab, todas `NotAvailable`/`NotConfigured`.
+- CI `.github/workflows/android.yml`: validação do wrapper, guarda contra cleartext fora do debug, build debug, Android Lint, testes JVM, build release minificado, integração real (cliente Kotlin × backend Node × MySQL 8.4) e APK de debug publicado somente com tudo verde.
+- `apps/android/README.md` (Android Studio, URL da API, emulador `10.0.2.2`, aparelho físico via `adb reverse`, backend local, testes sem smartwatch); capturas reais em `docs/assets/android/`; auditoria [Android A1/A2](docs/audit/android-a1-a2-audit-2026-10-25.md).
+
+#### Alterado
+- Versão do produto 0.9.5-dev.0 → 0.10.0-dev.0 em `package.json` da raiz, backend, frontend e lockfiles; app Android acompanha a mesma versão.
+- `requireAuth` passou a ser assíncrono para conferir a sessão móvel no banco; tokens sem `sid` (web legado) seguem o caminho anterior.
+
+#### Corrigido
+- Suíte de migrations (`eventIdentityMysql.test.js`) fixava as versões 001–003 e usava baseline sem `users`; com a 004 o CI do Backend falhou. A baseline agora modela `users` e a suíte cobre 004 (aplicar, reexecutar e reverter).
+- App: GET falhava com "Sem conexão" depois de ~9 s ocioso porque o OkHttp reutilizava um socket já fechado pelo keep-alive do Node (5 s) e `retryOnConnectionFailure(false)` impedia nova tentativa. GET agora tem exatamente uma nova tentativa após falha de conexão (nunca após timeout, nunca POST — refresh e ações não são reenviados) e conexões ociosas saem do pool em 4 s. Observado no emulador real e reproduzido em teste.
+- App: ANR na primeira abertura ("Application does not have a focused window") com a leitura da sessão cifrada na main thread; restauração e escrita do armazenamento seguro foram para `Dispatchers.IO`. No mesmo emulador o cold start caiu de ~6,8 s para ~3,0 s (build debug, renderização por software; indicativo, não benchmark).
+- App: papel → ações não tinha teste (a UI recebia `canAct` pronto; mutante "viewer pode agir" sobreviveu); agora há teste direto. Ao fixá-lo, o app escondia ações de `platform_admin`, que o servidor permite (`hasRole`); corrigido. O app só decide a visibilidade dos botões.
+- App: dependência `datastore-preferences` declarada e nunca usada foi removida (nenhuma preferência é persistida nesta versão; credenciais ficam só no armazenamento do Keystore).
+- App: a ocorrência exibia o valor cru `linked`; `evidenceStatus` e `evidenceSource` (ADR-016) aparecem em linhas separadas e traduzidas, e valor desconhecido é mostrado como "valor não reconhecido".
+
+#### Testado
+- Android: 48 testes JVM (47 aprovados e o teste de integração real, que é SKIPPED sem `QUEDA_LIVE_API_URL`), incluindo fixtures com respostas reais capturadas do backend, MockWebServer, ViewModels e UI Compose via Robolectric; Android Lint sem erros; integração real 1/1 no CI; smoke instrumentado 1/1 em emulador Android 14 (local, fora do CI).
+- Backend MySQL real: sessões e escopo 10/10 (login, rotação, reuso revoga a família, expiração, logout, sessão revogada recusa access token, organização alheia 403/404 sem efeito colateral, ação repetida 409, viewer recebe 403 nas três ações, login web legado); migrations 4/4.
+- Controles negativos: sessão sempre ativa → 3 testes falham; viewer liberado no servidor → teste falha; sem o retry de GET → teste falha 3/3 com o mesmo sintoma do emulador.
+- Mutação manual da suíte Android (16 mutantes em clone isolado): 15 detectados de primeira; o sobrevivente motivou teste novo, que o detecta. Auditoria Assertiva 0.9.0 no mesmo clone: ver a auditoria Android A1/A2.
+
+#### Limitações conhecidas
+- Sem FCM: alertas só aparecem com o app aberto; nenhuma notificação em segundo plano.
+- Estado da outbox/ACK do dispositivo não é exposto pelo backend: o app mostra "Desconhecido".
+- Filtro "Ativos" é aplicado no cliente sobre cada página da API (a API não aceita lista de status).
+- Keystore sem teste automatizado (Robolectric não o emula); validado apenas manualmente em emulador.
+- Sem assinatura de release nem distribuição; release exige `quedaReleaseApiBaseUrl` HTTPS e sem ele mostra "API não configurada".
+- Capturas e medições de tempo vêm de emulador com build debug; não representam aparelho físico.
+- Advisory moderado `GHSA-rj75-hqrm-r3gf` (`postcss-selector-parser` < 7.1.6, dev/build do frontend via Tailwind 3): sem correção na linha 6.x exigida pelo Tailwind 3; não alcançável (CSS próprio em build). Adiado até a migração para Tailwind 4.
+
+#### Dívida técnica
+- Testes instrumentados não rodam no CI (sem emulador no workflow).
+- Sem Room: o cache é em memória e se perde ao fechar o app.
+- Socket.IO não integrado ao app; atualização por pull/refresh e reconexão.
+- `npm run test:integration` do backend usa dublês (T4 da auditoria anterior), mantido.
+
+#### Próximos passos
+- 0.10.0: FCM com notification outbox no backend e estados de entrega sem confundir aceite do provedor com leitura humana; decidir se FCM é gate da 0.10.0.
+- Expor no backend o estado de outbox/último ACK por dispositivo para o Protection Health.
+- Instrumentados no CI (emulador) e teste do Keystore em aparelho.
+- HIL ESP32/outbox e wearable continuam nos marcos 0.11.x.
+
+### Registro anterior — 0.9.5-dev.0 (2026-10-25)
 
 A versão **0.9.5-dev.0** identifica a árvore de desenvolvimento posterior à tag histórica v0.9.4 e ao merge do PR #11 (513157c). É **pré-release interna proposta**, sem tag nem GitHub Release. Os itens já integrados desde v0.9.4 permanecem registrados neste bloco Unreleased para auditoria; não são reclassificados como releases publicadas retroativamente. O primeiro marco de release deve reconciliar estes registros e concluir os gates de docs/release-rules.md.
 

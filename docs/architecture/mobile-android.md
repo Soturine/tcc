@@ -6,6 +6,37 @@ O aplicativo do TCC será **Android-first com Kotlin e Jetpack Compose**.
 
 Flutter foi considerado inicialmente pela vantagem de uma única base Android/iOS. A decisão foi revista porque o projeto tende a exigir integração profunda com APIs Android: BLE/GATT, permissões, Companion Device APIs, foreground services, background execution, provisioning Wi‑Fi, notificações, lifecycle e possível SDK de wearable.
 
+## Estado implementado (0.10.0-dev.0, 2026-10-25)
+
+O restante deste documento é a **arquitetura-alvo**. O que existe de fato em `apps/android` (como rodar: [`apps/android/README.md`](../../apps/android/README.md)):
+
+```text
+Compose UI (features/*)  ── StateFlow ──  ViewModel
+                                             │
+                                     QuedaRepository  (cache em memória com idade; reconciliação de ações)
+                                        │         │
+                         Retrofit/OkHttp (core/network)   SessionManager (core/session)
+                         AuthHeaderInterceptor              KeystoreTokenStore (AES-256-GCM, Keystore)
+                         SessionAuthenticator (401 → 1 refresh serializado)
+                         IdempotentGetRetryInterceptor (GET: 1 nova tentativa após falha de conexão)
+                                        │
+                                  backend REST (/api/...)
+```
+
+| Tema | Decisão implementada | Onde |
+|---|---|---|
+| DI | manual (`AppContainer`/`AppDependencies`), sem framework: poucas peças e testes trocam a implementação inteira | `AppContainer.kt` |
+| Sessão | access token 900 s com `sid`; refresh opaco rotativo de 30 dias; reuso revoga a família; logout revoga no servidor e sempre limpa o aparelho | backend `sessionService.js`, app `SessionManager.kt` |
+| Segredos no aparelho | só o arquivo cifrado com chave não exportável do Keystore em `noBackupFilesDir`; `allowBackup=false`; nenhuma preferência em texto | `KeystoreTokenStore.kt` |
+| Autorização | sempre do servidor (`X-Organization-Id` revalidado, `assertRole`, 404 para objeto alheio); o app só oculta botões do papel `viewer` | backend `scopeService.js`, `alertService.js` |
+| Ações de alerta | confirmação explícita; sem sucesso otimista; 409 → recarrega e diferencia "já estava assim" de "recusado"; timeout/queda de conexão → "resultado desconhecido", sem reenvio automático | `QuedaRepository.act` |
+| Rede | timeouts de conexão/leitura/chamada; `retryOnConnectionFailure(false)` + nova tentativa somente de GET; pool ocioso de 4 s (abaixo do keep-alive de 5 s do Node) | `Network.kt` |
+| Cleartext | proibido em `main`; debug permite apenas `10.0.2.2`, `127.0.0.1`, `localhost`; CI verifica | `network_security_config.xml`, `android.yml` |
+| Protection Health | função pura; desconhecido nunca é apresentado como saudável; outbox "desconhecido" (backend não expõe) e notificações "não configuradas" | `ProtectionHealth.kt` |
+| Futuro | `PushRegistration`, `LocalProvisioning`, `MotionLabSessionSource` com implementações `NotConfigured`/`NotAvailable` | `core/extensions` |
+
+**Ainda não existe:** FCM e notification outbox, Socket.IO no app, Room/cache persistente, DataStore (não há preferência a guardar), deep link, provisioning BLE/Wi‑Fi, MotionLab, instrumentados no CI, teste em aparelho físico. Os módulos `core/database`, `core/realtime`, `core/notifications`, `core/bluetooth` e `core/provisioning` da estrutura proposta abaixo continuam proposta.
+
 ## Por que Kotlin nativo agora
 
 - acesso direto às APIs Android;

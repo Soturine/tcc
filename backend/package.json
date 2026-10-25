@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "0.9.5-dev.0",
+  "version": "0.10.0-dev.0",
   "description": "Backend MQTT + API REST do sistema de monitoramento de quedas com ESP32",
   "main": "src/server.js",
   "engines": {
@@ -16,6 +16,7 @@
     "test:integration": "node --test \"tests/alerts/*.test.js\" \"tests/mqtt/*.test.js\"",
     "test:mysql:migrations": "node --test \"tests/database/eventIdentityMysql.test.js\"",
     "test:mysql:retention": "node --test \"tests/data/telemetryRetentionMysql.test.js\"",
+    "test:mysql:sessions": "node --test \"tests/database/authSessionsMysql.test.js\" \"tests/database/authScopeMysql.test.js\"",
     "test:alerts": "node --test \"tests/alerts/*.test.js\"",
     "test:mqtt": "node --test \"tests/mqtt/*.test.js\"",
     "test:stress": "npm run stress:dry",

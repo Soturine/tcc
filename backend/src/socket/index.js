@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 
 const { env } = require("../config/env");
 const { verifyToken } = require("../utils/auth");
+const { assertSessionActive } = require("../middlewares/auth");
 const { logger } = require("../utils/logger");
 const { loadAccessContext } = require("../services/scopeService");
 const { joinScopedRooms } = require("./scopedEmitter");
@@ -33,6 +34,8 @@ function createSocketServer(httpServer) {
 
     try {
       const payload = verifyToken(token);
+      // Sessao movel revogada nao abre canal realtime (mesma regra do HTTP).
+      await assertSessionActive(payload);
       const accessContext = await loadAccessContext({
         userId: Number(payload.id || payload.sub),
         requestedOrganizationId: socket.handshake.auth?.organizationId || null,

@@ -1,0 +1,106 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "priority": "urgent",
+      "organizationId": 1,
+      "patientId": 1,
+      "status": "open",
+      "acknowledgedAt": null,
+      "canceledAt": null,
+      "resolvedAt": null,
+      "createdAt": "2026-10-25T15:43:26.000Z",
+      "updatedAt": "2026-10-25T15:43:26.000Z",
+      "acknowledgedBy": null,
+      "canceledBy": null,
+      "resolvedBy": null,
+      "device": {
+        "id": 1,
+        "deviceUid": "legacy:esp32_01",
+        "deviceIdentifier": "esp32_01",
+        "name": "Pulseira ESP32 Principal",
+        "patientName": "Paciente Demo"
+      },
+      "patient": {
+        "id": 1,
+        "fullName": "Paciente Demo"
+      },
+      "event": {
+        "id": 1,
+        "eventType": "fall_detected",
+        "severity": "critical",
+        "intensity": 3.74,
+        "immobility": true,
+        "message": "Queda simulada para demonstracao multi-organizacao.",
+        "evidenceStatus": "linked",
+        "evidenceTelemetryId": 1,
+        "evidenceSampleCount": 2,
+        "evidenceWindowSeconds": 0,
+        "evidenceSummary": {
+          "confidence": null,
+          "lastSampleAt": "2026-10-25 15:43:26.000000",
+          "firstSampleAt": "2026-10-25 15:43:26.000000",
+          "decisionSource": "firmware",
+          "algorithmVersion": "seed_threshold_fsm_v2_time_features_v1",
+          "confidenceStatus": "not_available",
+          "firmwareDecision": {
+            "reason": "impact_orientation_immobility",
+            "confidence": null,
+            "peakAccelG": 3.74,
+            "peakGyroDps": 182.5,
+            "sampleCount": 72,
+            "decisionSource": "firmware",
+            "algorithmVersion": "seed_threshold_fsm_v2_time_features_v1",
+            "confidenceStatus": "not_available",
+            "featuresTimeDomain": {
+              "available": true,
+              "peak_jerk": 8.4,
+              "sample_count": 64,
+              "window_duration_ms": 3200
+            },
+            "immobilityConfirmed": true,
+            "activityStateEstimate": "queda_confirmada",
+            "featuresFrequencyDomain": {
+              "reason": "fft_experimental_disabled",
+              "available": false,
+              "experimental": true
+            }
+          },
+          "maxGyroMagnitude": 182.5,
+          "maxAccelMagnitude": 3.74,
+          "immobilityConfirmed": true
+        },
+        "eventTime": "2026-10-25T15:43:26.000Z",
+        "rawPayloadJson": {
+          "reason": "impact_orientation_immobility",
+          "boot_id": "seed-demo-boot-001",
+          "detected": true,
+          "candidate": true,
+          "device_id": "esp32_01",
+          "timestamp": 1792943006,
+          "confidence": null,
+          "device_uid": "legacy:esp32_01",
+          "event_type": "fall_detected",
+          "event_uuid": "seed-demo-fall-001",
+          "peak_accel_g": 3.74,
+          "sample_count": 72,
+          "battery_level": 86,
+          "clock_quality": "unknown",
+          "peak_gyro_dps": 182.5,
+          "gyro_magnitude": 182.5,
+          "accel_magnitude": 3.74,
+          "decision_source": "firmware",
+          "event_uptime_ms": 3600,
+          "algorithm_version": "seed_threshold_fsm_v2_time_features_v1",
+          "confidence_status": "not_available",
+          "analysis_window_ms": 3600,
+          "immobility_confirmed": true,
+          "activity_state_estimate": "queda_confirmada"
+        }
+      }
+    }
+  ],
+  "page": 1,
+  "limit": 5,
+  "total": 1
+}

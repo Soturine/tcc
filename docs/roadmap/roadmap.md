@@ -280,4 +280,4 @@ O estado prévio de testes host/E2E **não** é HIL. Os riscos F-17/F-27 (TLS/AC
 
 ## Sequência versionada desde v0.9.4 — atualização 2026-10-25
 
-A sequência proposta, distinções entre *development*, *release candidate* e *release*, sincronização dos manifests, gates por componente e escopo Android/HIL consta em [version-milestones.md](version-milestones.md). **0.9.5-dev.0 é versão de desenvolvimento**, não marco físico homologado. Manter o [changelog histórico](../../CHANGELOG.md) e não reinterpretar os números de protocolo/firmware como a versão de produto.
+A sequência proposta, distinções entre *development*, *release candidate* e *release*, sincronização dos manifests, gates por componente e escopo Android/HIL consta em [version-milestones.md](version-milestones.md). **0.10.0-dev.0 é a versão de desenvolvimento atual** (Android A1/A2, após o registro 0.9.5-dev.0), não marco físico homologado. Manter o [changelog histórico](../../CHANGELOG.md) e não reinterpretar os números de protocolo/firmware como a versão de produto.

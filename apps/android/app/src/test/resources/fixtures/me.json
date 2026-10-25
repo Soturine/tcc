@@ -1,0 +1,38 @@
+{
+  "user": {
+    "id": 1,
+    "name": "Administradora Demo",
+    "email": "admin@queda.local",
+    "globalRole": "user",
+    "status": "active",
+    "createdAt": "2026-10-25T15:43:26.000Z",
+    "updatedAt": "2026-10-25T15:43:26.000Z",
+    "activeRole": "organization_admin",
+    "activeOrganizationId": 1,
+    "activeOrganization": {
+      "id": 1,
+      "name": "Familia Demo",
+      "type": "family",
+      "status": "active",
+      "createdAt": "2026-10-25T15:43:26.000Z",
+      "updatedAt": "2026-10-25T15:43:26.000Z"
+    },
+    "memberships": [
+      {
+        "id": 1,
+        "role": "organization_admin",
+        "status": "active",
+        "createdAt": "2026-10-25T15:43:26.000Z",
+        "updatedAt": "2026-10-25T15:43:26.000Z",
+        "organization": {
+          "id": 1,
+          "name": "Familia Demo",
+          "type": "family",
+          "status": "active",
+          "createdAt": "2026-10-25T15:43:26.000Z",
+          "updatedAt": "2026-10-25T15:43:26.000Z"
+        }
+      }
+    ]
+  }
+}
