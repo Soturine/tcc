@@ -141,6 +141,17 @@ def cmd_nyquist_synthetic(args) -> int:
     return 0
 
 
+def cmd_weda_spectrum(args) -> int:
+    from .spectral_profile import profile_dataset
+
+    report = profile_dataset(Path(args.root), args.rate_dir)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(str(out))
+    return 0
+
+
 def cmd_split(args) -> int:
     excluded = []
     subjects = {trial.subject_id for trial in _load_trials(args, excluded)}
@@ -182,6 +193,12 @@ def build_parser() -> argparse.ArgumentParser:
     nyquist_parser = sub.add_parser("nyquist-synthetic", help="artefato espectral sintetico 4+17 Hz @125 Hz")
     nyquist_parser.add_argument("--out", required=True)
     nyquist_parser.set_defaults(func=cmd_nyquist_synthetic)
+
+    spectrum_parser = sub.add_parser("weda-spectrum", help="perfil espectral agregado do WEDA-FALL")
+    spectrum_parser.add_argument("--root", required=True)
+    spectrum_parser.add_argument("--rate-dir", default="50Hz")
+    spectrum_parser.add_argument("--out", required=True)
+    spectrum_parser.set_defaults(func=cmd_weda_spectrum)
     return parser
 
 

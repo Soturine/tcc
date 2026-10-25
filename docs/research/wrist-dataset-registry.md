@@ -1,6 +1,8 @@
 # Inventário multi-dataset para pulso — escopo, origem e limites
 
-**Status: catalogação/protocolo proposto, não dados processados.** Nenhuma fonte é automaticamente incorporável: checar licença do **dataset**, não confundir CC BY do artigo com licença das gravações. Originais permanecem imutáveis e fora do Git; direitos, termos de acesso, consentimento, finalidade, compartilhamento e hashes registrados.
+**Atualização 2026-10-25 (estados verificados na fonte):** WEDA-FALL — `license_state: none declared`, `access_state: authorized by author (per project owner, e-mail not archived)`, processado offline ([resultado](wrist-baseline-weda-fall-2026-10-25.md)); BITS-2 — `license_state: verified CC-BY-4.0`, `access_state: open`, **`excluded`** para replay temporal (timestamps sem resolução); SmartFallMM e Combined-fall-dataset — sem licença declarada, `blocked`.
+
+**Status original: catalogação/protocolo proposto, não dados processados.** Nenhuma fonte é automaticamente incorporável: checar licença do **dataset**, não confundir CC BY do artigo com licença das gravações. Originais permanecem imutáveis e fora do Git; direitos, termos de acesso, consentimento, finalidade, compartilhamento e hashes registrados.
 
 ## Catálogo inicial
 | Conjunto | Posição/sinais conhecidos | Papel | Restrições e verificações obrigatórias |

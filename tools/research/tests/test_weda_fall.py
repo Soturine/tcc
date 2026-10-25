@@ -181,3 +181,26 @@ class SubjectBootstrapTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SpectralProfileTest(unittest.TestCase):
+    def test_high_frequency_trial_shows_energy_above_firmware_nyquist(self):
+        from fallbench import spectral_profile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "dataset"
+            for code, freq in (("F01", 15.0), ("D01", 2.0)):
+                folder = root / "50Hz" / code
+                folder.mkdir(parents=True)
+                times = [n / 50.0 for n in range(400)]
+                accel = [(t, 0.0, 0.0, 9.80665 * (1 + 0.5 * math.sin(2 * math.pi * freq * t))) for t in times]
+                gyro = [(t, 0.0, 0.0, math.sin(2 * math.pi * freq * t)) for t in times]
+                write_series(folder / "U01_R01_accel.csv", "accel", accel)
+                write_series(folder / "U01_R01_gyro.csv", "gyro", gyro)
+            report = spectral_profile.profile_dataset(root)
+        fall = report["groups"]["fall/young"]["accel"]
+        adl = report["groups"]["adl/young"]["accel"]
+        self.assertGreater(fall["energy_above_10hz"]["median"], 0.9)
+        self.assertLess(adl["energy_above_10hz"]["median"], 0.05)
+        self.assertAlmostEqual(fall["fs_hz"]["median"], 50.0, places=1)
+        self.assertEqual(report["firmware_nyquist_hz"], 10.0)
