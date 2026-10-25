@@ -62,6 +62,9 @@ jobs:
           python tools/research/fixtures/make_synthetic.py
           git diff --exit-code -- tools/research/fixtures/synthetic
 
+      - name: Run HIL serial-log checker tests (synthetic logs; not HIL evidence)
+        run: python -m unittest discover -s tools/hil/tests -v
+
       - name: Run MotionLab offline foundation tests (synthetic only, isolated from SOS/outbox)
         run: python -m unittest discover -s tools/motionlab/tests -v
 
