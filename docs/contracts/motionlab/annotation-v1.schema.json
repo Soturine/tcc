@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soturine.local/contracts/motionlab/annotation-v1.schema.json",
+  "title": "MotionLab ground-truth annotation v1",
+  "$comment": "IMPLEMENTED offline (tools/motionlab). Ground truth is independent from intended_activity and from model predictions: source 'model' is not accepted. 'unknown' and 'ambiguous' are valid labels. Falls are out of scope of this study.",
+  "type": "object",
+  "required": ["schema_version", "label", "source", "time_start_us", "time_end_us", "uncertainty_us", "review_status"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "label": { "enum": ["sitting", "sit_to_stand", "standing", "stand_to_sit", "other_movement", "unknown", "ambiguous"] },
+    "source": { "enum": ["observer", "video_review", "self_report"] },
+    "time_start_us": { "type": "integer", "minimum": 0 },
+    "time_end_us": { "type": "integer", "minimum": 0 },
+    "uncertainty_us": { "type": "integer", "minimum": 0 },
+    "review_status": { "enum": ["draft", "reviewed", "rejected"] },
+    "reviewer_pseudonym": { "type": "string", "maxLength": 64 },
+    "annotation_version": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

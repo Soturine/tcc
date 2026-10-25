@@ -269,3 +269,28 @@ test("resultados gerados pelo backend validam contra critical-event-result-v1", 
     assert.equal(validate(result), true, `${code}: ${JSON.stringify(validate.errors)}`);
   }
 });
+
+test("MotionLab: frame e anotacao validam; predicao de modelo nao e ground truth", () => {
+  const motionlabRoot = path.join(contractsRoot, "motionlab");
+  const read = (name) => JSON.parse(fs.readFileSync(path.join(motionlabRoot, name), "utf8"));
+  const ajv = buildAjv();
+  const frame = ajv.compile(read("lab-frame-v1.schema.json"));
+  const annotation = ajv.compile(read("annotation-v1.schema.json"));
+  const example = read("examples/lab-frame-v1.synthetic.json");
+
+  assert.equal(frame(example), true, JSON.stringify(frame.errors));
+  assert.equal(frame({ ...example, ax_g: "1" }), false);
+  assert.equal(frame({ ...example, sample_seq: -1 }), false);
+  assert.equal(frame({ ...example, event_uuid: "x" }), false);
+
+  const label = {
+    schema_version: 1, label: "unknown", source: "observer", time_start_us: 0,
+    time_end_us: 10, uncertainty_us: 5, review_status: "draft",
+  };
+  assert.equal(annotation(label), true, JSON.stringify(annotation.errors));
+  assert.equal(annotation({ ...label, source: "model" }), false);
+  assert.equal(annotation({ ...label, label: "fall" }), false);
+  const withoutUncertainty = clone(label);
+  delete withoutUncertainty.uncertainty_us;
+  assert.equal(annotation(withoutUncertainty), false);
+});
