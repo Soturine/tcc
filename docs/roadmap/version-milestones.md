@@ -1,6 +1,6 @@
-# Marcos de versão — TCC após v0.9.4 (revisão 2026-10-25)
+# Marcos de versão — TCC após v0.9.4 (revisão 2026-10-25, 0.10.0-dev.0)
 
-> **Registro de versão e proposta de entregas; não é anúncio de release.** A tag **v0.9.4 (2026-09-04)** é o último marco estável identificado; as tags `v0.9.1`–`v0.9.4` e `tcc-baseline-v0.9.0` são históricas, não mover. GitHub Releases: nenhum publicado até esta revisão. A `main@513157c` inclui PRs #8–#11, mas seus resultados não equivalem a HIL físico.
+> **Registro de versão e proposta de entregas; não é anúncio de release.** A tag **v0.9.4 (2026-09-04)** é o último marco estável identificado; as tags `v0.9.1`–`v0.9.4` e `tcc-baseline-v0.9.0` são históricas, não mover. GitHub Releases: nenhum publicado até esta revisão. A `main@513157c` inclui PRs #8–#11 e `main@1ef3478` o PR #12; nada disso equivale a HIL físico. **Versão de trabalho atual: 0.10.0-dev.0** (Android A1/A2), sem tag nem release.
 
 ## Regra: duas dimensões diferentes
 
@@ -11,9 +11,9 @@
 | Marco | Escopo alvo | Gate para fechar | Situação |
 |---|---|---|---|
 | **0.9.4** | identidade persistente do evento e migrations SQL | tag histórica e registro de 2026-09-04 | **tag existente** |
-| **0.9.5-dev.0** | registrar evolução já integrada: outbox persistente + resultado versionado/ACK, falhas de broker/MySQL, TLS/ACL de referência, replay WEDA-FALL, Nyquist e MotionLab offline, auditoria QA | versões sincronizadas e CI; limitações host/dataset descritas | **versão em desenvolvimento; sem tag/release** |
-| **0.9.5** | checkpoint de estabilização de software P2.1, docs/evidência atuais e contratos sem inconsistências; HIL pendente declarado | CI verde no SHA, revisão do changelog, regressões/segurança, artefatos; autorização de release | **candidata futura**, nenhuma tag |
-| **0.10.0-dev.N** | Android A1/A2: `apps/android` Gradle Kotlin/Compose, sessões/REST tipados, telas de proteção/alerta, testes e CI Android; backend atual interoperável | APK compilável, contratos reais, offline/error states, testes device-independent | **planejado** |
+| **0.9.5-dev.0** | registrar evolução já integrada: outbox persistente + resultado versionado/ACK, falhas de broker/MySQL, TLS/ACL de referência, replay WEDA-FALL, Nyquist e MotionLab offline, auditoria QA | versões sincronizadas e CI; limitações host/dataset descritas | **registro anterior** (substituída por 0.10.0-dev.0 como versão de trabalho); sem tag/release |
+| **0.9.5** | checkpoint de estabilização de software P2.1, docs/evidência atuais e contratos sem inconsistências; HIL pendente declarado | CI verde no SHA, revisão do changelog, regressões/segurança, artefatos; autorização de release | **não publicada**; se 0.9.5 será publicada ou absorvida pela linha 0.10 é decisão de release pendente, sem retrodatar |
+| **0.10.0-dev.N** | Android A1/A2: `apps/android` Gradle Kotlin/Compose, sessões/REST tipados, telas de proteção/alerta, testes e CI Android; backend atual interoperável | APK compilável, contratos reais, offline/error states, testes device-independent | **0.10.0-dev.0 em desenvolvimento** (2026-10-25): app, sessões móveis, CI Android e integração real presentes; sem tag/release, sem FCM, sem aparelho físico |
 | **0.10.0** | Android funcional MVP + backend de autorização e confiabilidade de notificações; decidir se FCM já deve ser gate da versão ou próximo marco | testes reais de API/ACL, CI Android; estado de push nunca apresentado como lido se só aceito pelo provedor | **planejado**, escopo a congelar antes de executar |
 | **0.11.0-dev.N / 0.11.0** | wearable ESP32 de pulso com IMU seis eixos, port HAL/ODR, montagem/energia, SOS e outbox; BLE provisioning se pronto | HIL real, consumo, bateria, retorno de falhas, relatórios de confiabilidade sem alegação clínica | **planejado/condicionado à compra** |
 | **0.12.0-dev.N / 0.12.0** | MotionLab Live, gravação IMU, HAR/ground truth, pesquisa cross-dataset e comunicação segura com Android | captura física/replay, qualidade/sincronização, consentimento/ética quando aplicável, não interferência crítica | **planejado/experimental** |
@@ -25,10 +25,10 @@ A **ordem do número** não obriga a ordem temporal rígida: Android e qualifica
 
 | Componente | Versão exibida ao usuário | Identidade técnica adicional | Estado atual |
 |---|---|---|---|
-| Backend Node/Express/MySQL | produto `0.9.5-dev.0` | migrations, API OpenAPI/contratos MQTT, commit SHA | código P2.1 e CI host/integration, staging real pendente |
+| Backend Node/Express/MySQL | produto `0.10.0-dev.0` | migrations, API OpenAPI/contratos MQTT, commit SHA | código P2.1 + sessões móveis (migration 004) e CI host/integration com MySQL real; staging real pendente |
 | Firmware ESP32/IMU | produto no firmware **somente quando implementado** | git SHA, `board/SKU`, algoritmo/config hash, partições, build flags, firmware binary SHA | ESP32 bancada, HIL P2.1 não validado; não simular atualização de binário ao alterar package.json |
-| Frontend React | produto `0.9.5-dev.0` | build SHA, asset hash, API contract | lint/build; UI testes automatizados pendentes |
-| Android Kotlin/Compose | versão própria no Gradle quando existir | `versionCode/versionName`, release channel e SHA | app inexistente no momento deste documento |
+| Frontend React | produto `0.10.0-dev.0` | build SHA, asset hash, API contract | lint/build; UI testes automatizados pendentes |
+| Android Kotlin/Compose | produto `0.10.0-dev.0` (`versionName` lido do `package.json` da raiz) | `versionCode` 1000000 (derivado), SHA; sem canal de release nem assinatura | JVM/Robolectric + integração real no CI, smoke em emulador local; sem aparelho físico, sem FCM |
 | MotionLab + FallBench | produto por release + esquema/algoritmo/dataset hashes | experiment-run manifest, protocolo/amostragem, licenças e split | offline/sintético + WEDA-FALL offline, sem HIL/live |
 
 ## Gate de publicação e rollback
