@@ -142,6 +142,9 @@ function buildHarness(options = {}) {
     },
     recordEventFromMqtt: async ({ payload, eventTime, receivedAt }) => {
       calls.events.push({ payload, eventTime, receivedAt });
+      if (options.recordEventError) {
+        throw options.recordEventError;
+      }
       const eventType = payload.event_type || "device_event";
       if (options.deduplicateEventUuid && payload.event_uuid) {
         return {
@@ -740,5 +743,173 @@ test("sem publisher de ACK o evento e persistido e a ausencia e registrada", asy
     await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} });
     assert.equal(calls.events.length, 1);
     assert.ok(calls.logs.some((entry) => entry.metadata?.reason === "ack_publisher_missing"));
+  });
+});
+
+// ---------------------------------------------------------------- critical-event-result-v1 (F-29)
+
+const crypto = require("node:crypto");
+
+function sha256(text) {
+  return crypto.createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
+}
+
+function resultCapablePayload(overrides = {}) {
+  return criticalEventPayload({ ingest_result_version: 1, ...overrides });
+}
+
+function codedError(code, message = code) {
+  return Object.assign(new Error(message), { code });
+}
+
+test("F-29 reproducao: sem ingest_result_version uma rejeicao permanente continua sem resposta (legado)", async () => {
+  await withHarness({ recordEventError: codedError("EVENT_UUID_CONFLICT") }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(
+      handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: criticalEventPayload(), io: {} }),
+      /EVENT_UUID_CONFLICT/,
+    );
+    // Contrato v1 preservado: dispositivos antigos nao recebem nada novo.
+    assert.equal(calls.acks.length, 0);
+  });
+});
+
+test("device com resultado v1 recebe committed pos-commit com hash dos bytes recebidos e sem ACK legado", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    const payloadText = resultCapablePayload();
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText, io: {} });
+
+    assert.equal(calls.acks.length, 1);
+    const [{ topic, ack, transactionsAtPublish }] = calls.acks;
+    assert.equal(topic, "queda/devices/esp32_01/critical-event-results");
+    assert.equal(transactionsAtPublish, 1);
+    assert.equal(ack.schema_version, 1);
+    assert.equal(ack.status, "committed");
+    assert.equal(ack.device_id, "esp32_01");
+    assert.equal(ack.event_uuid, "esp32-aabb:b00000002-1234abcd:00000001");
+    assert.equal(ack.payload_sha256, sha256(payloadText));
+    assert.equal(ack.event_id, 101);
+    assert.equal(ack.reason_code, null);
+    assert.equal(ack.retry_after_ms, null);
+    assert.equal(ack.committed_at, "2026-10-21T00:00:01.000Z");
+  });
+});
+
+test("hash informado pelo bridge (bytes brutos) prevalece sobre o recalculado", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events"),
+      payloadText: resultCapablePayload(),
+      payloadSha256: "a".repeat(64),
+      io: {},
+    });
+    assert.equal(calls.acks[0].ack.payload_sha256, "a".repeat(64));
+  });
+});
+
+test("retransmissao de evento ja persistido recebe duplicate com o mesmo event_id", async () => {
+  await withHarness({ deduplicateEventUuid: true }, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: resultCapablePayload(), io: {} });
+    assert.equal(calls.acks[0].ack.status, "duplicate");
+    assert.equal(calls.acks[0].ack.event_id, 707);
+    assert.equal(calls.alerts.length, 0);
+  });
+});
+
+for (const [code, reason] of [
+  ["EVENT_UUID_CONFLICT", "event_uuid_conflict"],
+  ["INVALID_EVENT_UUID", "invalid_event_uuid"],
+  ["DEVICE_IDENTITY_MISMATCH", "identity_rejected"],
+]) {
+  test(`${code} gera rejected_permanent sem event_id e sem confirmacao de persistencia`, async () => {
+    await withHarness({ recordEventError: codedError(code) }, async ({ calls, handleMqttMessage }) => {
+      const payloadText = resultCapablePayload();
+      await assert.rejects(handleMqttMessage({ topicInfo: topicInfo("events"), payloadText, io: {} }));
+      assert.equal(calls.acks.length, 1);
+      const { ack } = calls.acks[0];
+      assert.equal(ack.status, "rejected_permanent");
+      assert.equal(ack.reason_code, reason);
+      assert.equal(ack.event_id, null);
+      assert.equal(ack.committed_at, null);
+      assert.equal(ack.payload_sha256, sha256(payloadText));
+      assert.equal(calls.alerts.length, 0);
+      assert.equal(calls.emits.length, 0);
+    });
+  });
+}
+
+test("MySQL recusando conexao gera retryable com retry_after_ms; nunca committed", async () => {
+  await withHarness({ recordEventError: codedError("ECONNREFUSED") }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: resultCapablePayload(), io: {} }));
+    assert.equal(calls.acks[0].ack.status, "retryable");
+    assert.equal(calls.acks[0].ack.reason_code, "storage_unavailable");
+    assert.equal(calls.acks[0].ack.retry_after_ms, 5000);
+    assert.equal(calls.acks[0].ack.event_id, null);
+  });
+});
+
+test("falha no COMMIT (incerta) gera retryable, nunca committed", async () => {
+  await withHarness({ failCommit: true }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: resultCapablePayload(), io: {} }));
+    assert.equal(calls.acks.length, 1);
+    assert.equal(calls.acks[0].ack.status, "retryable");
+  });
+});
+
+test("erro desconhecido e retryable (fail-safe: o device mantem o evento)", async () => {
+  await withHarness({ recordEventError: new Error("boom") }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(handleMqttMessage({ topicInfo: topicInfo("events"), payloadText: resultCapablePayload(), io: {} }));
+    assert.equal(calls.acks[0].ack.status, "retryable");
+    assert.equal(calls.acks[0].ack.reason_code, "internal_error");
+  });
+});
+
+test("identidade divergente topico/payload: rejected_permanent no topico autenticado, sem vazar o outro id", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events", "esp32_01"),
+      payloadText: resultCapablePayload({ device_id: "esp32_99" }),
+      io: {},
+    });
+    assert.equal(calls.events.length, 0);
+    assert.equal(calls.acks.length, 1);
+    assert.equal(calls.acks[0].topic, "queda/devices/esp32_01/critical-event-results");
+    assert.equal(calls.acks[0].ack.status, "rejected_permanent");
+    assert.equal(calls.acks[0].ack.reason_code, "identity_rejected");
+    assert.equal(calls.acks[0].ack.device_id, "esp32_01");
+    assert.ok(!JSON.stringify(calls.acks[0].ack).includes("esp32_99"));
+  });
+});
+
+test("UUID nao correlacionavel (longo demais) nao recebe resultado", async () => {
+  await withHarness({ recordEventError: codedError("INVALID_EVENT_UUID") }, async ({ calls, handleMqttMessage }) => {
+    await assert.rejects(handleMqttMessage({
+      topicInfo: topicInfo("events"),
+      payloadText: resultCapablePayload({ event_uuid: "x".repeat(161) }),
+      io: {},
+    }));
+    assert.equal(calls.acks.length, 0);
+  });
+});
+
+test("versao de resultado desconhecida cai no ACK legado", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("events"),
+      payloadText: criticalEventPayload({ ingest_result_version: 9 }),
+      io: {},
+    });
+    assert.equal(calls.acks[0].topic, "queda/devices/esp32_01/critical-event-acks");
+    assert.equal(calls.acks[0].ack.status, "committed");
+  });
+});
+
+test("telemetria com ingest_result_version nao gera resultado critico", async () => {
+  await withHarness({}, async ({ calls, handleMqttMessage }) => {
+    await handleMqttMessage({
+      topicInfo: topicInfo("telemetry"),
+      payloadText: JSON.stringify({ device_id: "esp32_01", ingest_result_version: 1, ax: 0, ay: 0, az: 1, gx: 0, gy: 0, gz: 0 }),
+      io: {},
+    });
+    assert.equal(calls.acks.length, 0);
   });
 });

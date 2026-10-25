@@ -205,3 +205,67 @@ test("ACK gerado pelo backend valida contra critical-event-ack-v1", () => {
   assert.equal(duplicate.status, "duplicate");
   assert.equal(duplicate.event_id, 42);
 });
+
+test("critical-event-result-v1: exemplos validam e combinacoes inseguras sao recusadas", () => {
+  const validate = buildAjv().compile(readJson("critical-event-result-v1.schema.json"));
+  const committed = readJson("examples/critical-event-result-v1.committed.json");
+  const rejected = readJson("examples/critical-event-result-v1.rejected.json");
+
+  assert.equal(validate(committed), true, JSON.stringify(validate.errors));
+  assert.equal(validate(rejected), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...committed, status: "duplicate" }), true);
+
+  // Rejeicao nunca pode carregar identidade de persistencia.
+  assert.equal(validate({ ...rejected, event_id: 5 }), false);
+  assert.equal(validate({ ...rejected, committed_at: committed.committed_at }), false);
+  assert.equal(validate({ ...rejected, reason_code: "storage_unavailable" }), false);
+  assert.equal(validate({ ...rejected, reason_code: null }), false);
+  // Persistido exige event_id e nao aceita motivo.
+  assert.equal(validate({ ...committed, event_id: null }), false);
+  assert.equal(validate({ ...committed, reason_code: "internal_error" }), false);
+  // retryable nao confirma persistencia.
+  const retryable = { ...rejected, status: "retryable", reason_code: "storage_unavailable", retry_after_ms: 5000 };
+  assert.equal(validate(retryable), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...retryable, event_id: 1 }), false);
+  assert.equal(validate({ ...retryable, reason_code: "event_uuid_conflict" }), false);
+  // Correlacao obrigatoria.
+  assert.equal(validate({ ...committed, payload_sha256: "ABC" }), false);
+  assert.equal(validate({ ...committed, payload_sha256: "A".repeat(64) }), false);
+  const withoutDevice = clone(committed);
+  delete withoutDevice.device_id;
+  assert.equal(validate(withoutDevice), false);
+  assert.equal(validate({ ...committed, status: "accepted" }), false);
+  assert.equal(validate({ ...committed, schema_version: 2 }), false);
+});
+
+test("resultados gerados pelo backend validam contra critical-event-result-v1", () => {
+  const {
+    buildCriticalEventResult,
+    buildPersistedResult,
+    classifyIngestError,
+  } = require("../../src/mqtt/criticalEventResult");
+  const validate = buildAjv().compile(readJson("critical-event-result-v1.schema.json"));
+  const base = {
+    deviceIdentifier: "esp32_01",
+    eventUuid: "esp32-aabb:b00000002-1234abcd:00000001",
+    payloadSha256: "0".repeat(64),
+  };
+  const persisted = buildPersistedResult({
+    deviceIdentifier: base.deviceIdentifier,
+    payloadSha256: base.payloadSha256,
+    event: { id: "9", eventUuid: base.eventUuid, persistedAt: "2026-10-25T00:00:00.000Z" },
+  });
+  assert.equal(validate(persisted), true, JSON.stringify(validate.errors));
+  assert.equal(persisted.event_id, 9);
+
+  for (const code of ["EVENT_UUID_CONFLICT", "INVALID_EVENT_UUID", "DEVICE_IDENTITY_MISMATCH", "ECONNREFUSED", "ECONNRESET", undefined]) {
+    const classification = classifyIngestError(code ? Object.assign(new Error(code), { code }) : new Error("x"));
+    const result = buildCriticalEventResult({
+      ...base,
+      status: classification.status,
+      reasonCode: classification.reasonCode,
+      retryAfterMs: classification.retryAfterMs ?? null,
+    });
+    assert.equal(validate(result), true, `${code}: ${JSON.stringify(validate.errors)}`);
+  }
+});
