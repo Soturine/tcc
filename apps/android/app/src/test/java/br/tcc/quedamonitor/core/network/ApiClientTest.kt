@@ -96,11 +96,14 @@ class ApiClientTest {
 
     @Test
     fun getRecoversFromConnectionClosedByServerButTimeoutIsNotRetried() = runBlocking {
-        // Caso real no emulador: socket do pool fechado pelo keep-alive do Node.
-        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        // Caso real no emulador: a conexao ja atendeu uma resposta, fica no pool e o
+        // servidor a fecha (keep-alive do Node). O GET seguinte reutiliza o socket morto.
+        server.enqueue(Fixtures.response("patients").setSocketPolicy(SocketPolicy.DISCONNECT_AT_END))
         server.enqueue(Fixtures.response("patients"))
         assertTrue(repository.patients() is ApiResult.Success)
-        assertEquals(3, server.requestCount) // login + falha + nova tentativa
+        val second = repository.patients()
+        assertTrue("GET apos conexao fechada pelo servidor: $second", second is ApiResult.Success)
+        assertEquals(3, server.requestCount) // login + 2 GETs atendidos (o reuso morto nao chega ao servidor)
 
         server.enqueue(Fixtures.response("patients").setHeadersDelay(5, TimeUnit.SECONDS))
         server.enqueue(Fixtures.response("patients"))

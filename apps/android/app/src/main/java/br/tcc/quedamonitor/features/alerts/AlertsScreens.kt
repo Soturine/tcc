@@ -133,7 +133,8 @@ fun AlertDetailScreen(viewModel: AlertDetailViewModel, now: Instant, canAct: Boo
                             Text("Ocorrência segundo o dispositivo: ${formatInstant(detail.occurredAtDevice)}")
                             Text("Recebido pelo servidor: ${formatInstant(detail.receivedAt)}")
                             Text("Qualidade do horário: ${detail.clockQuality.label()}")
-                            Text("Evidência: ${detail.evidenceSource ?: detail.evidenceStatus ?: "não informada"}")
+                            Text("Evidência: ${evidenceStatusLabel(detail.evidenceStatus)}")
+                            Text("Origem da decisão: ${evidenceSourceLabel(detail.evidenceSource)}")
                             detail.eventUuid?.let { Text("Identificador do evento: $it", style = MaterialTheme.typography.bodySmall) }
                         }
                         event.loading -> Text("Carregando detalhes do evento…")

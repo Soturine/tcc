@@ -62,6 +62,24 @@ fun ClockQuality.label(): String = when (this) {
     ClockQuality.UNKNOWN -> "qualidade do relógio não informada"
 }
 
+/** events.evidence_status (contrato: none, partial, linked). */
+fun evidenceStatusLabel(value: String?): String = when (value) {
+    "linked" -> "telemetria associada ao evento"
+    "partial" -> "telemetria parcialmente associada"
+    "none", null -> "sem telemetria associada"
+    else -> "valor não reconhecido ($value)"
+}
+
+/** events.evidence_source (ADR-016). null = registro anterior à migration 003, origem não registrada. */
+fun evidenceSourceLabel(value: String?): String = when (value) {
+    "device" -> "decisão do dispositivo"
+    "server_telemetry" -> "telemetria recebida pelo servidor"
+    "both" -> "dispositivo e telemetria do servidor"
+    "none" -> "sem evidência adicional"
+    null -> "não registrada"
+    else -> "valor não reconhecido ($value)"
+}
+
 fun historyLabel(type: String): String = when (type) {
     "acknowledge" -> "Reconhecido"
     "cancel" -> "Cancelado"
