@@ -45,6 +45,13 @@ async function withDatabase(suffix, work) {
 }
 
 async function createBaselineEventsTable(pool) {
+  // Banco legado sempre possui users; a migration 004 referencia users(id).
+  await pool.query(`
+    CREATE TABLE users (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      PRIMARY KEY (id)
+    )
+  `);
   await pool.query(`
     CREATE TABLE events (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -103,7 +110,7 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
     );
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
 
-    assert.deepEqual(first.applied, ["001", "002", "003"]);
+    assert.deepEqual(first.applied, ["001", "002", "003", "004"]);
     assert.deepEqual(second.applied, []);
     assert.equal(rows[0].event_uuid, "evt-upgrade-001");
     assert.equal(rows[0].boot_id, "boot-upgrade-001");
@@ -120,8 +127,13 @@ integrationTest("runner migra baseline, registra historico, reexecuta e reverte"
       ["001", "event_identity"],
       ["002", "telemetry_retention_index"],
       ["003", "event_evidence_source"],
+      ["004", "auth_sessions"],
     ]);
 
+    const revertedSessions = await runMigrations({ direction: "down", databasePool: pool });
+    assert.deepEqual(revertedSessions.reverted, ["004"]);
+    const [sessionsAfterDown] = await pool.query("SHOW TABLES LIKE 'auth_sessions'");
+    assert.equal(sessionsAfterDown.length, 0);
     const revertedEvidenceSource = await runMigrations({ direction: "down", databasePool: pool });
     assert.deepEqual(revertedEvidenceSource.reverted, ["003"]);
     const [evidenceSourceAfterDown] = await pool.query(
@@ -174,11 +186,12 @@ integrationTest("runner registra migration sobre schema canonico sem eventos", a
     const [history] = await pool.query("SELECT version, name FROM schema_migrations");
     const [events] = await pool.query("SELECT COUNT(*) AS total FROM events");
 
-    assert.deepEqual(result.applied, ["001", "002", "003"]);
+    assert.deepEqual(result.applied, ["001", "002", "003", "004"]);
     assert.deepEqual(history.map((row) => [row.version, row.name]), [
       ["001", "event_identity"],
       ["002", "telemetry_retention_index"],
       ["003", "event_evidence_source"],
+      ["004", "auth_sessions"],
     ]);
     assert.equal(events[0].total, 0);
   });
