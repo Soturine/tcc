@@ -61,3 +61,15 @@ jobs:
         run: |
           python tools/research/fixtures/make_synthetic.py
           git diff --exit-code -- tools/research/fixtures/synthetic
+
+      - name: Run HIL serial-log checker tests (synthetic logs; not HIL evidence)
+        run: python -m unittest discover -s tools/hil/tests -v
+
+      - name: Run MotionLab offline foundation tests (synthetic only, isolated from SOS/outbox)
+        run: python -m unittest discover -s tools/motionlab/tests -v
+
+      - name: Verify committed Nyquist synthetic artifact is reproducible (4+17 Hz @ 125 Hz)
+        working-directory: tools/research
+        run: |
+          python -m fallbench nyquist-synthetic --out fixtures/nyquist/synthetic_4hz_17hz_125hz.json
+          git diff --exit-code -- fixtures/nyquist

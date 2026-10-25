@@ -7,15 +7,15 @@
 | Frente | Estado em 22/10/2026 | Entrega-alvo e evidência |
 |---|---|---|
 | Firmware base: FSM, outbox/UUID/CRC/ACK | código presente, host/build/emulação de P2 executados na rodada #8 | HIL físico e política de rejeição/overflow |
-| MQTT TLS/ACL/QoS1 | exemplo de ACL, spike ESP-MQTT; infraestrutura de produção **não validada** | testes negativos no broker real; QoS1 somente após HIL/flash gate |
+| MQTT TLS/ACL/QoS1 | exemplo de ACL, spike ESP-MQTT; infraestrutura de produção **não validada**. **2026-10-25:** perfil TLS+ACL verificado em Mosquitto 2.1.2 de referência (19 casos, no CI); staging implantado inexistente; device→broker continua QoS 0 (ADR-020) | testes negativos no broker real; QoS1 somente após HIL/flash gate |
 | Backend Node/Express/MySQL | código, migrations e contrato operacionais | idempotência e autenticação, notificação-outbox, observabilidade |
 | Wearable 6 eixos | hardware investigado, nenhum dispositivo validado | HW00–09 e port QMI8658 com testes |
-| Pesquisa de pulso | dataset registry e replay sintético, sem dados reais | WEDA-FALL e segundo dataset com direitos confirmados, hashes, replay e métricas |
+| Pesquisa de pulso | dataset registry e replay sintético, sem dados reais. **2026-10-25:** baseline congelada avaliada offline no WEDA-FALL autorizado ([resultado](../research/wrist-baseline-weda-fall-2026-10-25.md)); BITS-2 excluído por timestamps; sem HIL | WEDA-FALL e segundo dataset com direitos confirmados, hashes, replay e métricas |
 | Nyquist / consumo | proposta e hipóteses 20/50/100 Hz | SIG00–06, anti-alias, jitter/ODR/energia reais quando houver hardware |
-| MotionLab | especificação, sem recorder ou classificador | primeiro offline, depois live e integração |
+| MotionLab | especificação, sem recorder ou classificador. **2026-10-25:** fundação offline ML-0/ML-1 (recorder, manifest, reimport, GT) com dados sintéticos; Live, stream, Android e classificador não existem | primeiro offline, depois live e integração |
 | Android / FCM | planejados; `apps/android` não existe | app mínimo, sessão revogável, push/alerta/background |
 | Personalização/ML | proposta, sem implantação | shadow mode separado e não-inferioridade documentada |
-| Publicação | protocolo de artigo candidato; nenhum resultado novo com dados externos | estudo focal, com orientador e evidência reprodutível |
+| Publicação | protocolo de artigo candidato; nenhum resultado novo com dados externos. **2026-10-25:** existe um resultado offline de caracterização (WEDA-FALL), ainda sem revisão do orientador | estudo focal, com orientador e evidência reprodutível |
 
 A única contribuição científica **mínima candidata** da etapa TG1 é avaliar uma baseline congelada em dados válidos de pulso, com análise de falhas e taxas; engenharia de confiabilidade HIL é contribuição alternativa/complementar. TG2/TCC prioriza demonstração física end-to-end (SOS/queda→outbox→nuvem→Android), MotionLab funcional e resultados. Versões posteriores (LoRa/4G, Thread, OTA amplo, federated, DL profundo, várias interfaces, wearable próprio) são extensões; não bloquear defesa por elas. Cronograma exato é do orientador/instituição.
 

@@ -11,6 +11,7 @@ const { logger } = require("../utils/logger");
 const { getPagination } = require("../utils/pagination");
 const { parseDateBoundary } = require("../utils/time");
 const { createAuditLog } = require("./auditService");
+const { resolveAlertPolicy } = require("./alertPolicy");
 const { assertRole, buildScopeFilter, canAccessScope } = require("./scopeService");
 
 const RECENT_CRITICAL_ALERT_DEDUP_WINDOW_SECONDS = 20;
@@ -95,6 +96,12 @@ function mapAlertRow(row) {
 
   return {
     id: Number(row.id),
+    // Derivado da politica (ADR-029), nao armazenado: urgent | attention.
+    priority: resolveAlertPolicy({
+      eventType: row.eventType,
+      evidenceSource: row.evidenceSource ?? row.evidence_source ?? null,
+      evidenceStatus: row.evidenceStatus || row.evidence_status || "none",
+    }).priority,
     organizationId: row.organizationId || row.organization_id
       ? Number(row.organizationId || row.organization_id)
       : null,
@@ -172,6 +179,7 @@ async function fetchAlertRow(alertId, executor = null) {
         e.immobility,
         e.message,
         e.evidence_status AS evidenceStatus,
+        e.evidence_source AS evidenceSource,
         e.evidence_telemetry_id AS evidenceTelemetryId,
         e.evidence_sample_count AS evidenceSampleCount,
         e.evidence_window_seconds AS evidenceWindowSeconds,
@@ -338,6 +346,7 @@ async function listAlerts(filters = {}, accessContext) {
         e.immobility,
         e.message,
         e.evidence_status AS evidenceStatus,
+        e.evidence_source AS evidenceSource,
         e.evidence_telemetry_id AS evidenceTelemetryId,
         e.evidence_sample_count AS evidenceSampleCount,
         e.evidence_window_seconds AS evidenceWindowSeconds,
@@ -431,6 +440,7 @@ async function exportAlertsReport(filters = {}, accessContext) {
         e.immobility,
         e.message,
         e.evidence_status AS evidenceStatus,
+        e.evidence_source AS evidenceSource,
         e.event_time AS eventTime
       FROM alerts a
       INNER JOIN events e ON e.id = a.event_id

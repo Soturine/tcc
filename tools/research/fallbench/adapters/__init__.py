@@ -23,6 +23,10 @@ def get_adapter(name: str):
         from . import kfall
 
         return kfall
+    if name == "weda_fall":
+        from . import weda_fall
+
+        return weda_fall
     if name == "normalized":
         from . import normalized_csv
 

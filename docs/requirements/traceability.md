@@ -18,7 +18,7 @@ Nenhum item está `hw-validated` ou `exp-validated` nesta data.
 | RF-027 teste de alerta sem queda física | backend | `alert_test` persistido, confirmado, sem alerta | `eventEvidence.test.js`; E2E 10 | partial: backend apenas; app/push (P5) planned |
 | RF-001 a RF-020, RF-026, RF-028 a RF-030 | web/backend/Android | — | — | not reassessed / planned (Android, FCM, provisioning) |
 | RNF-SEC-003 secrets fora do Git | repo/CI | workflow `secret-patterns`; senhas de teste geradas em runtime | CI Security | implemented, tested (CI) |
-| RNF-SEC-004 credencial por device e ACL mínima | broker | `infra/mqtt/mosquitto-acl.example` | `infra/mqtt/verify-acl.js` contra Mosquitto real (5/5) | partial: referência verificada; staging/firmware sem credencial por device (P6/P8) |
+| RNF-SEC-004 credencial por device e ACL mínima | broker | `infra/mqtt/mosquitto-acl.example`, `infra/mqtt/mosquitto-staging.conf` | `infra/mqtt/run-security-verification.sh` (19 casos: TLS/CA/hostname, anônimo, revogação, forja cruzada, auto-ACK, curinga, retained) no CI; histórico `verify-acl.js` (5/5) | partial: referência verificada; staging implantado e credencial por device no ESP pendentes |
 | RNF-SEC-006 segredo JWT default/fraco não inicia ambiente externo | backend | `validateRuntimeConfig` | `tests/security/runtimeConfig.test.js` | implemented, tested |
 | RNF-SEC-001 TLS externo | backend | validação de `mqtts://` e `rejectUnauthorized` | `runtimeConfig.test.js` | partial: backend recusa; firmware/staging pendentes |
 | RNF-SEC-007 identidade derivada do tópico | backend | ver RF-025; tópico do ACK derivado do tópico de origem | idem RF-025 | implemented, tested, emulated |
@@ -29,8 +29,8 @@ Nenhum item está `hw-validated` ou `exp-validated` nesta data.
 | RNF-REL-006 pendente sobrevive a reboot | firmware | restauração da outbox | `testRebootRestores…`, `testSameOrderAcrossBootsNeverOverwritesPendingEvent` | implemented, tested; HIL pendente |
 | RNF-REL-007 `event_uuid` independente de NTP | firmware | contador de boot + nonce + sequência | `test_critical_delivery` | implemented, tested |
 | RNF-REL-008 alerta após período offline | backend | ver RF-024 | E2E 2 | implemented, tested, emulated |
-| RNF-REL-009 restart/duplicata/reorder não alteram resultado lógico | backend | idempotência + ACK | E2E 3, 6, 8 | emulated; restart de broker não ensaiado |
-| RNF-REL-010 overflow detectável | firmware | `overflow_count`, `status.critical_outbox` | `testOverflowRejectsNewEventWithoutDroppingAccepted` | implemented, tested |
+| RNF-REL-009 restart/duplicata/reorder não alteram resultado lógico | backend | idempotência + ACK | E2E 3, 6, 8, 16–18 (MySQL recusado, TCP reset, broker parado) | emulated; HIL pendente |
+| RNF-REL-010 overflow detectável | firmware | `overflow_count`, `sos_overflow_count`, `degraded`, reservas SOS/queda | `testOverflowRejectsNewEventWithoutDroppingAccepted`, `testCapacity16_17_100WithTwoRebootsNeverDropsAccepted`, `testReservesKeepSlotsForSosAndFall` | implemented, tested; HIL pendente |
 | RNF-DATA-001 ocorrência ≠ recebimento | backend | `occurred_at_device`, `received_at`, `event_time` por ocorrência | `criticalEventTime.test.js`; E2E 2 e 8 | implemented, tested, emulated |
 | RNF-DATA-002 clock quality preservada | firmware + backend | `clock_quality` no payload e no banco | E2E 9 | implemented, emulated |
 | RNF-DATA-003 dado do servidor enriquece, não apaga decisão edge | backend | `evidence_source` | `eventEvidence.test.js` (`both`, `device`) | implemented, tested |
@@ -38,7 +38,7 @@ Nenhum item está `hw-validated` ou `exp-validated` nesta data.
 | RNF-PRI-004 teste distinguível de real | backend | `alert_test`, severidade `low`, sem alerta | E2E 10 | partial |
 | RNF-MAN-002 contratos versionados | contratos | schemas MQTT/OpenAPI | `tests/contracts/contracts.test.js` | implemented, tested |
 | RNF-MAN-003 migrations versionadas | banco | `003_event_evidence_source` | MySQL descartável | implemented, tested |
-| RNF-MAN-004 regras críticas testáveis sem hardware | firmware | `event_identity`, `critical_outbox`, `outbox_codec`, `critical_ack`, `sensor_signal` puros | 42 testes nativos | implemented, tested |
+| RNF-MAN-004 regras críticas testáveis sem hardware | firmware | `event_identity`, `critical_outbox`, `outbox_codec`, `critical_ack`, `critical_result`, `critical_delivery`, `sha256`, `sensor_signal` puros | 65 testes nativos | implemented, tested |
 | RNF-MAN-005 scripts em CI/Linux | repo | `scripts/pio-docker.sh`, workflows | CI | implemented |
 | RNF-OBS-001 identificador ponta a ponta | todos | `event_uuid` em logs, banco e ACK | E2E (ACK correlacionado ao registro) | implemented, emulated |
 | RNF-OBS-005 health cobre outbox | firmware | `status.critical_outbox` | schema/exemplo de status | partial: exibição no app (P5) planned |
@@ -71,7 +71,8 @@ A trilha é de planejamento; não acrescenta cobertura testada nem métricas val
 
 | Grupo | Requisito / risco | Código/evidência atual | Evidência requerida para aprovação | Status |
 |---|---|---|---|---|
-| P2.1 | F-29 rejeição permanente, SOS e outbox cheia | `CriticalEventOutbox`/ACK v1 | contrato v2, testes host/E2E adversariais e HIL | planned |
+| P2.1 | F-29 rejeição permanente, SOS e outbox cheia | `critical-event-result-v1`, quarentena, reservas | 13 testes de ingestão, 23 nativos, E2E 13–15 ([evidência](../quality/p2-1-implementation-evidence-2026-10-25.md)) | implemented, tested, emulated; HIL pendente |
+| P2.1 | F-31 suspeita × confirmada × SOS | `alertPolicy.js` (ADR-029) | matriz de prioridade, E2E 9 | implemented, tested; revisão de produto pendente |
 | Segurança | F-17/27 MQTT TLS/ACL por device | `infra/mqtt/*example*` | broker staging real e testes cruzados de identidade | planned |
 | Firmware | F-28 flash/partições/OTA | `platformio.ini`, build 91% na partição antiga | build/memória/migração/recovery e HIL do modelo escolhido | planned |
 | Tempo | F-30 clock sem sincronização | eventos com clock_quality | replay offline e âncoras temporais com incerteza | planned |

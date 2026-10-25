@@ -18,6 +18,13 @@ const {
   toDateFromUnixSeconds,
 } = require("../utils/time");
 const { buildScopeFilter, canAccessScope } = require("./scopeService");
+const {
+  ALERT_EVENT_TYPES,
+  EVIDENCE_SOURCES,
+  TEST_EVENT_TYPES,
+  hasTelemetryEvidence,
+  resolveAlertPolicy,
+} = require("./alertPolicy");
 
 const FALL_EVIDENCE_WINDOW_BEFORE_MS = 10_000;
 const FALL_EVIDENCE_WINDOW_AFTER_MS = 3_000;
@@ -27,17 +34,9 @@ const TELEMETRY_REQUIRED_NUMERIC_FIELDS = ["ax", "ay", "az", "gx", "gy", "gz"];
 const EVENT_UUID_MAX_LENGTH = 160;
 const BOOT_ID_MAX_LENGTH = 128;
 const CLOCK_QUALITIES = new Set(["synced", "unsynced", "unknown"]);
-const ALERT_EVENT_TYPES = new Set([
-  "fall_detected",
-  "fall_suspected",
-  "sos_pressed",
-  "manual_sos",
-  "sensor_fault",
-]);
+// Tipos e politica de alerta centralizados (F-31, ADR-029).
 // "Testar alerta" (P5): persistido e confirmado ao device, nunca vira alerta real.
-const TEST_EVENT_TYPES = new Set(["alert_test"]);
 const LOCAL_EVIDENCE_VERSION = 1;
-const EVIDENCE_SOURCES = new Set(["device", "server_telemetry", "both", "none"]);
 
 function toFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -171,7 +170,8 @@ function deriveSeverity(eventType, payload) {
         ? "critical"
         : "high";
     case "fall_suspected":
-      return "high";
+      // Nao confirmada pela FSM: atencao, nao urgencia (F-31).
+      return "medium";
     case "movement_detected":
       return "low";
     case "sos_pressed":
@@ -212,10 +212,6 @@ function deriveMessage(eventType, payload) {
 
 function shouldCreateAlert(eventType) {
   return ALERT_EVENT_TYPES.has(eventType);
-}
-
-function hasTelemetryEvidence(event) {
-  return ["linked", "partial"].includes(event?.evidenceStatus);
 }
 
 /**
@@ -269,26 +265,13 @@ function resolveEvidenceSource(localEvidence, telemetryEvidence) {
 }
 
 /**
- * Politica de alerta:
- * - fall_detected: alerta com evidencia local confirmada OU telemetria do servidor;
- *   sem nenhuma das duas ("none") o evento e persistido sem alerta (evidencia insuficiente);
- * - fall_suspected, SOS e sensor_fault: alerta (severidade derivada no backend);
+ * Politica de alerta (alertPolicy.js, ADR-029):
+ * - SOS: urgente; fall_detected com evidencia local e/ou telemetria: urgente;
+ * - fall_detected sem evidencia ("none"), fall_suspected e sensor_fault: atencao;
  * - alert_test e eventos informativos: nunca geram alerta real.
- * Registros antigos sem evidence_source mantem a regra baseada so na telemetria.
  */
 function shouldCreateAlertForEvent(event) {
-  if (!event || !shouldCreateAlert(event.eventType)) {
-    return false;
-  }
-
-  if (event.eventType === "fall_detected") {
-    if (EVIDENCE_SOURCES.has(event.evidenceSource)) {
-      return event.evidenceSource !== "none";
-    }
-    return hasTelemetryEvidence(event);
-  }
-
-  return true;
+  return resolveAlertPolicy(event).createAlert;
 }
 
 function buildEmptyEvidence(immobilityConfirmed = false) {
@@ -1248,6 +1231,7 @@ module.exports = {
   resolveFallTelemetryEvidence,
   resolveEventTemporalFields,
   shouldCreateAlert,
+  resolveAlertPolicy,
   shouldCreateAlertForEvent,
   validateTelemetryPayload,
 };

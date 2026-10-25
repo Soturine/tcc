@@ -288,15 +288,15 @@ Antes do app ser chamado de interface principal, CUJ de perda de Internet deve p
 
 ## P17 — Correções pós-auditoria P2.1 e gates transversais (proposed 2026-10-22)
 
-**Não implementado por esta documentação.** Seguir [plano integral](docs/roadmap/tg1-execution-gates-2026-10-22.md) e [matriz F-17/F-27..F-33](docs/quality/critical-reliability-remediation-2026-10-22.md).
+**Execução 2026-10-25:** ver [evidência P2.1](docs/quality/p2-1-implementation-evidence-2026-10-25.md) — host/emulação/broker de referência; **HIL `BLOCKED`**. Seguir [plano integral](docs/roadmap/tg1-execution-gates-2026-10-22.md) e [matriz F-17/F-27..F-33](docs/quality/critical-reliability-remediation-2026-10-22.md).
 
-- [ ] F-29 e capacidade da outbox: resultados versionados e não confirmatórios, quarentena/retry seguro, SOS sob overflow e estado de proteção degradada; compatibilidade v1, anti-spoof e testes de reboot/flash.
-- [ ] F-17/F-27: broker TLS e ACL por device efetivas, dispositivo não publica ACK, teste intruso e credencial inválida; provisioning seguro sem broker público em caminho real.
-- [ ] F-28: definir e testar partições e migração LittleFS/NVS/OTA, medir budget do ESP32 bancada e S3 conforme device físico, nenhum erase destrutivo ou OTA desprotegida.
-- [ ] F-30: clock quality, evento offline, monotonic+boot, receivedAt separados, sincronização ancorada e regressões de deduplicação.
-- [ ] F-31: política de suspeita vs queda confirmada/SOS, risco de falsos negativos e testes de matriz de severidade/ações.
-- [ ] F-32: somente após design: envelope compacto versionado, golden contracts antigos intactos, métricas reais de tamanho/CPU.
-- [ ] F-33: broker indisponível, DB connection refused versus pause, ACK perdido/forjado e múltiplos processos; suíte de negativos e logs reproduzíveis.
+- [x] F-29 e capacidade da outbox (host/emulação): `critical-event-result-v1` não confirmatório, quarentena persistente limitada, reserva SOS/queda, `degraded`, compatibilidade v1, hash anti-spoof, reboot/`CEO1→CEO2`. Pendente: HIL e política de expiração da quarentena (decisão humana).
+- [~] F-17/F-27: perfil staging TLS+ACL verificado em Mosquitto 2.1.2 real (19/19, no CI); default de broker público removido do firmware. Pendente: staging implantado, credencial por device provisionada no ESP, rotação.
+- [ ] F-28 (dados medidos, decisão: não trocar layout sem HIL; ver evidência §5): definir e testar partições e migração LittleFS/NVS/OTA, medir budget do ESP32 bancada e S3 conforme device físico, nenhum erase destrutivo ou OTA desprotegida.
+- [~] F-30 (semântica testada E2E; estimativa por âncora não implementada): clock quality, evento offline, monotonic+boot, receivedAt separados, sincronização ancorada e regressões de deduplicação.
+- [x] F-31 (ADR-029, revisão pendente): política de suspeita vs queda confirmada/SOS, risco de falsos negativos e testes de matriz de severidade/ações.
+- [ ] F-32 (DEFERRED sem benchmark que justifique): somente após design: envelope compacto versionado, golden contracts antigos intactos, métricas reais de tamanho/CPU.
+- [x] F-33 (emulação; HIL pendente): broker indisponível, DB connection refused versus pause, ACK perdido/forjado e múltiplos processos; suíte de negativos e logs reproduzíveis.
 - [ ] HIL com ESP32 físico (quando disponível); se ausente, marcar blocked e preparar roteiro, **não** declarar green.
 - [ ] Research/Wrist: verificar licenças WEDA e segunda base, replay real da FSM congelada, splits sem leakage, protocolos Nyquist e energia; distinguir condições sintéticas.
 - [ ] MotionLab offline antes de live; Android REST/FCM fundacional em paralelo após backend crítico, com testes de notificações em dispositivo físico.

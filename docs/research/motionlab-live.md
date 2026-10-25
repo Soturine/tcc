@@ -1,6 +1,6 @@
 # MotionLab Live — especificação implementável
 
-**Status: design, não implementado.** Estudo piloto: `sitting`, `sit_to_stand`, `standing`, `stand_to_sit`, `other_movement`, `unknown`. No pulso, postura global do corpo não é diretamente observável; classes sentado/em pé devem ser inferidas com incerteza. Hipótese prioritária = **transições**. O detector crítico de queda e SOS não depende do resultado HAR.
+**Status: design; fundação offline ML-0/ML-1 implementada em 2026-10-25** ([`tools/motionlab`](../../tools/motionlab/README.md), somente dados sintéticos). MotionLab **Live** (stream, UI, classificador, sessões com pessoas) **não implementado.** Texto original: design, não implementado. Estudo piloto: `sitting`, `sit_to_stand`, `standing`, `stand_to_sit`, `other_movement`, `unknown`. No pulso, postura global do corpo não é diretamente observável; classes sentado/em pé devem ser inferidas com incerteza. Hipótese prioritária = **transições**. O detector crítico de queda e SOS não depende do resultado HAR.
 
 ## Arquitetura
 ```text

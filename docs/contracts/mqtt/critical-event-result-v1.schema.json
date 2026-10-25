@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soturine.local/contracts/mqtt/critical-event-result-v1.schema.json",
+  "title": "Critical event ingestion result v1",
+  "$comment": "IMPLEMENTED 2026-10-25 (ADR-026, F-29). Topic <base>/<device_id>/critical-event-results, QoS 1, retain=false, published only by the backend principal and only for events that declare ingest_result_version=1. committed/duplicate are published only after COMMIT. retryable and rejected_permanent are NOT persistence confirmations: the device keeps (retryable) or quarantines (rejected_permanent) the event, never deletes it as delivered. Devices without ingest_result_version keep receiving critical-event-ack-v1 unchanged.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "device_id",
+    "event_uuid",
+    "payload_sha256",
+    "status",
+    "reason_code",
+    "event_id",
+    "committed_at",
+    "retry_after_ms",
+    "issued_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "device_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "event_uuid": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 (lowercase hex) of the exact event payload bytes received by the backend."
+    },
+    "status": { "enum": ["committed", "duplicate", "retryable", "rejected_permanent"] },
+    "reason_code": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "event_uuid_conflict",
+        "invalid_event_uuid",
+        "identity_rejected",
+        "storage_unavailable",
+        "internal_error"
+      ]
+    },
+    "event_id": { "type": ["integer", "null"], "minimum": 1 },
+    "committed_at": { "type": ["string", "null"], "format": "date-time" },
+    "retry_after_ms": { "type": ["integer", "null"], "minimum": 0, "maximum": 3600000 },
+    "issued_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["committed", "duplicate"] } } },
+      "then": {
+        "properties": {
+          "event_id": { "type": "integer" },
+          "committed_at": { "type": "string" },
+          "reason_code": { "const": null },
+          "retry_after_ms": { "const": null }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "rejected_permanent" } } },
+      "then": {
+        "properties": {
+          "event_id": { "const": null },
+          "committed_at": { "const": null },
+          "retry_after_ms": { "const": null },
+          "reason_code": { "enum": ["event_uuid_conflict", "invalid_event_uuid", "identity_rejected"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "retryable" } } },
+      "then": {
+        "properties": {
+          "event_id": { "const": null },
+          "committed_at": { "const": null },
+          "reason_code": { "enum": ["storage_unavailable", "internal_error"] }
+        }
+      }
+    }
+  ]
+}

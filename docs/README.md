@@ -12,7 +12,7 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 - [Plano de QA/Gates do pulso e ML](quality/wrist-motionlab-verification.md)
 - [Estratégia acadêmica, artigo, TG1/TG2 e escopo](research/publication-and-scope.md)
 
-**Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos.
+**Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos. *Atualização 2026-10-25:* ver [evidência P2.1](quality/p2-1-implementation-evidence-2026-10-25.md), [resultado WEDA-FALL](research/wrist-baseline-weda-fall-2026-10-25.md) (offline, sem HIL) e [MotionLab offline](../tools/motionlab/README.md); wearable e Android continuam ausentes.
 
 ## Plano de execução e remediação — 2026-10-22
 

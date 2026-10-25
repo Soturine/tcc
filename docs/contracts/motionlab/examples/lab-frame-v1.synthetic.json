@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "session_id": "lab-synthetic-001",
+  "boot_id": "b00000001-0000abcd",
+  "sample_seq": 153,
+  "device_time_us": 3060000,
+  "ax_g": 0.1,
+  "ay_g": 0.2,
+  "az_g": 0.97,
+  "gx_dps": 2.1,
+  "gy_dps": 0.8,
+  "gz_dps": -1.0,
+  "valid": true
+}

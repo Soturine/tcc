@@ -34,6 +34,7 @@ async function transaction(work, options = {}) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const connection = await pool.getConnection();
+    let connectionBroken = false;
 
     try {
       await connection.beginTransaction();
@@ -41,13 +42,25 @@ async function transaction(work, options = {}) {
       await connection.commit();
       return result;
     } catch (error) {
-      await connection.rollback();
+      try {
+        await connection.rollback();
+      } catch {
+        // Conexao perdida (reset/recusa): o rollback falha, mas o erro ORIGINAL
+        // decide a classificacao (ex.: retryable no resultado critico). Sem COMMIT
+        // concluido o servidor desfaz a transacao ao perder a sessao.
+        connectionBroken = true;
+      }
 
       if (error.code !== "ER_LOCK_DEADLOCK" || attempt === maxAttempts) {
         throw error;
       }
     } finally {
-      connection.release();
+      // Conexao quebrada nao volta ao pool para nao contaminar a proxima transacao.
+      if (connectionBroken && typeof connection.destroy === "function") {
+        connection.destroy();
+      } else {
+        connection.release();
+      }
     }
   }
 

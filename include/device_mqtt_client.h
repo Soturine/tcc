@@ -24,10 +24,12 @@ class DeviceMqttClient {
   using MessageHandler = std::function<void(const char* topic, const uint8_t* payload, unsigned int length)>;
 
   bool publish(const String& topic, const String& payload, bool retained = false);
-  // Topico assinado a cada (re)conexao; sessao limpa nao preserva assinaturas.
+  // Topicos assinados a cada (re)conexao; sessao limpa nao preserva assinaturas.
   void setSubscription(const String& topic, uint8_t qos);
+  // Ate dois topicos (critical-event-acks legado + critical-event-results).
+  void setSubscriptions(const String& primary, const String& secondary, uint8_t qos);
   void setMessageHandler(MessageHandler handler);
-  // true somente depois que a assinatura do topico configurado foi aceita.
+  // true somente depois que TODAS as assinaturas configuradas foram aceitas.
   bool isSubscribed() const;
   bool isConnected();
   bool hasValidConfiguration() const;
@@ -68,7 +70,8 @@ class DeviceMqttClient {
   int lastFailureCode_ = MQTT_DISCONNECTED;
   bool wasConnected_ = false;
 
-  String subscriptionTopic_;
+  static constexpr uint8_t kMaxSubscriptions = 2;
+  String subscriptionTopics_[kMaxSubscriptions];
   uint8_t subscriptionQos_ = 1;
   bool subscribed_ = false;
 };

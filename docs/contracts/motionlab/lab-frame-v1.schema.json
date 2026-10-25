@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soturine.local/contracts/motionlab/lab-frame-v1.schema.json",
+  "title": "MotionLab IMU frame v1",
+  "$comment": "IMPLEMENTED offline only (tools/motionlab, 2026-10-25). NOT a critical-event contract and NOT transported over MQTT yet: a lab-frames topic needs its own ACL/schema review (ADR-024). device_time_us is the device monotonic clock, not UTC.",
+  "type": "object",
+  "required": ["schema_version", "sample_seq", "device_time_us", "ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps", "valid"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "boot_id": { "type": "string", "maxLength": 128 },
+    "sample_seq": { "type": "integer", "minimum": 0 },
+    "device_time_us": { "type": "integer", "minimum": 0 },
+    "ax_g": { "type": "number" },
+    "ay_g": { "type": "number" },
+    "az_g": { "type": "number" },
+    "gx_dps": { "type": "number" },
+    "gy_dps": { "type": "number" },
+    "gz_dps": { "type": "number" },
+    "valid": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

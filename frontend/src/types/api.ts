@@ -282,6 +282,8 @@ export interface AlertAction {
 
 export interface AlertRecord {
   id: number;
+  // ADR-029: urgent (SOS / queda com evidencia) | attention (verificar). Opcional para backend antigo.
+  priority?: "urgent" | "attention" | null;
   organizationId: number | null;
   patientId: number | null;
   status: string;

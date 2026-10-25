@@ -161,6 +161,8 @@ Os tempos exatos serão definidos posteriormente.
 
 **Risco (identificado no CP5 de 2026-10-21):** o device remove um evento crítico da outbox ao receber ACK válido no próprio tópico. Sem ACL no broker, qualquer cliente pode publicar em `queda/devices/<id>/critical-event-acks` e fazer o device descartar um evento nunca persistido.
 
+**Atualização 2026-10-25:** o mesmo vale para `+/critical-event-results`; o device só aplica um resultado com o próprio `device_id` e com `payload_sha256` igual ao do evento armazenado (replay de outro conteúdo é ignorado). O perfil [`mosquitto-staging.conf`](../../infra/mqtt/mosquitto-staging.conf) (somente TLS, sem anônimo, `retain_available false`) é verificado em 19 casos por [`run-security-verification.sh`](../../infra/mqtt/run-security-verification.sh) no CI; staging implantado ainda não existe.
+
 **Mitigação:** somente o principal do backend pode publicar em `+/critical-event-acks`; cada device lê apenas o próprio ACK e escreve apenas nos próprios canais. Referência em [`infra/mqtt/mosquitto-acl.example`](../../infra/mqtt/mosquitto-acl.example), verificada contra Mosquitto 2.1.2 real e descartável por [`infra/mqtt/verify-acl.js`](../../infra/mqtt/verify-acl.js): credencial inválida recusada, ACK forjado por outro device não entregue, ACK alheio não lido, evento em tópico alheio não entregue ao backend.
 
 **Risco residual:** o broker de CI e o default de fábrica do firmware continuam sem autenticação (F-17); a ACL só protege um ambiente que a aplique. O firmware valida tópico e schema, mas não autentica a origem do ACK além do broker.
