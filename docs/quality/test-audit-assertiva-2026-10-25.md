@@ -73,3 +73,9 @@ Limites: 22 mutantes escolhidos à mão sobre o código desta rodada não são u
 - Sensibilidade a falhas do código herdado e do detector (não mutados nesta auditoria).
 - Mutação pelo engine: precisaria do Cosmic Ray e de descoberta de testes em `tools/*/tests`; não foi feita.
 - Execução dos 65 testes C++ e dos testes `node --test` pelo engine: não suportada; essas suítes foram executadas pelos runners do próprio projeto (localmente e no CI), não pela Assertiva.
+
+## Reexecução no SHA final da branch
+
+- Clone limpo de `91222ce` (`tcc/tg1-wrist-motionlab-research-foundation`, depois do merge da implementação), run `bf5f5edca6d743dd`: os mesmos 7 findings, `--run-check` HIL 4/4 e MotionLab 12/12 `PASS`, 142 testes JS e 60 Python no inventário estático. As disposições acima foram anexadas ao relatório do engine (`--assessment`, aceito pelo engine).
+- Relatório HTML local (fora do repositório): `~/.assertiva/reports/tcc-91222ce-eea64d1a8b9361db/audit.html`.
+- Commits posteriores a `91222ce` alteram apenas este documento.
