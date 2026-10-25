@@ -185,3 +185,21 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 ## ADR-028 — Foco de TG1 e dependências de Android/FCM sem inflar escopo
 **Status: Proposed (2026-10-22).** CP1 confiabilidade, CP3 dataset real de pulso e CP4 Nyquist podem evoluir com gates independentes; Android Kotlin/Compose/FCM pode ser iniciado após contratos críticos estabilizados, mesmo antes de comprar relógio. A demonstração mínima TG2 deve usar evidência física da cadeia `SOS/IMU→persistência→alerta→Android`, respeitando indisponibilidade de rede e sem promessa clínica. MotionLab/ML/personalização são extensões estritamente isoladas da proteção. [Plano](../roadmap/tg1-execution-gates-2026-10-22.md).
 
+
+## ADR-029 — Matriz de prioridade de alerta: urgente × atenção (F-31)
+**Status: Accepted (2026-10-25) — decisão de produto sujeita a revisão do orientador/PR.** Complementa ADR-016; não altera limiares do detector.
+
+| Evento | Evidência | Alerta | Prioridade | Severidade |
+|---|---|---|---|---|
+| `sos_pressed`, `manual_sos` | — | sim | `urgent` | high |
+| `fall_detected` | `device`, `server_telemetry`, `both` (ou legado `linked/partial`) | sim | `urgent` | critical/high |
+| `fall_detected` | `none` | **sim (antes: não)** | `attention` | medium |
+| `fall_suspected` | qualquer | sim | `attention` | **medium (antes: high)** |
+| `sensor_fault` | — | sim | `attention` | high |
+| `alert_test`, informativos | — | não | — | low/— |
+
+**Contexto.** `fall_suspected` usava o mesmo caminho urgente de `fall_detected`; `fall_detected` sem evidência era persistido **sem alerta**, o que podia silenciar um falso negativo (firmware antigo, evidência incompleta/ilegível).
+
+**Decisão.** Política pura em `backend/src/services/alertPolicy.js`; `priority` é derivada (não armazenada, sem migração) e exposta em `Alert` (OpenAPI) e na Web como rótulo textual. Evidência insuficiente **não confirma** queda (nunca `urgent`), mas gera alerta de atenção. SOS nunca é rebaixado.
+
+**Consequências.** Mais alertas de atenção possíveis; nenhum alerta urgente a mais. Não há push/FCM nesta fase, portanto “prioridade” afeta apenas listagem/realtime. Testes: matriz em `backend/tests/alerts/eventService.test.js`, E2E cenário 9.

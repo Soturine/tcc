@@ -1141,6 +1141,13 @@ components:
       properties:
         id: { type: integer }
         status: { type: string }
+        priority:
+          type: [string, 'null']
+          enum: [urgent, attention, null]
+          description: >-
+            Derivada da politica de alerta (ADR-029, F-31): urgent para SOS e queda com
+            evidencia; attention para queda sem evidencia suficiente, queda suspeita e falha
+            de sensor. Nao e diagnostico medico nem garantia de entrega ao cuidador.
         device: { type: object, additionalProperties: true }
         patient: { type: [object, 'null'], additionalProperties: true }
         event: { $ref: '#/components/schemas/Event' }

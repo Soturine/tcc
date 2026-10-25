@@ -538,14 +538,16 @@ scenario("8. entregas fora de ordem preservam instantes e geram alertas distinto
   await device.close();
 });
 
-scenario("9. queda sem evidencia local nem telemetria: persistida e confirmada, sem alerta", async (results) => {
+scenario("9. queda sem evidencia local nem telemetria: persistida, confirmada e alerta de atencao (ADR-029)", async (results) => {
   const device = new VirtualDevice(`e2e-noevidence-${RUN_ID}`);
   await device.connect();
   const payload = device.buildFall({ localEvidence: false, clockQuality: "unsynced" });
   const delivery = await device.deliver(payload);
   const [row] = await eventRows(payload.event_uuid);
   check(results, delivery.ack?.status === "committed", "ACK committed (persistencia nao depende de alerta)");
-  check(results, row?.evidence_source === "none" && Number(row.alert_count) === 0, "evidencia insuficiente: sem alerta");
+  // Falso negativo nao e silenciado: alerta de atencao com severidade nao urgente.
+  check(results, row?.evidence_source === "none" && Number(row.alert_count) === 1 && row.severity === "medium",
+    `evidencia insuficiente: 1 alerta de atencao, severidade medium (alertas=${row?.alert_count}, severidade=${row?.severity})`);
   check(results, row?.clock_quality === "unsynced", "clock_quality unsynced preservado");
   await device.close();
 });

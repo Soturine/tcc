@@ -22,7 +22,8 @@ test("deriveSeverity classifica eventos criticos de queda, SOS e sensor", () => 
   assert.equal(deriveSeverity("sos_pressed", {}), "high");
   assert.equal(deriveSeverity("manual_sos", {}), "high");
   assert.equal(deriveSeverity("sensor_fault", {}), "high");
-  assert.equal(deriveSeverity("fall_suspected", {}), "high");
+  // F-31: suspeita nao confirmada pela FSM nao usa severidade de urgencia.
+  assert.equal(deriveSeverity("fall_suspected", {}), "medium");
   assert.equal(deriveSeverity("movement_detected", {}), "low");
   assert.equal(deriveSeverity("unknown_event", {}), "medium");
 });
@@ -58,9 +59,10 @@ test("shouldCreateAlertForEvent exige evidencia para queda e preserva SOS manual
     shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceStatus: "partial" }),
     true,
   );
+  // ADR-029: queda declarada sem evidencia nao e silenciada (alerta de atencao).
   assert.equal(
     shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceStatus: "none" }),
-    false,
+    true,
   );
   assert.equal(
     shouldCreateAlertForEvent({ eventType: "sos_pressed", evidenceStatus: "none" }),
@@ -219,4 +221,29 @@ test("validateTelemetryPayload exige eixos reais e sensor valido", () => {
   });
   assert.equal(invalidSensor.valid, false);
   assert.equal(invalidSensor.reason, "sensor_invalid");
+});
+
+test("matriz de prioridade F-31/ADR-029: urgente so para SOS e queda com evidencia", () => {
+  const { resolveAlertPolicy } = require("../../src/services/alertPolicy");
+  const cases = [
+    [{ eventType: "sos_pressed" }, true, "urgent"],
+    [{ eventType: "manual_sos" }, true, "urgent"],
+    [{ eventType: "fall_detected", evidenceSource: "device" }, true, "urgent"],
+    [{ eventType: "fall_detected", evidenceSource: "both" }, true, "urgent"],
+    [{ eventType: "fall_detected", evidenceSource: "server_telemetry" }, true, "urgent"],
+    [{ eventType: "fall_detected", evidenceSource: null, evidenceStatus: "partial" }, true, "urgent"],
+    [{ eventType: "fall_detected", evidenceSource: "none" }, true, "attention"],
+    [{ eventType: "fall_detected", evidenceSource: null, evidenceStatus: "none" }, true, "attention"],
+    [{ eventType: "fall_suspected", evidenceSource: "device" }, true, "attention"],
+    [{ eventType: "sensor_fault" }, true, "attention"],
+    [{ eventType: "alert_test", evidenceSource: "device" }, false, null],
+    [{ eventType: "movement_detected" }, false, null],
+    [{ eventType: "heartbeat" }, false, null],
+    [null, false, null],
+  ];
+  for (const [event, createAlert, priority] of cases) {
+    const policy = resolveAlertPolicy(event);
+    assert.equal(policy.createAlert, createAlert, JSON.stringify(event));
+    assert.equal(policy.priority, priority, JSON.stringify(event));
+  }
 });

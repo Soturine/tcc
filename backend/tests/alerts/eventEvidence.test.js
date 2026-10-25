@@ -563,7 +563,12 @@ test("evidencia local incompleta ou de versao desconhecida nao confirma queda", 
       });
       assert.equal(event.evidenceSource, "none");
       assert.equal(event.severity, "medium");
-      assert.equal(harness.eventService.shouldCreateAlertForEvent(event), false);
+      // ADR-029: nao confirma queda (nunca urgente), mas nao silencia: alerta de atencao.
+      assert.deepEqual(harness.eventService.resolveAlertPolicy(event), {
+        createAlert: true,
+        priority: "attention",
+        reason: "fall_evidence_insufficient",
+      });
     }
   } finally {
     harness.restore();
@@ -623,7 +628,9 @@ test("politica de alerta distingue tipos e fontes de evidencia", () => {
 
     assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "device" }), true);
     assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "server_telemetry" }), true);
-    assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: "none", evidenceStatus: "linked" }), false);
+    // evidence_source explicito prevalece sobre o status legado; "none" vira atencao (ADR-029).
+    assert.equal(harness.eventService.resolveAlertPolicy({ eventType: "fall_detected", evidenceSource: "none", evidenceStatus: "linked" }).priority, "attention");
+    assert.equal(harness.eventService.resolveAlertPolicy({ eventType: "fall_detected", evidenceSource: "device" }).priority, "urgent");
     // Registro legado sem evidence_source preserva a regra anterior.
     assert.equal(shouldCreateAlertForEvent({ eventType: "fall_detected", evidenceSource: null, evidenceStatus: "linked" }), true);
     assert.equal(shouldCreateAlertForEvent({ eventType: "sos_pressed", evidenceSource: null }), true);
