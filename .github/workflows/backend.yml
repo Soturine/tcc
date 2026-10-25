@@ -40,6 +40,9 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      - name: Verify consistent project development version
+        run: node scripts/check-version-consistency.mjs
+
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
