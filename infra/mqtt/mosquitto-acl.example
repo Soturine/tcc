@@ -1,18 +1,22 @@
-# ACL de menor privilegio para staging/producao experimental (ADR-015, auditoria CP5).
+# ACL de menor privilegio para staging/producao experimental (ADR-015, ADR-026, auditoria CP5/F-27).
 # Convencao: o username MQTT de cada device e o proprio device_id do topico.
-# Sem esta ACL qualquer cliente poderia publicar um ACK falso em
-# queda/devices/<outro>/critical-event-acks e fazer a outbox do device descartar
-# um evento que nunca foi persistido.
+# Sem esta ACL qualquer cliente poderia publicar um ACK/resultado falso em
+# queda/devices/<outro>/critical-event-acks|critical-event-results e fazer a outbox
+# do device descartar ou quarentenar um evento que nunca foi persistido.
+# Tudo que nao esta listado e negado (Mosquitto 2.x com acl_file).
 
-# Backend: le todos os canais de device e e o UNICO publisher de ACK.
+# Backend: le todos os canais de device e e o UNICO publisher de ACK/resultado.
 user queda-backend
 topic read queda/devices/+/events
 topic read queda/devices/+/status
 topic read queda/devices/+/telemetry
 topic write queda/devices/+/critical-event-acks
+topic write queda/devices/+/critical-event-results
 
-# Devices: escrevem apenas nos proprios canais e leem apenas o proprio ACK.
+# Devices: escrevem apenas nos proprios canais e leem apenas as proprias confirmacoes.
+# Nao ha linha de escrita para critical-event-acks/results: o device nao confirma a si mesmo.
 pattern write queda/devices/%u/events
 pattern write queda/devices/%u/status
 pattern write queda/devices/%u/telemetry
 pattern read queda/devices/%u/critical-event-acks
+pattern read queda/devices/%u/critical-event-results

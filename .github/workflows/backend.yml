@@ -150,3 +150,8 @@ jobs:
           # Nenhum cenario pode ser silenciosamente pulado no CI.
           report=$(ls -t logs/e2e/critical-delivery-*.json | head -1)
           node -e "const r=require('./'+process.argv[1]);const s=r.scenarios.filter(x=>x.status!=='passed');if(s.length){console.error(JSON.stringify(s,null,2));process.exit(1)}" "$report"
+
+      - name: Verify staging MQTT profile against real Mosquitto (TLS, auth, ACL, retained, revocation)
+        # CA/certificados/senhas efemeros; relatorio sanitizado em backend/logs/security.
+        timeout-minutes: 5
+        run: bash infra/mqtt/run-security-verification.sh
