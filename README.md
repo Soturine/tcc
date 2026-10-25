@@ -2,11 +2,11 @@
 
 Repositório oficial da evolução para Trabalho de Conclusão de Curso do projeto [`Soturine/iot-fall-monitor`](https://github.com/Soturine/iot-fall-monitor).
 
-> **Estado atual (2026-10-21):** baseline portada e validada, saneamento P1, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Entrega crítica com outbox persistente no ESP32, `event_uuid` robusto a reboot, ACK de aplicação pós-commit e alerta de queda offline por evidência local estão **implementados e verificados em testes host e emulação ponta a ponta**, ainda **sem validação em ESP32 físico** e com transporte device→broker em QoS 0 (ADR-020). A infraestrutura de avaliação do detector com datasets reais existe; em 2026-10-25 foi produzido o **primeiro resultado offline com dados reais** (WEDA-FALL, pulso, uso autorizado pelo autor; [resultado](docs/research/wrist-baseline-weda-fall-2026-10-25.md)), que é caracterização da baseline e não validação clínica. Android, FCM, provisioning seguro e staging continuam planejados.
+> **Estado atual (2026-10-21):** baseline portada e validada, saneamento P1, contratos HTTP/MQTT, identidade temporal no MySQL e lifecycle inicial de dados concluídos. Entrega crítica com outbox persistente no ESP32, `event_uuid` robusto a reboot, ACK de aplicação pós-commit e alerta de queda offline por evidência local estão **implementados e verificados em testes host e emulação ponta a ponta**, ainda **sem validação em ESP32 físico** e com transporte device→broker em QoS 0 (ADR-020). A infraestrutura de avaliação do detector com datasets reais existe; em 2026-10-25 foi produzido o **primeiro resultado offline com dados reais** (WEDA-FALL, pulso, uso autorizado pelo autor; [resultado](docs/research/wrist-baseline-weda-fall-2026-10-25.md)), que é caracterização da baseline e não validação clínica. Em 2026-10-25 entrou o app Android A1/A2 (0.10.0-dev.0, emulador e CI, sem aparelho físico); FCM, provisioning seguro e staging continuam planejados.
 
 ## Linha TG1 — Wearable de pulso, MotionLab e pesquisa (planejada)
 
-A partir de 2026-10-21 o eixo de pesquisa prioriza **relógio ESP32 com acelerômetro e giroscópio triaxiais**; placas apenas com acelerômetro não são elegíveis. **Nenhum wearable foi comprado/portado/validado**, um dataset externo de pulso (WEDA-FALL) foi processado offline com a baseline congelada (sem ajuste: recall 21% nas quedas simuladas e especificidade 99,8% nas ADLs; caracterização offline, não HIL nem desempenho clínico), nenhum perfil individual/ML foi implantado e `apps/android` ainda está ausente. O núcleo de entrega crítica foi verificado em host/emulação, **não HIL**.
+A partir de 2026-10-21 o eixo de pesquisa prioriza **relógio ESP32 com acelerômetro e giroscópio triaxiais**; placas apenas com acelerômetro não são elegíveis. **Nenhum wearable foi comprado/portado/validado**, um dataset externo de pulso (WEDA-FALL) foi processado offline com a baseline congelada (sem ajuste: recall 21% nas quedas simuladas e especificidade 99,8% nas ADLs; caracterização offline, não HIL nem desempenho clínico), nenhum perfil individual/ML foi implantado; o app `apps/android` (A1/A2) existe desde 0.10.0-dev.0, sem integração com wearable. O núcleo de entrega crítica foi verificado em host/emulação, **não HIL**.
 
 Documentos consolidados: [matriz hardware](docs/hardware/wearable-selection-2026-10-21.md), [Android/conectividade independente de cuidador](docs/architecture/wearable-mobile-and-resilience.md), [registry wrist de datasets](docs/research/wrist-dataset-registry.md), [MotionLab Live](docs/research/motionlab-live.md), [calibração e aprendizado seguro](docs/research/personalization-feedback.md), [gates QA](docs/quality/wrist-motionlab-verification.md), [recorte acadêmico e artigo](docs/research/publication-and-scope.md). Decisões propostas estão catalogadas nos ADRs; evolução executiva no roadmap/backlog. Não elevar documentação a implementação.
 
@@ -16,7 +16,17 @@ Documentos consolidados: [matriz hardware](docs/hardware/wearable-selection-2026
 
 ## Versão de desenvolvimento
 
-**0.9.5-dev.0** — versão de trabalho após v0.9.4, **não é uma release publicada**. Código e CI de host/emulação devem ser interpretados separados de HIL e deployment. A matriz de versões, componentes e evidências está em [Version Milestones](docs/roadmap/version-milestones.md). O [CHANGELOG](CHANGELOG.md) preserva o histórico 0.9.4 e o delta ainda não lançado.
+**0.10.0-dev.0** — versão de trabalho que abre a linha Android A1/A2 (após 0.9.5-dev.0 e a tag histórica v0.9.4), **não é uma release publicada**: sem tag, sem GitHub Release, sem APK assinado. Código e CI de host/emulação devem ser interpretados separados de HIL e deployment. A matriz de versões, componentes e evidências está em [Version Milestones](docs/roadmap/version-milestones.md). O [CHANGELOG](CHANGELOG.md) preserva o histórico 0.9.4 e os deltas ainda não lançados.
+
+## App Android (A1/A2, 0.10.0-dev.0)
+
+App nativo Kotlin + Jetpack Compose em [`apps/android`](apps/android/README.md): login com sessão móvel revogável (refresh rotativo, logout que revoga no servidor, sessão cifrada pelo Android Keystore), pessoas, dispositivos com Protection Health, alertas e ações autorizadas pelo backend. Testado em JVM/Robolectric, contra backend + MySQL reais no CI e em emulador Android 14; **não** testado em aparelho físico. **Sem notificações push (FCM)**: alertas só aparecem com o app aberto. Capturas de uma execução real no emulador com dados sintéticos do seed:
+
+| Login | Visão geral | Alertas | Ocorrência | Dispositivo |
+|---|---|---|---|---|
+| ![Login](docs/assets/android/01-login.png) | ![Visão geral](docs/assets/android/02-overview.png) | ![Alertas](docs/assets/android/03-alerts.png) | ![Ocorrência](docs/assets/android/04-occurrence.png) | ![Protection Health](docs/assets/android/06-device-health.png) |
+
+Detalhes e limites: [arquitetura Android](docs/architecture/mobile-android.md) · [auditoria A1/A2](docs/audit/android-a1-a2-audit-2026-10-25.md).
 
 ## Visão do projeto
 

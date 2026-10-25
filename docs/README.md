@@ -12,7 +12,7 @@ Este índice define quais documentos devem ser lidos como canônicos durante a i
 - [Plano de QA/Gates do pulso e ML](quality/wrist-motionlab-verification.md)
 - [Estratégia acadêmica, artigo, TG1/TG2 e escopo](research/publication-and-scope.md)
 
-**Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos. *Atualização 2026-10-25:* ver [evidência P2.1](quality/p2-1-implementation-evidence-2026-10-25.md), [resultado WEDA-FALL](research/wrist-baseline-weda-fall-2026-10-25.md) (offline, sem HIL) e [MotionLab offline](../tools/motionlab/README.md); wearable e Android continuam ausentes.
+**Todos planejados;** nenhum wearable, Android, novo dataset real ou MotionLab foi qualificado/implementado por estes documentos. *Atualização 2026-10-25:* ver [evidência P2.1](quality/p2-1-implementation-evidence-2026-10-25.md), [resultado WEDA-FALL](research/wrist-baseline-weda-fall-2026-10-25.md) (offline, sem HIL) e [MotionLab offline](../tools/motionlab/README.md); wearable continua ausente; o app Android A1/A2 entrou em 0.10.0-dev.0 (ver abaixo).
 
 ## Plano de execução e remediação — 2026-10-22
 
@@ -42,7 +42,9 @@ A complementação pós-PR #8/#9 **não implementa** os itens restantes: mantém
 - [`architecture/device-connectivity.md`](architecture/device-connectivity.md) — device, critical event reliability, provisioning, wearable.
 - [`architecture/contracts.md`](architecture/contracts.md) — HTTP/MQTT, ACKs, schemas, identidade.
 - [`architecture/data-model.md`](architecture/data-model.md) — MySQL/migrations/event evidence/mobile sessions.
-- [`architecture/mobile-android.md`](architecture/mobile-android.md) — Kotlin/Compose, FCM, Protection Health, provisioning.
+- [`architecture/mobile-android.md`](architecture/mobile-android.md) — Kotlin/Compose, FCM, Protection Health, provisioning; seção "Estado implementado" separa o que existe em 0.10.0-dev.0 do que é proposta.
+- [`../apps/android/README.md`](../apps/android/README.md) — rodar e testar o app (emulador, aparelho via `adb reverse`, backend local).
+- [`audit/android-a1-a2-audit-2026-10-25.md`](audit/android-a1-a2-audit-2026-10-25.md) — auditoria ponta a ponta A1/A2 (FIXED/PARTIAL/DEFERRED/BLOCKED) e Assertiva da suíte Android.
 - [`architecture/mobile-technology-evaluation.md`](architecture/mobile-technology-evaluation.md) — racional Kotlin × Flutter/RN/KMP.
 - [`architecture/cloud-deployment.md`](architecture/cloud-deployment.md) — staging provider-agnostic.
 - [`architecture/cloud-options-evaluation.md`](architecture/cloud-options-evaluation.md) — opções de fornecedores avaliadas.
