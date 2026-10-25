@@ -59,8 +59,12 @@ async function refused(promise) {
     client.end(true);
     return { refused: false, reason: "connected" };
   } catch (error) {
-    // Somente a classe do erro (sem detalhes de credencial).
-    return { refused: true, reason: error.code || error.message.split(":")[0] };
+    // Somente um codigo de erro de formato restrito: nunca a mensagem, que poderia
+    // ecoar dados da tentativa (usuario/credencial) no log.
+    const code = error && (error.code ?? error.reasonCode);
+    const reason = /^[A-Z0-9_]{1,40}$/.test(String(code)) ? String(code)
+      : Number.isInteger(code) ? `CONNACK_${code}` : "REFUSED";
+    return { refused: true, reason };
   }
 }
 
@@ -114,8 +118,8 @@ async function main() {
   // ---------------- autenticacao
   const anonymous = await refused(connect(undefined, undefined));
   check(anonymous.refused, `anonimo recusado (${anonymous.reason})`);
-  const badPassword = await refused(connect("esp32_a", "senha-invalida"));
-  check(badPassword.refused, `senha invalida recusada (${badPassword.reason})`);
+  const invalidCredentialAttempt = await refused(connect("esp32_a", "senha-invalida"));
+  check(invalidCredentialAttempt.refused, `credencial invalida recusada (${invalidCredentialAttempt.reason})`);
   const unknownUser = await refused(connect("intruso", env.PA));
   check(unknownUser.refused, `usuario desconhecido recusado (${unknownUser.reason})`);
 

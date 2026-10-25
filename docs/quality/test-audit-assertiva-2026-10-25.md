@@ -78,4 +78,4 @@ Limites: 22 mutantes escolhidos à mão sobre o código desta rodada não são u
 
 - Clone limpo de `91222ce` (`tcc/tg1-wrist-motionlab-research-foundation`, depois do merge da implementação), run `bf5f5edca6d743dd`: os mesmos 7 findings, `--run-check` HIL 4/4 e MotionLab 12/12 `PASS`, 142 testes JS e 60 Python no inventário estático. As disposições acima foram anexadas ao relatório do engine (`--assessment`, aceito pelo engine).
 - Relatório HTML local (fora do repositório): `~/.assertiva/reports/tcc-91222ce-eea64d1a8b9361db/audit.html`.
-- Commits posteriores a `91222ce` alteram apenas este documento.
+- Commits posteriores a `91222ce`: este documento e a correção do alerta CodeQL `js/clear-text-logging` (high) no verificador de broker (`infra/mqtt/verify-broker-security.js`), que passou a registrar só códigos de erro de formato restrito. Nenhum código de produto (firmware/backend/web) mudou. O alerta foi levantado pelo code scanning do GitHub no PR, não pela Assertiva nem pelos testes.
