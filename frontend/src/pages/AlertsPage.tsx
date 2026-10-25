@@ -417,6 +417,12 @@ export function AlertsPage() {
                       <Badge tone={sev === "critical" ? "critical" : (severityTone(sev) as never)}>
                         {humanizeSeverity(sev)}
                       </Badge>
+                      {alert.priority ? (
+                        // Texto explicito: prioridade nao depende apenas de cor.
+                        <Badge tone={alert.priority === "urgent" ? "critical" : ("muted" as never)}>
+                          {alert.priority === "urgent" ? "Urgente" : "Verificar"}
+                        </Badge>
+                      ) : null}
                       <span className="ml-auto text-xs font-medium text-surface-500">
                         {formatDateTime(alert.event.eventTime)}
                       </span>

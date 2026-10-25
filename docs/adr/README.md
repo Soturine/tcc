@@ -158,6 +158,8 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 2. O transporte continua PubSubClient nesta fase. ESP-MQTT é viável em memória (spike), mas executa em task própria, entrega callbacks fora do `loop()` e muda TLS/reconexão; trocá-lo sem ESP32 físico colocaria em risco o caminho crítico sem evidência de execução.
 3. A adoção de ESP-MQTT QoS 1 fica como próximo passo de firmware, atrás de interface de transporte, com critério de aceite: HIL com broker TLS, perda de Wi‑Fi, reboot e medição de heap/stack em execução.
 
+**Atualização 2026-10-25.** O laço de entrega foi isolado atrás de `CriticalTransport` (`include/critical_delivery.h`), com testes nativos; o cliente continua PubSubClient. A troca para ESP-MQTT continua condicionada ao HIL acima.
+
 **Consequências.** O backend já assina com QoS 1 e publica ACK com QoS 1. Do device para o broker a mensagem segue QoS 0; perdas nesse trecho são recuperadas por retry da outbox (maior latência de recuperação, não perda lógica). Sessão persistente continua otimização (F-13), não requisito de correção.
 
 ## ADR-021 — Pulso + IMU completa como alvo de qualificação
@@ -167,7 +169,7 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 **Status: Proposed (2026-10-21).** Manter `wearable → Wi-Fi/MQTT/TLS → backend → FCM → Android` com SOS/outbox. Cuidador pode estar distante; BLE é para onboarding, diagnóstico, MotionLab e eventual hub **dedicado**. LoRa/Thread exigem gateway; 4G opcional não é característica implícita de nenhum relógio. Falha total de rede degrada o envio, registrada de forma explícita. Não sobrescrever ADR-005/020. [Detalhes](../architecture/wearable-mobile-and-resilience.md).
 
 ## ADR-023 — Dataset registry e posição do sensor são fronteiras científicas
-**Status: Proposed (2026-10-21).** Arquivos originais imutáveis/fora do Git e por licença; pulso é corpus primário, cintura/lombar só avaliação separada, acelerômetro-only não alimenta FSM de 6 eixos; harmonização de unidades/eixos/frequência explícita, splits sujeito/sessão/fonte e holdout congelado. Nenhum resultado de dataset real produzido. [Dataset registry](../research/wrist-dataset-registry.md).
+**Status: Proposed (2026-10-21).** Arquivos originais imutáveis/fora do Git e por licença; pulso é corpus primário, cintura/lombar só avaliação separada, acelerômetro-only não alimenta FSM de 6 eixos; harmonização de unidades/eixos/frequência explícita, splits sujeito/sessão/fonte e holdout congelado. Primeiro resultado real (2026-10-25): baseline congelada no WEDA-FALL, ver [resultado](../research/wrist-baseline-weda-fall-2026-10-25.md). [Dataset registry](../research/wrist-dataset-registry.md).
 
 ## ADR-024 — MotionLab separado e subordinado à proteção crítica
 **Status: Proposed (2026-10-21).** Uma aquisição da IMU abastece FallDetector, recorder e classificador experimental; pipeline live limitado e descartável, gravação local auditável e GT independente; lab nunca bloqueia SOS/outbox; classificação `unknown` é válida; novo contrato/ACL/armazenamento segregados. [Especificação](../research/motionlab-live.md).
@@ -177,7 +179,7 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 
 
 ## ADR-026 — Resultados negativos de ingestão crítica não equivalem a ACK de persistência
-**Status: Proposed (2026-10-22).** `critical-event-ack-v1` continua significando apenas `committed/duplicate` após COMMIT. Tratar F-29 via *resultado versionado* e política persistente de retry/quarentena, com semântica e limites explícitos. Nunca remover evento em resposta a rejeição como se tivesse sido persistido. Resolver `outbox full` com observabilidade e decisão de risco, sem promessa impossível de armazenamento ilimitado. [Protocolo P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
+**Status: Accepted (2026-10-25)** — implementado como `critical-event-result-v1` (host/emulação; HIL pendente), ver [evidência P2.1](../quality/p2-1-implementation-evidence-2026-10-25.md). Proposto em 2026-10-22. `critical-event-ack-v1` continua significando apenas `committed/duplicate` após COMMIT. Tratar F-29 via *resultado versionado* e política persistente de retry/quarentena, com semântica e limites explícitos. Nunca remover evento em resposta a rejeição como se tivesse sido persistido. Resolver `outbox full` com observabilidade e decisão de risco, sem promessa impossível de armazenamento ilimitado. [Protocolo P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
 
 ## ADR-027 — Flash/energia, taxa de amostragem e qualificação de wearable são gates físicos
 **Status: Proposed (2026-10-22).** Não promover smartwatch a hardware final, mudança de partição/OTA ou amostragem 50/100 Hz por documentação, demonstração do fornecedor ou build de bancada. Requer BOM/SKU revisados, drivers e eixos reais, HIL para outbox/flash e medidas de jitter/energia. O algoritmo baseline A permanece congelado; trocar taxa/filtro exige nova condição experimental. [Hardware](../hardware/wearable-qualification-protocol-2026-10-22.md) · [Nyquist](../research/wrist-sampling-nyquist-protocol.md).
@@ -185,3 +187,21 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 ## ADR-028 — Foco de TG1 e dependências de Android/FCM sem inflar escopo
 **Status: Proposed (2026-10-22).** CP1 confiabilidade, CP3 dataset real de pulso e CP4 Nyquist podem evoluir com gates independentes; Android Kotlin/Compose/FCM pode ser iniciado após contratos críticos estabilizados, mesmo antes de comprar relógio. A demonstração mínima TG2 deve usar evidência física da cadeia `SOS/IMU→persistência→alerta→Android`, respeitando indisponibilidade de rede e sem promessa clínica. MotionLab/ML/personalização são extensões estritamente isoladas da proteção. [Plano](../roadmap/tg1-execution-gates-2026-10-22.md).
 
+
+## ADR-029 — Matriz de prioridade de alerta: urgente × atenção (F-31)
+**Status: Accepted (2026-10-25) — decisão de produto sujeita a revisão do orientador/PR.** Complementa ADR-016; não altera limiares do detector.
+
+| Evento | Evidência | Alerta | Prioridade | Severidade |
+|---|---|---|---|---|
+| `sos_pressed`, `manual_sos` | — | sim | `urgent` | high |
+| `fall_detected` | `device`, `server_telemetry`, `both` (ou legado `linked/partial`) | sim | `urgent` | critical/high |
+| `fall_detected` | `none` | **sim (antes: não)** | `attention` | medium |
+| `fall_suspected` | qualquer | sim | `attention` | **medium (antes: high)** |
+| `sensor_fault` | — | sim | `attention` | high |
+| `alert_test`, informativos | — | não | — | low/— |
+
+**Contexto.** `fall_suspected` usava o mesmo caminho urgente de `fall_detected`; `fall_detected` sem evidência era persistido **sem alerta**, o que podia silenciar um falso negativo (firmware antigo, evidência incompleta/ilegível).
+
+**Decisão.** Política pura em `backend/src/services/alertPolicy.js`; `priority` é derivada (não armazenada, sem migração) e exposta em `Alert` (OpenAPI) e na Web como rótulo textual. Evidência insuficiente **não confirma** queda (nunca `urgent`), mas gera alerta de atenção. SOS nunca é rebaixado.
+
+**Consequências.** Mais alertas de atenção possíveis; nenhum alerta urgente a mais. Não há push/FCM nesta fase, portanto “prioridade” afeta apenas listagem/realtime. Testes: matriz em `backend/tests/alerts/eventService.test.js`, E2E cenário 9.

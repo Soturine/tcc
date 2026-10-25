@@ -6,6 +6,7 @@ const { env } = require("../config/env");
 const { logger } = require("../utils/logger");
 const { parseDeviceTopic, getSubscriptionTopics } = require("./topics");
 const { handleMqttMessage } = require("../services/mqttIngestionService");
+const { sha256Hex } = require("./criticalEventResult");
 
 function loadTlsCaIfConfigured() {
   if (!env.mqtt.tlsCaFile) {
@@ -100,9 +101,12 @@ function createMqttBridge({ io }) {
     handleMqttMessage({
       topicInfo,
       payloadText: payloadBuffer.toString(),
+      // critical-event-result-v1 correlaciona pelos bytes exatos recebidos.
+      payloadSha256: sha256Hex(payloadBuffer),
       io,
-      // QoS 1 e retain=false (critical-event-ack-v1). O callback informa falha;
-      // sem ACK o device retransmite o mesmo event_uuid e o backend deduplica.
+      // QoS 1 e retain=false (critical-event-ack-v1 e critical-event-result-v1).
+      // O callback informa falha; sem confirmacao o device retransmite o mesmo
+      // event_uuid e o backend deduplica.
       publishAck: (ackTopic, ack, callback) =>
         client.publish(ackTopic, JSON.stringify(ack), { qos: 1, retain: false }, callback),
     }).catch((error) => {

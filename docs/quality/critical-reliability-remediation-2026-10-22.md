@@ -1,5 +1,7 @@
 # Remediação P2.1 — confiabilidade crítica, ameaça e verificação (2026-10-22)
 
+> **Execução 2026-10-25:** status por finding, comandos e limites em [evidência P2.1](p2-1-implementation-evidence-2026-10-25.md) (host/emulação/broker de referência; HIL `BLOCKED`). Este documento permanece como especificação.
+>
 > **Tipo:** especificação de implementação e ensaio, **não** conclusão de correções. Baseline de leitura: `main@184db917` (PR #8 + PR #9). Estado existente: outbox LittleFS/CRC32, UUID, replay de host e E2E emulado, ACK após COMMIT. HIL, entrega Android e operação segura em staging continuam pendentes. Evidências históricas: [auditoria](../audit/tcc-comprehensive-audit-2026-10-21.md), [testes registrados](critical-delivery-validation.md), [ADR-020](../adr/README.md#adr-020--outbox-crítica-com-ack-de-aplicação-sobre-pubsubclient-esp-mqtt-qos-1-condicionado-a-hil).
 
 ## 1. Limites e invariantes: o que significa entregar uma emergência

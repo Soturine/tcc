@@ -1,3 +1,4 @@
+const { env } = require("../config/env");
 const { transaction } = require("../db/pool");
 const {
   createCorrelationId,
@@ -9,7 +10,19 @@ const {
   resolveCriticalEventOccurrence,
   resolveRealtimeMqttTimestamp,
 } = require("../utils/time");
-const { buildCriticalEventAckTopic } = require("../mqtt/topics");
+const {
+  buildCriticalEventAckTopic,
+  buildCriticalEventResultTopic,
+} = require("../mqtt/topics");
+const {
+  RESULT_STATUSES,
+  REASON_CODES,
+  buildCriticalEventResult,
+  buildPersistedResult,
+  classifyIngestError,
+  requestedIngestResultVersion,
+  sha256Hex,
+} = require("../mqtt/criticalEventResult");
 const {
   getDeviceBehaviorSnapshot,
   getOrCreateDeviceByIdentity,
@@ -140,6 +153,62 @@ function publishCriticalEventAck({ publishAck, topicInfo, event, correlationId }
   return { topic: ackTopic, ack };
 }
 
+/**
+ * critical-event-result-v1. Resultados persistidos so sao publicados apos COMMIT;
+ * resultados negativos nunca carregam event_id e nao confirmam persistencia.
+ */
+function publishCriticalEventResult({ publishAck, topicInfo, result, correlationId }) {
+  const resultTopic = buildCriticalEventResultTopic(topicInfo.deviceIdentifier);
+  const logContext = {
+    correlationId,
+    resultTopic,
+    eventUuid: result.event_uuid,
+    eventId: result.event_id,
+    status: result.status,
+    reasonCode: result.reason_code,
+  };
+
+  if (typeof publishAck !== "function") {
+    logger.warn("Resultado de ingestao nao publicado: publisher MQTT indisponivel.", {
+      ...logContext,
+      reason: "result_publisher_missing",
+    });
+    return null;
+  }
+
+  const onPublishError = (error) => {
+    logger.error("Falha ao publicar resultado de ingestao; o device retransmitira o mesmo UUID.", {
+      ...logContext,
+      message: error.message,
+      reason: "result_publish_failed",
+    });
+  };
+
+  try {
+    publishAck(resultTopic, result, (error) => {
+      if (error) {
+        onPublishError(error);
+      }
+    });
+  } catch (error) {
+    onPublishError(error);
+    return null;
+  }
+
+  logger.info("Resultado de ingestao critica publicado.", logContext);
+  return { topic: resultTopic, result };
+}
+
+// So e possivel correlacionar um resultado com UUID textual valido pelo contrato.
+function correlatableEventUuid(payload) {
+  const value = payload?.event_uuid;
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed && trimmed.length <= 160 ? trimmed : null;
+}
+
 function buildTelemetryLogSummary(payload) {
   return {
     ax: toNullableNumber(payload.ax),
@@ -158,11 +227,18 @@ function buildTelemetryLogSummary(payload) {
   };
 }
 
-async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null }) {
+async function handleMqttMessage({
+  topicInfo,
+  payloadText,
+  io,
+  publishAck = null,
+  payloadSha256 = null,
+}) {
   const correlationId = createCorrelationId("mqtt");
   const messageStartedAt = process.hrtime.bigint();
   const receivedAt = new Date();
   const payloadBytes = Buffer.byteLength(payloadText || "", "utf8");
+  const receivedPayloadSha256 = payloadSha256 || sha256Hex(Buffer.from(payloadText || "", "utf8"));
   let payload;
 
   try {
@@ -209,6 +285,29 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
     return;
   }
 
+  const resultVersion = topicInfo.channel === "events"
+    ? requestedIngestResultVersion(payload)
+    : null;
+  const resultEventUuid = resultVersion ? correlatableEventUuid(payload) : null;
+  const publishNegativeResult = (status, reasonCode, retryAfterMs = null) => {
+    if (!resultEventUuid || !topicInfo.deviceIdentifier) {
+      return null;
+    }
+    return publishCriticalEventResult({
+      publishAck,
+      topicInfo,
+      correlationId,
+      result: buildCriticalEventResult({
+        deviceIdentifier: topicInfo.deviceIdentifier,
+        eventUuid: resultEventUuid,
+        payloadSha256: receivedPayloadSha256,
+        status,
+        reasonCode,
+        retryAfterMs,
+      }),
+    });
+  };
+
   if (
     topicInfo.deviceIdentifier &&
     payload.device_id &&
@@ -224,6 +323,8 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
       payloadBytes,
       reason: "topic_payload_device_mismatch",
     });
+    // O topico autenticado e a autoridade (ADR-015): o resultado vai para ele.
+    publishNegativeResult(RESULT_STATUSES.REJECTED_PERMANENT, REASON_CODES.IDENTITY_REJECTED);
     return;
   }
 
@@ -260,7 +361,27 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
   });
 
   return runWithKeyedLock(`mqtt:${deviceIdentifier}`, async () => {
-    const result = await transaction(async (connection) => {
+    let result;
+    try {
+      result = await ingestInTransaction();
+    } catch (error) {
+      // Rollback (ou COMMIT incerto): nunca resultado persistido. A falha continua
+      // propagada para o log do bridge MQTT.
+      if (topicInfo.channel === "events") {
+        const classification = classifyIngestError(error);
+        publishNegativeResult(
+          classification.status,
+          classification.reasonCode,
+          classification.retryAfterMs ?? null,
+        );
+      }
+      throw error;
+    }
+    return finishIngestion(result);
+  });
+
+  function ingestInTransaction() {
+    return transaction(async (connection) => {
       const device = await getOrCreateDeviceByIdentity(
         {
           deviceUid,
@@ -486,6 +607,9 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
         alert: null,
       };
     });
+  }
+
+  function finishIngestion(result) {
 
     if (result.channel === "status") {
       logger.info("MQTT status processado.", {
@@ -564,8 +688,25 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
     }
 
     if (result.channel === "events_duplicate" || result.channel === "events") {
-      // O commit ja ocorreu (transaction resolveu). Duplicatas recebem novo ACK.
-      publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
+      // O commit ja ocorreu (transaction resolveu). Duplicatas recebem nova confirmacao.
+      if (resultVersion && result.event?.eventUuid) {
+        publishCriticalEventResult({
+          publishAck,
+          topicInfo,
+          correlationId,
+          result: buildPersistedResult({
+            deviceIdentifier: topicInfo.deviceIdentifier,
+            event: result.event,
+            payloadSha256: receivedPayloadSha256,
+          }),
+        });
+        if (env.mqtt.legacyAckForResultDevices) {
+          // Mesma semantica (persistido); cobre ACL ainda sem critical-event-results.
+          publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
+        }
+      } else {
+        publishCriticalEventAck({ publishAck, topicInfo, event: result.event, correlationId });
+      }
     }
 
     if (result.channel === "events_duplicate") {
@@ -606,7 +747,7 @@ async function handleMqttMessage({ topicInfo, payloadText, io, publishAck = null
         patientId: result.alert.patientId || null,
       }, { correlationId });
     }
-  });
+  }
 }
 
 module.exports = {

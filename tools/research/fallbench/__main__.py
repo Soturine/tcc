@@ -30,6 +30,8 @@ def _load_trials(args, excluded):
     options = {}
     if args.adapter == "kfall":
         options = {"labels_path": args.labels, "excluded": excluded}
+    if args.adapter == "weda_fall":
+        options = {"rate_dir": args.rate_dir, "timebase": args.timebase, "excluded": excluded}
     if args.adapter == "sisfall":
         if args.accel_g_per_count:
             options["accel_g_per_count"] = args.accel_g_per_count
@@ -86,6 +88,10 @@ def cmd_evaluate(args) -> int:
             "firmware_sample_interval_ms": interval_ms,
             "max_gap_ms": args.max_gap_ms,
             "axis_map": axis_map.spec,
+            "weda_fall": (
+                {"rate_dir": args.rate_dir, "timebase": args.timebase}
+                if args.adapter == "weda_fall" else None
+            ),
             "subjects_filter": sorted(_subjects(args.subjects) or []),
             "evaluation_unit": "trial",
             "detector_config": config,
@@ -125,6 +131,27 @@ def cmd_evaluate(args) -> int:
     return 0
 
 
+def cmd_nyquist_synthetic(args) -> int:
+    from .signal_lab import synthetic_condition_report
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(synthetic_condition_report(), indent=2) + "\n", encoding="utf-8")
+    print(str(out))
+    return 0
+
+
+def cmd_weda_spectrum(args) -> int:
+    from .spectral_profile import profile_dataset
+
+    report = profile_dataset(Path(args.root), args.rate_dir)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(str(out))
+    return 0
+
+
 def cmd_split(args) -> int:
     excluded = []
     subjects = {trial.subject_id for trial in _load_trials(args, excluded)}
@@ -137,12 +164,15 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def common(command):
-        command.add_argument("--adapter", required=True, choices=["sisfall", "kfall", "normalized"])
+        command.add_argument("--adapter", required=True, choices=["sisfall", "kfall", "normalized", "weda_fall"])
         command.add_argument("--root", required=True)
         command.add_argument("--labels", help="KFall: exportacao CSV dos rotulos")
         command.add_argument("--subjects", default="", help="lista separada por virgula")
         command.add_argument("--accel-g-per-count", type=float, default=None)
         command.add_argument("--gyro-dps-per-count", type=float, default=None)
+        command.add_argument("--rate-dir", default="50Hz", help="WEDA-FALL: subdiretorio de taxa")
+        command.add_argument("--timebase", default="recorded", choices=["recorded", "uniform_index"],
+                             help="WEDA-FALL: timestamps como gravados ou suposicao uniforme declarada")
 
     evaluate_parser = sub.add_parser("evaluate")
     common(evaluate_parser)
@@ -159,6 +189,16 @@ def build_parser() -> argparse.ArgumentParser:
     split_parser.add_argument("--seed", required=True)
     split_parser.add_argument("--dev-fraction", type=float, default=0.5)
     split_parser.set_defaults(func=cmd_split)
+
+    nyquist_parser = sub.add_parser("nyquist-synthetic", help="artefato espectral sintetico 4+17 Hz @125 Hz")
+    nyquist_parser.add_argument("--out", required=True)
+    nyquist_parser.set_defaults(func=cmd_nyquist_synthetic)
+
+    spectrum_parser = sub.add_parser("weda-spectrum", help="perfil espectral agregado do WEDA-FALL")
+    spectrum_parser.add_argument("--root", required=True)
+    spectrum_parser.add_argument("--rate-dir", default="50Hz")
+    spectrum_parser.add_argument("--out", required=True)
+    spectrum_parser.set_defaults(func=cmd_weda_spectrum)
     return parser
 
 

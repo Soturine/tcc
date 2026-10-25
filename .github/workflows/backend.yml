@@ -80,11 +80,12 @@ jobs:
           npm run test:mysql:migrations
           npm run test:mysql:retention
 
+      # Mosquitto 2.1.2 fixado por digest (2026-09-17); per_listener_settings e legado nessa linha.
       - name: Start Mosquitto integration broker
         run: >-
           docker run --detach --name mosquitto-ci --publish 1883:1883
           --volume "${GITHUB_WORKSPACE}/infra/mqtt/mosquitto-ci.conf:/mosquitto/config/mosquitto.conf:ro"
-          eclipse-mosquitto:2
+          eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408
 
       - name: Run real MySQL and Mosquitto smoke
         working-directory: backend
@@ -140,4 +141,17 @@ jobs:
           MQTT_BROKER_URL: mqtt://127.0.0.1:1883
           MQTT_TOPIC_BASE: queda/devices
           E2E_BACKEND_PORT: 4100
-        run: npm run test:e2e:critical
+          # Habilita os cenarios de banco congelado (docker pause) e broker parado
+          # (docker stop/start); sem eles os cenarios 7 e 18 seriam skipped.
+          E2E_DB_CONTAINER: ${{ job.services.mysql.id }}
+          E2E_BROKER_CONTAINER: mosquitto-ci
+        run: |
+          npm run test:e2e:critical
+          # Nenhum cenario pode ser silenciosamente pulado no CI.
+          report=$(ls -t logs/e2e/critical-delivery-*.json | head -1)
+          node -e "const r=require('./'+process.argv[1]);const s=r.scenarios.filter(x=>x.status!=='passed');if(s.length){console.error(JSON.stringify(s,null,2));process.exit(1)}" "$report"
+
+      - name: Verify staging MQTT profile against real Mosquitto (TLS, auth, ACL, retained, revocation)
+        # CA/certificados/senhas efemeros; relatorio sanitizado em backend/logs/security.
+        timeout-minutes: 5
+        run: bash infra/mqtt/run-security-verification.sh

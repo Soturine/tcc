@@ -20,6 +20,15 @@ String pathFor(const OutboxEntry& entry, const char* suffix) {
 bool endsWith(const String& value, const char* suffix) {
   return value.endsWith(suffix);
 }
+
+std::string readAll(File& file) {
+  std::string content;
+  content.reserve(file.size());
+  while (file.available()) {
+    content.push_back(static_cast<char>(file.read()));
+  }
+  return content;
+}
 }  // namespace
 
 bool CriticalOutboxFsStore::begin() {
@@ -87,7 +96,7 @@ bool CriticalOutboxFsStore::loadAll(std::vector<OutboxEntry>& out, StoreLoadRepo
     const String path = String(kDirectory) + "/" + String(file.name()).substring(
                                                        String(file.name()).lastIndexOf('/') + 1);
     if (endsWith(path, ".tmp")) {
-      // Escrita interrompida antes do rename: o evento nao havia sido aceito como persistido.
+      // Escrita interrompida: decidido depois da listagem (OutboxCodec::decideTmpRecovery).
       temporaryFiles.push_back(path);
       file.close();
       continue;
@@ -97,11 +106,7 @@ bool CriticalOutboxFsStore::loadAll(std::vector<OutboxEntry>& out, StoreLoadRepo
       continue;
     }
 
-    std::string content;
-    content.reserve(file.size());
-    while (file.available()) {
-      content.push_back(static_cast<char>(file.read()));
-    }
+    const std::string content = readAll(file);
     file.close();
 
     OutboxEntry entry;
@@ -118,6 +123,29 @@ bool CriticalOutboxFsStore::loadAll(std::vector<OutboxEntry>& out, StoreLoadRepo
   directory.close();
 
   for (const String& path : temporaryFiles) {
+    const String finalPath = path.substring(0, path.length() - 4) + ".evt";
+    std::string content;
+    File tmp = LittleFS.open(path, FILE_READ);
+    if (tmp) {
+      content = readAll(tmp);
+      tmp.close();
+    }
+    const OutboxCodec::TmpRecovery decision =
+        OutboxCodec::decideTmpRecovery(LittleFS.exists(finalPath), content);
+    OutboxEntry entry;
+    if (decision == OutboxCodec::TmpRecovery::PromoteTmp && LittleFS.rename(path, finalPath) &&
+        OutboxCodec::decode(content, entry)) {
+      // Regravacao interrompida entre remove e rename: o evento NAO pode se perder.
+      out.push_back(entry);
+      ++report.loaded;
+      AppLog::warnf("[outbox] tmp_promoted path=%s\n", finalPath.c_str());
+      continue;
+    }
+    if (decision == OutboxCodec::TmpRecovery::PromoteTmp) {
+      // Rename falhou: mantem o .tmp para a proxima tentativa em vez de apagar.
+      AppLog::errorf("[outbox] tmp_promote_failed path=%s\n", path.c_str());
+      continue;
+    }
     LittleFS.remove(path);
   }
   return true;

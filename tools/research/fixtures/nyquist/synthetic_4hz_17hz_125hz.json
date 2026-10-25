@@ -1,0 +1,301 @@
+{
+  "data_kind": "synthetic",
+  "disclaimer": "Fixture sintetica (senoides conhecidas). Nao e medicao de sinal humano nem da IMU.",
+  "reference_fs_hz": 125.0,
+  "components": [
+    {
+      "amplitude": 1.0,
+      "hz": 4.0
+    },
+    {
+      "amplitude": 0.5,
+      "hz": 17.0
+    }
+  ],
+  "duration_s": 8.0,
+  "conditions": [
+    {
+      "factor": 1,
+      "fs_out_hz": 125.0,
+      "antialias": false,
+      "nyquist_hz": 62.5,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9674
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 17.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.479
+        }
+      ]
+    },
+    {
+      "factor": 2,
+      "fs_out_hz": 62.5,
+      "antialias": false,
+      "nyquist_hz": 31.25,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9675
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 17.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.479
+        }
+      ]
+    },
+    {
+      "factor": 2,
+      "fs_out_hz": 62.5,
+      "antialias": true,
+      "cutoff_hz": 25.0,
+      "taps": 101,
+      "group_delay_s": 0.4,
+      "nyquist_hz": 31.25,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9736
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 17.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.483
+        }
+      ]
+    },
+    {
+      "factor": 3,
+      "fs_out_hz": 41.6667,
+      "antialias": false,
+      "nyquist_hz": 20.8333,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9937
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 17.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.4985
+        }
+      ]
+    },
+    {
+      "factor": 3,
+      "fs_out_hz": 41.6667,
+      "antialias": true,
+      "cutoff_hz": 16.666666666666668,
+      "taps": 101,
+      "group_delay_s": 0.4,
+      "nyquist_hz": 20.8333,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.995
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 17.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.1839
+        }
+      ]
+    },
+    {
+      "factor": 4,
+      "fs_out_hz": 31.25,
+      "antialias": false,
+      "nyquist_hz": 15.625,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9676
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 14.25,
+          "aliased": true,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.4791
+        }
+      ]
+    },
+    {
+      "factor": 4,
+      "fs_out_hz": 31.25,
+      "antialias": true,
+      "cutoff_hz": 12.5,
+      "taps": 101,
+      "group_delay_s": 0.4,
+      "nyquist_hz": 15.625,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9735
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 14.25,
+          "aliased": true,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.0
+        }
+      ]
+    },
+    {
+      "factor": 5,
+      "fs_out_hz": 25.0,
+      "antialias": false,
+      "nyquist_hz": 12.5,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.9994
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 8.0,
+          "aliased": true,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.4988
+        }
+      ]
+    },
+    {
+      "factor": 5,
+      "fs_out_hz": 25.0,
+      "antialias": true,
+      "cutoff_hz": 10.0,
+      "taps": 101,
+      "group_delay_s": 0.4,
+      "nyquist_hz": 12.5,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.999
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 8.0,
+          "aliased": true,
+          "ambiguous_with_other_component": false,
+          "measured_amplitude": 0.0
+        }
+      ]
+    },
+    {
+      "factor": 6,
+      "fs_out_hz": 20.8333,
+      "antialias": false,
+      "nyquist_hz": 10.4167,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": true,
+          "measured_amplitude": null
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 3.8333,
+          "aliased": true,
+          "ambiguous_with_other_component": true,
+          "measured_amplitude": null
+        }
+      ]
+    },
+    {
+      "factor": 6,
+      "fs_out_hz": 20.8333,
+      "antialias": true,
+      "cutoff_hz": 8.333333333333334,
+      "taps": 101,
+      "group_delay_s": 0.4,
+      "nyquist_hz": 10.4167,
+      "components": [
+        {
+          "true_hz": 4.0,
+          "true_amplitude": 1.0,
+          "apparent_hz": 4.0,
+          "aliased": false,
+          "ambiguous_with_other_component": true,
+          "measured_amplitude": null
+        },
+        {
+          "true_hz": 17.0,
+          "true_amplitude": 0.5,
+          "apparent_hz": 3.8333,
+          "aliased": true,
+          "ambiguous_with_other_component": true,
+          "measured_amplitude": null
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "50 Hz nao e obtido de 125 Hz por fator inteiro; exige reamostragem racional L/M.",
+    "Antialias com corte em 0,8 x Nyquist de saida: componentes logo abaixo de Nyquist sao atenuadas pela banda de transicao (fs > 2B nao basta sem margem)."
+  ]
+}

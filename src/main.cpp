@@ -12,6 +12,8 @@
 #include "connectivity_manager.h"
 #include "device_config.h"
 #include "critical_ack.h"
+#include "critical_delivery.h"
+#include "critical_result.h"
 #include "critical_outbox.h"
 #include "critical_outbox_fs_store.h"
 #include "event_identity.h"
@@ -35,6 +37,23 @@ FallFeatureExtractor fallFeatureExtractor;
 ConfigStore configStore;
 WifiManager wifiManager;
 DeviceMqttClient mqttClient;
+
+// Adaptador PubSubClient -> CriticalTransport (ADR-020). Troca de cliente MQTT so
+// apos HIL; a outbox e a confirmacao de aplicacao nao dependem dele.
+class MqttCriticalTransport : public CriticalTransport {
+ public:
+  explicit MqttCriticalTransport(DeviceMqttClient& client) : client_(client) {}
+  bool ready() override {
+    return client_.isConnected() && client_.isSubscribed();
+  }
+  bool publish(const std::string& topic, const std::string& payload) override {
+    return client_.publish(topic.c_str(), payload.c_str(), false);
+  }
+
+ private:
+  DeviceMqttClient& client_;
+};
+MqttCriticalTransport mqttTransport(mqttClient);
 SetupPortal setupPortal(configStore, mqttClient);
 ConnectivityManager connectivityManager(configStore, wifiManager, mqttClient, setupPortal);
 CriticalOutboxFsStore criticalOutboxStore;
@@ -44,6 +63,9 @@ OutboxConfig criticalOutboxConfig() {
   config.maxPayloadBytes = AppConfig::CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES;
   config.retryBaseMs = AppConfig::CRITICAL_OUTBOX_RETRY_BASE_MS;
   config.retryMaxMs = AppConfig::CRITICAL_OUTBOX_RETRY_MAX_MS;
+  config.sosReserve = AppConfig::CRITICAL_OUTBOX_SOS_RESERVE;
+  config.fallReserve = AppConfig::CRITICAL_OUTBOX_FALL_RESERVE;
+  config.quarantineCapacity = AppConfig::CRITICAL_OUTBOX_QUARANTINE_CAPACITY;
   return config;
 }
 CriticalEventOutbox criticalOutbox(criticalOutboxConfig(), []() { return esp_random(); });
@@ -66,6 +88,7 @@ unsigned long lastExperimentalAlertSkipLogAtMs = 0;
 unsigned long motionTestStableSinceAtMs = 0;
 unsigned long lastOutboxPersistRetryAtMs = 0;
 uint32_t invalidAckCount = 0;
+uint32_t invalidResultCount = 0;
 unsigned long lastSensorHealthLogAtMs = 0;
 unsigned long lastTelemetrySkipLogAtMs = 0;
 unsigned long lastLoopHealthLogAtMs = 0;
@@ -431,6 +454,8 @@ String buildEventPayload(const char* eventType,
   addDeviceIdentityToPayload(doc);
   doc["event_type"] = eventType;
   doc["event_uuid"] = eventUuid;
+  // Pede critical-event-result-v1 (resultados negativos sem confundir com ACK).
+  doc["ingest_result_version"] = AppConfig::CRITICAL_INGEST_RESULT_VERSION;
   doc["event_sequence"] = eventSequence;
   doc["sample_seq"] = sampleSeq;
   doc["timestamp"] = currentTimestampSeconds();
@@ -582,6 +607,23 @@ void addCriticalOutboxDiagnostics(JsonDocument& doc, unsigned long nowMs) {
     outbox["last_ack_age_ms"] = nullptr;
   }
   outbox["ack_subscribed"] = mqttClient.isSubscribed();
+  outbox["sos_reserve"] = stats.sosReserve;
+  outbox["fall_reserve"] = stats.fallReserve;
+  outbox["sos_overflow_count"] = stats.sosOverflowCount;
+  outbox["fall_overflow_count"] = stats.fallOverflowCount;
+  outbox["quarantined"] = stats.quarantined;
+  outbox["quarantine_capacity"] = stats.quarantineCapacity;
+  outbox["quarantine_full_count"] = stats.quarantineFullCount;
+  outbox["rejected_permanent_results"] = stats.rejectedPermanentResults;
+  outbox["retryable_results"] = stats.retryableResults;
+  outbox["hash_mismatch_results"] = stats.hashMismatchResults;
+  outbox["invalid_results"] = invalidResultCount;
+  outbox["last_quarantine_reason"] = stats.lastQuarantineReason.c_str();
+  // Degradado: algum evento critico foi recusado, rejeitado ou nao esta em flash.
+  // Nao e indicador medico; apenas sinaliza que a garantia local nao vale integralmente.
+  outbox["degraded"] = stats.sosOverflowCount > 0U || stats.fallOverflowCount > 0U ||
+                       stats.quarantined > 0U || stats.quarantineFullCount > 0U ||
+                       stats.notPersisted > 0U || !stats.storeAvailable;
   doc["boot_id"] = eventIdentity.bootId().c_str();
 }
 
@@ -642,6 +684,21 @@ String criticalAckTopic() {
   return DeviceSettings::buildTopic(runtimeConfig(), "critical-event-acks");
 }
 
+String criticalResultTopic() {
+  return DeviceSettings::buildTopic(runtimeConfig(), "critical-event-results");
+}
+
+EventPriority priorityForEventType(const char* eventType) {
+  const String type(eventType == nullptr ? "" : eventType);
+  if (type == "sos_pressed" || type == "manual_sos") {
+    return EventPriority::Sos;
+  }
+  if (type == "fall_detected") {
+    return EventPriority::Fall;
+  }
+  return EventPriority::Normal;
+}
+
 // Tenta transmitir um unico item vencido por chamada (nao bloqueia o laco).
 // Transmitir NAO remove: o item permanece ate o ACK de aplicacao pos-commit.
 void serviceCriticalOutbox(unsigned long nowMs) {
@@ -656,27 +713,15 @@ void serviceCriticalOutbox(unsigned long nowMs) {
     }
   }
 
-  // Sem assinatura do topico de ACK o envio geraria retries cegos.
-  if (!mqttClient.isConnected() || !mqttClient.isSubscribed()) {
-    return;
-  }
-
-  const OutboxEntry* due = criticalOutbox.nextDue(now32);
-  if (due == nullptr) {
-    return;
-  }
-
-  const std::string uuid = due->uuid;
-  const bool accepted = mqttClient.publish(due->topic.c_str(), due->payload.c_str(), false);
-  criticalOutbox.onPublishAttempt(uuid, now32, accepted);
+  const CriticalDelivery::ServiceReport report = CriticalDelivery::serviceOnce(criticalOutbox, mqttTransport, now32);
   const OutboxStats stats = criticalOutbox.stats();
-  if (accepted) {
+  if (report.outcome == CriticalDelivery::ServiceOutcome::Sent) {
     AppLog::infof("[outbox] sent_awaiting_ack event_uuid=%s pending=%u\n",
-                  uuid.c_str(),
+                  report.uuid.c_str(),
                   static_cast<unsigned>(stats.pending));
-  } else {
+  } else if (report.outcome == CriticalDelivery::ServiceOutcome::PublishFailed) {
     AppLog::warnf("[outbox] publish_failed event_uuid=%s mqtt_state=%d pending=%u\n",
-                  uuid.c_str(),
+                  report.uuid.c_str(),
                   mqttClient.currentStateCode(),
                   static_cast<unsigned>(stats.pending));
   }
@@ -688,8 +733,12 @@ bool enqueueCriticalEvent(const String& topic,
                           const char* eventType,
                           const String& eventUuid,
                           uint64_t order) {
-  const EnqueueResult result = criticalOutbox.enqueue(
-      eventUuid.c_str(), topic.c_str(), payload.c_str(), order, static_cast<uint32_t>(millis()));
+  const EnqueueResult result = criticalOutbox.enqueue(eventUuid.c_str(),
+                                                      topic.c_str(),
+                                                      payload.c_str(),
+                                                      order,
+                                                      static_cast<uint32_t>(millis()),
+                                                      priorityForEventType(eventType));
   const OutboxStats stats = criticalOutbox.stats();
 
   switch (result) {
@@ -727,32 +776,64 @@ bool enqueueCriticalEvent(const String& topic,
 }
 
 void handleIncomingMqttMessage(const char* topic, const uint8_t* payload, unsigned int length) {
-  CriticalAck::Ack ack;
-  const CriticalAck::ParseStatus status = CriticalAck::parse(criticalAckTopic().c_str(),
-                                                             topic == nullptr ? "" : topic,
-                                                             reinterpret_cast<const char*>(payload),
-                                                             length,
-                                                             ack);
-  if (status != CriticalAck::ParseStatus::Ok) {
-    ++invalidAckCount;
-    AppLog::warnf("[outbox] ack_ignored reason=%s topic=%s bytes=%u\n",
-                  CriticalAck::describe(status),
-                  topic == nullptr ? "" : topic,
-                  length);
-    return;
-  }
+  CriticalDelivery::InboundConfig config;
+  config.ackTopic = criticalAckTopic().c_str();
+  config.resultTopic = criticalResultTopic().c_str();
+  config.deviceId = DeviceSettings::effectiveDeviceId(runtimeConfig()).c_str();
+  config.acceptLegacyAck = AppConfig::CRITICAL_ACCEPT_LEGACY_ACK;
+  const CriticalDelivery::InboundReport report =
+      CriticalDelivery::handleInbound(criticalOutbox,
+                                      config,
+                                      topic == nullptr ? "" : topic,
+                                      reinterpret_cast<const char*>(payload),
+                                      length,
+                                      static_cast<uint32_t>(millis()));
+  const OutboxStats stats = criticalOutbox.stats();
 
-  const AckResult result = criticalOutbox.onAck(ack.eventUuid, static_cast<uint32_t>(millis()));
-  const char* outcome = result == AckResult::Removed             ? "removed"
-                        : result == AckResult::RemovedStoreError ? "removed_store_error"
-                        : result == AckResult::DuplicateAck      ? "duplicate_ack"
-                                                                 : "unknown_uuid";
-  AppLog::infof("[outbox] ack event_uuid=%s event_id=%lld status=%s outcome=%s pending=%u\n",
-                ack.eventUuid.c_str(),
-                static_cast<long long>(ack.eventId),
-                ack.status.c_str(),
-                outcome,
-                static_cast<unsigned>(criticalOutbox.stats().pending));
+  switch (report.kind) {
+    case CriticalDelivery::InboundKind::Result:
+      AppLog::infof("[outbox] result event_uuid=%s status=%s reason=%s outcome=%s pending=%u quarantined=%u\n",
+                    report.result.eventUuid.c_str(),
+                    CriticalResult::describe(report.result.status),
+                    report.result.reasonCode.empty() ? "-" : report.result.reasonCode.c_str(),
+                    CriticalDelivery::describe(report.resultOutcome),
+                    static_cast<unsigned>(stats.pending),
+                    static_cast<unsigned>(stats.quarantined));
+      if (report.resultOutcome == ResultOutcome::Quarantined ||
+          report.resultOutcome == ResultOutcome::KeptQuarantineFull ||
+          report.resultOutcome == ResultOutcome::KeptStoreError) {
+        // Rejeicao nao e entrega: sinaliza localmente que o evento nao chegou ao backend.
+        AppLog::errorf("[outbox] critical_event_not_delivered event_uuid=%s reason=%s\n",
+                       report.result.eventUuid.c_str(),
+                       report.result.reasonCode.c_str());
+      }
+      return;
+    case CriticalDelivery::InboundKind::InvalidResult:
+      ++invalidResultCount;
+      AppLog::warnf("[outbox] result_ignored reason=%s bytes=%u\n",
+                    CriticalResult::describe(report.resultParse),
+                    length);
+      return;
+    case CriticalDelivery::InboundKind::LegacyAckDisabled:
+      ++invalidAckCount;
+      AppLog::warnf("[outbox] legacy_ack_disabled bytes=%u\n", length);
+      return;
+    case CriticalDelivery::InboundKind::InvalidAck:
+      ++invalidAckCount;
+      AppLog::warnf("[outbox] ack_ignored reason=%s topic=%s bytes=%u\n",
+                    CriticalAck::describe(report.ackParse),
+                    topic == nullptr ? "" : topic,
+                    length);
+      return;
+    case CriticalDelivery::InboundKind::LegacyAck:
+      AppLog::infof("[outbox] ack event_uuid=%s event_id=%lld status=%s outcome=%s pending=%u\n",
+                    report.ack.eventUuid.c_str(),
+                    static_cast<long long>(report.ack.eventId),
+                    report.ack.status.c_str(),
+                    CriticalDelivery::describe(report.ackOutcome),
+                    static_cast<unsigned>(stats.pending));
+      return;
+  }
 }
 
 IndicatorState computeIndicatorState() {
@@ -1101,7 +1182,7 @@ void beginCriticalDelivery() {
                 static_cast<unsigned>(stats.pending));
 
   mqttClient.setMessageHandler(handleIncomingMqttMessage);
-  mqttClient.setSubscription(criticalAckTopic(), 1);
+  mqttClient.setSubscriptions(criticalAckTopic(), criticalResultTopic(), 1);
 }
 
 void holdDisabledBuzzerInactive() {
@@ -1573,8 +1654,8 @@ void loop() {
 
   maybeSyncPatientProfile(nowMs);
 
-  // O device_id (e portanto o topico de ACK) pode mudar pelo portal.
-  mqttClient.setSubscription(criticalAckTopic(), 1);
+  // O device_id (e portanto os topicos de ACK/resultado) pode mudar pelo portal.
+  mqttClient.setSubscriptions(criticalAckTopic(), criticalResultTopic(), 1);
   serviceCriticalOutbox(nowMs);
 
   indicator.setBuzzerEnabled(runtimeConfig().alertTuning.buzzerEnabled);

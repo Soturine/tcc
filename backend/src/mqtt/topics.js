@@ -19,6 +19,11 @@ function buildCriticalEventAckTopic(deviceIdentifier, base = env.mqtt.topicBase)
   return `${normalizeBase(base)}/${deviceIdentifier}/critical-event-acks`;
 }
 
+// Topico do resultado de ingestao (critical-event-result-v1), mesma regra de identidade.
+function buildCriticalEventResultTopic(deviceIdentifier, base = env.mqtt.topicBase) {
+  return `${normalizeBase(base)}/${deviceIdentifier}/critical-event-results`;
+}
+
 function parseDeviceTopic(topic, base = env.mqtt.topicBase) {
   const normalizedBase = normalizeBase(base);
   const baseParts = normalizedBase.split("/");
@@ -43,6 +48,7 @@ function parseDeviceTopic(topic, base = env.mqtt.topicBase) {
 
 module.exports = {
   buildCriticalEventAckTopic,
+  buildCriticalEventResultTopic,
   getSubscriptionTopics,
   parseDeviceTopic,
 };
