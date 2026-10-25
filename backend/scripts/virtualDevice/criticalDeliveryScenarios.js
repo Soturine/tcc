@@ -770,6 +770,36 @@ scenario("19. upgrade/downgrade: device antigo e novo convivem no mesmo backend"
   await modern.close();
 });
 
+scenario("20. F-30: relogio nao sincronizado e 45 min offline nao inventam UTC; timestamp conflitante e rejeitado", async (results) => {
+  const device = new VirtualDevice(`e2e-unsynced-${RUN_ID}`, { resultCapable: true });
+  await device.connect();
+  // Sem NTP o firmware envia occurred_at_device=null e um timestamp de millis (nao UTC).
+  const payload = device.buildFall({ clockQuality: "unsynced", occurredAt: new Date(45 * 60 * 1000) });
+  payload.device_uptime_ms = 45 * 60 * 1000 + 1234;
+  const sentAt = Date.now();
+  const delivery = await device.deliver(payload);
+  const [row] = await db.query(
+    `SELECT event_time, occurred_at_device, received_at, clock_quality, boot_id, device_uptime_ms
+     FROM events WHERE event_uuid = ?`,
+    [payload.event_uuid],
+  ).then(([rows]) => rows);
+  check(results, delivery.ack?.status === "committed", "evento confirmado");
+  check(results, row?.occurred_at_device === null, "occurred_at_device permanece NULL (UTC desconhecido)");
+  check(results, row?.clock_quality === "unsynced", "clock_quality=unsynced preservado");
+  check(results, row?.boot_id === payload.boot_id && Number(row?.device_uptime_ms) === payload.device_uptime_ms,
+    "boot_id e device_uptime_ms preservados para estimativa futura com ancora");
+  check(results, Math.abs(new Date(row?.event_time).getTime() - new Date(row?.received_at).getTime()) < 2000 &&
+    new Date(row?.received_at).getTime() >= sentAt - 2000,
+    "event_time = received_at (fallback declarado), nunca 1970 nem instante inventado");
+
+  // Mesmo UUID com timestamp diferente nao e duplicata: e conflito permanente.
+  const conflicting = { ...payload, timestamp: payload.timestamp + 600 };
+  const conflict = await device.deliver(conflicting, { attempts: 2 });
+  check(results, conflict.quarantined?.reason_code === "event_uuid_conflict", "timestamp conflitante => event_uuid_conflict");
+  check(results, (await eventRows(payload.event_uuid)).length === 1, "um unico evento logico");
+  await device.close();
+});
+
 // ---------------------------------------------------------------- execucao
 
 async function main() {
@@ -838,10 +868,12 @@ async function main() {
   const outPath = path.join(BACKEND_ROOT, "logs", "e2e", `critical-delivery-${RUN_ID}.json`);
   fs.writeFileSync(outPath, JSON.stringify(report, null, 2));
   console.log(`relatorio: ${outPath}`);
-  process.exitCode = failed > 0 ? 1 : 0;
+  // Clientes MQTT reconectados (cenario de broker) e sockets do proxy podem manter o
+  // event loop vivo; sem saida explicita o job de CI ficaria preso ate o timeout.
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 main().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });
