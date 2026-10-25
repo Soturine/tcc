@@ -11,6 +11,8 @@
 | Build ESP32 | compilação do firmware com outbox | **executado**: SUCCESS, Flash 91,0%, RAM estática 16,9% |
 | ESP32 físico (HIL) | LittleFS real, reboot real, perda de Wi‑Fi, TLS, heap em execução | **pendente**: hardware indisponível nesta rodada |
 
+**Rodada P2.1 (2026-10-25):** nativo 65/65; backend 148 testes (143 pass, 5 skipped sem MySQL, executados à parte em MySQL descartável); E2E **20/20** (novos 13–20: `critical-event-result-v1`, F-29, identidade, MySQL recusado, TCP reset, broker parado, upgrade/downgrade, relógio não sincronizado); broker de referência 19/19. Detalhes em [evidência P2.1](p2-1-implementation-evidence-2026-10-25.md). O cenário 9 mudou por decisão (ADR-029): queda sem evidência agora gera alerta de atenção.
+
 O virtual device **emula** a outbox (retransmite o mesmo `event_uuid` até o ACK). Ele não executa o código C++ do firmware; essa lógica é coberta pelos testes host. Nenhum resultado abaixo é validação física.
 
 ## Execução registrada

@@ -158,6 +158,8 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 2. O transporte continua PubSubClient nesta fase. ESP-MQTT é viável em memória (spike), mas executa em task própria, entrega callbacks fora do `loop()` e muda TLS/reconexão; trocá-lo sem ESP32 físico colocaria em risco o caminho crítico sem evidência de execução.
 3. A adoção de ESP-MQTT QoS 1 fica como próximo passo de firmware, atrás de interface de transporte, com critério de aceite: HIL com broker TLS, perda de Wi‑Fi, reboot e medição de heap/stack em execução.
 
+**Atualização 2026-10-25.** O laço de entrega foi isolado atrás de `CriticalTransport` (`include/critical_delivery.h`), com testes nativos; o cliente continua PubSubClient. A troca para ESP-MQTT continua condicionada ao HIL acima.
+
 **Consequências.** O backend já assina com QoS 1 e publica ACK com QoS 1. Do device para o broker a mensagem segue QoS 0; perdas nesse trecho são recuperadas por retry da outbox (maior latência de recuperação, não perda lógica). Sessão persistente continua otimização (F-13), não requisito de correção.
 
 ## ADR-021 — Pulso + IMU completa como alvo de qualificação
@@ -177,7 +179,7 @@ Valores de build (`pio run`), não medições em execução. O firmware completo
 
 
 ## ADR-026 — Resultados negativos de ingestão crítica não equivalem a ACK de persistência
-**Status: Proposed (2026-10-22).** `critical-event-ack-v1` continua significando apenas `committed/duplicate` após COMMIT. Tratar F-29 via *resultado versionado* e política persistente de retry/quarentena, com semântica e limites explícitos. Nunca remover evento em resposta a rejeição como se tivesse sido persistido. Resolver `outbox full` com observabilidade e decisão de risco, sem promessa impossível de armazenamento ilimitado. [Protocolo P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
+**Status: Accepted (2026-10-25)** — implementado como `critical-event-result-v1` (host/emulação; HIL pendente), ver [evidência P2.1](../quality/p2-1-implementation-evidence-2026-10-25.md). Proposto em 2026-10-22. `critical-event-ack-v1` continua significando apenas `committed/duplicate` após COMMIT. Tratar F-29 via *resultado versionado* e política persistente de retry/quarentena, com semântica e limites explícitos. Nunca remover evento em resposta a rejeição como se tivesse sido persistido. Resolver `outbox full` com observabilidade e decisão de risco, sem promessa impossível de armazenamento ilimitado. [Protocolo P2.1](../quality/critical-reliability-remediation-2026-10-22.md).
 
 ## ADR-027 — Flash/energia, taxa de amostragem e qualificação de wearable são gates físicos
 **Status: Proposed (2026-10-22).** Não promover smartwatch a hardware final, mudança de partição/OTA ou amostragem 50/100 Hz por documentação, demonstração do fornecedor ou build de bancada. Requer BOM/SKU revisados, drivers e eixos reais, HIL para outbox/flash e medidas de jitter/energia. O algoritmo baseline A permanece congelado; trocar taxa/filtro exige nova condição experimental. [Hardware](../hardware/wearable-qualification-protocol-2026-10-22.md) · [Nyquist](../research/wrist-sampling-nyquist-protocol.md).
