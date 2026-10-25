@@ -115,3 +115,61 @@ test("transaction nao repete erro que nao seja deadlock", async () => {
     restore();
   }
 });
+
+test("conexao perdida: falha no rollback nao mascara o erro original e a conexao e destruida", async () => {
+  const connection = fakeConnection();
+  connection.destroyCalls = 0;
+  connection.rollback = async function rollback() {
+    this.rollbackCalls += 1;
+    throw Object.assign(new Error("Can't add new command when connection is in closed state"), {
+      code: "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR",
+    });
+  };
+  connection.destroy = function destroy() {
+    this.destroyCalls += 1;
+  };
+  const { module: database, restore } = loadPoolWithConnections([connection]);
+
+  try {
+    await assert.rejects(
+      database.transaction(async () => {
+        throw Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+      }),
+      // O codigo original decide se o resultado critico e retryable.
+      (error) => error.code === "ECONNRESET",
+    );
+    assert.equal(connection.rollbackCalls, 1);
+    assert.equal(connection.destroyCalls, 1);
+    assert.equal(connection.releaseCalls, 0);
+  } finally {
+    restore();
+  }
+});
+
+test("falha no COMMIT propaga o erro do commit e nao devolve conexao quebrada ao pool", async () => {
+  const connection = fakeConnection();
+  connection.destroyCalls = 0;
+  connection.commit = async function commit() {
+    this.commitCalls += 1;
+    throw Object.assign(new Error("Connection lost"), { code: "PROTOCOL_CONNECTION_LOST", fatal: true });
+  };
+  connection.rollback = async function rollback() {
+    this.rollbackCalls += 1;
+    throw Object.assign(new Error("closed"), { code: "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" });
+  };
+  connection.destroy = function destroy() {
+    this.destroyCalls += 1;
+  };
+  const { module: database, restore } = loadPoolWithConnections([connection]);
+
+  try {
+    await assert.rejects(
+      database.transaction(async () => "work-done"),
+      (error) => error.code === "PROTOCOL_CONNECTION_LOST",
+    );
+    assert.equal(connection.destroyCalls, 1);
+    assert.equal(connection.releaseCalls, 0);
+  } finally {
+    restore();
+  }
+});
