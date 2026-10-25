@@ -29,7 +29,10 @@ constexpr unsigned long FIRMWARE_TELEMETRY_SKIP_LOG_INTERVAL_MS = 5000;
 constexpr char DEFAULT_DEVICE_ID[] = "esp32_01";
 constexpr char DEFAULT_WIFI_SSID[] = "YOUR_WIFI_SSID";
 constexpr char DEFAULT_WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
-constexpr char DEFAULT_MQTT_HOST[] = "broker.hivemq.com";
+// F-17: sem broker de fabrica. Antes apontava para um broker PUBLICO sem TLS, onde
+// qualquer cliente poderia ler eventos ou forjar ACKs. Vazio = nao configurado:
+// o device segue detectando e enfileirando na outbox, e o portal pede o broker.
+constexpr char DEFAULT_MQTT_HOST[] = "";
 constexpr uint16_t DEFAULT_MQTT_PORT = 1883;
 constexpr char DEFAULT_MQTT_USERNAME[] = "";
 constexpr char DEFAULT_MQTT_PASSWORD[] = "";

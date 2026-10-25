@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include <cstring>
+
+#include "app_config.h"
 #include "critical_outbox.h"
 #include "critical_result.h"
 #include "event_identity.h"
@@ -467,6 +470,30 @@ void testTmpRecoveryNeverLosesRewrittenEvent() {
   TEST_ASSERT_EQUAL(static_cast<int>(R::DiscardTmp), static_cast<int>(OutboxCodec::decideTmpRecovery(false, "")));
 }
 
+// ---------------------------------------------------------------- configuracao de produto
+
+void testFactoryDefaultsDoNotUsePublicBrokerOrInsecureTls() {
+  // F-17: nenhum broker de fabrica (publico ou nao) e TLS nunca inseguro por padrao.
+  TEST_ASSERT_EQUAL_UINT32(0, std::strlen(AppConfig::DEFAULT_MQTT_HOST));
+  TEST_ASSERT_FALSE(AppConfig::DEFAULT_MQTT_TLS_INSECURE);
+}
+
+void testProductOutboxBudgetIsCoherent() {
+  // Reservas deixam espaco para eventos normais e cabem na capacidade.
+  TEST_ASSERT_TRUE(AppConfig::CRITICAL_OUTBOX_SOS_RESERVE + AppConfig::CRITICAL_OUTBOX_FALL_RESERVE <
+                   AppConfig::CRITICAL_OUTBOX_CAPACITY);
+  TEST_ASSERT_TRUE(AppConfig::CRITICAL_OUTBOX_SOS_RESERVE >= 1U);
+  // Payload maximo + topico + cabecalho cabem no buffer MQTT.
+  TEST_ASSERT_TRUE(AppConfig::CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES + 128U <= AppConfig::MQTT_PACKET_BUFFER_SIZE);
+  // Pior caso da outbox+quarentena (payload maximo + ~512 B de cabecalho do codec)
+  // abaixo de 10% da particao de dados do default.csv do esp32dev (spiffs 0x160000).
+  const std::size_t worstCaseBytes =
+      (AppConfig::CRITICAL_OUTBOX_CAPACITY + AppConfig::CRITICAL_OUTBOX_QUARANTINE_CAPACITY) *
+      (AppConfig::CRITICAL_OUTBOX_MAX_PAYLOAD_BYTES + 512U);
+  TEST_ASSERT_TRUE(worstCaseBytes <= 0x160000U / 10U);
+  TEST_ASSERT_EQUAL_INT(1, AppConfig::CRITICAL_INGEST_RESULT_VERSION);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -487,5 +514,7 @@ int main(int, char**) {
   RUN_TEST(testCodecV2RoundTripsStateAndPriority);
   RUN_TEST(testLegacyCeo1FilesAreRestoredAfterUpgrade);
   RUN_TEST(testTmpRecoveryNeverLosesRewrittenEvent);
+  RUN_TEST(testFactoryDefaultsDoNotUsePublicBrokerOrInsecureTls);
+  RUN_TEST(testProductOutboxBudgetIsCoherent);
   return UNITY_END();
 }
