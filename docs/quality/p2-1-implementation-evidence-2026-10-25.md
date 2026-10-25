@@ -66,6 +66,7 @@ Fragilidades encontradas no CP0 (não documentadas antes):
 | Outbox do device | quarentena cheia ou falha de escrita | mantém ativo com retry lento; não apaga |
 | Outbox do device | fila cheia | recusa o NOVO evento (contado por prioridade); nada aceito é despejado |
 | Device | ACK legado `critical-event-ack-v1` | aceito por compatibilidade (`CRITICAL_ACCEPT_LEGACY_ACK=true`) — **fail-open consciente** para downgrade; desligar após backend novo + ACL efetiva |
+| Backend → device (migração) | `MQTT_LEGACY_ACK_FOR_RESULT_DEVICES=true` | o backend também envia ACK v1 a devices com resultado v1 para não travar com ACL antiga. **Consequência:** enquanto esta flag e `CRITICAL_ACCEPT_LEGACY_ACK` estiverem ligadas, o ACK v1 (sem hash) pode remover o evento antes de o resultado com hash ser conferido; a proteção por hash contra replay de outro conteúdo só vale com as duas desligadas. A ACL continua sendo a barreira contra forja. |
 | Backend | erro desconhecido na ingestão | `retryable` (nunca `committed`) |
 | Backend | COMMIT incerto (conexão perdida) | `retryable`; a retransmissão vira `duplicate` se o COMMIT ocorreu |
 | Backend | CA TLS ilegível em ambiente externo | recusa iniciar (validação existente em `env.js`) |
@@ -115,3 +116,11 @@ Achados durante a execução e corrigidos: o processo E2E não terminava depois 
 - O virtual device **emula** a regra da outbox; ele não executa o C++ do firmware (essa lógica é coberta pelos testes nativos).
 - O broker verificado é uma referência descartável; staging implantado, rotação de credenciais e provisionamento de credencial por device no ESP **não existem ainda**.
 - Não há FCM/Android: "prioridade" de alerta afeta apenas a listagem e o realtime; não houve entrega a humano.
+
+## 9. CP4–CP6 (mesma rodada, continuação)
+
+- **CP4 — pesquisa de pulso e Nyquist:** adaptador WEDA-FALL, métrica com janela 1:1, bootstrap por participante, laboratório de Nyquist com artefato sintético reprodutível no CI e perfil espectral real. Resultado offline da baseline congelada em [wrist-baseline-weda-fall-2026-10-25.md](../research/wrist-baseline-weda-fall-2026-10-25.md). Ensaio físico de ODR/DLPF/energia: `BLOCKED`.
+- **CP5 — MotionLab offline (ML-0/ML-1):** [`tools/motionlab`](../../tools/motionlab/README.md) com contratos `lab-frame-v1` e `annotation-v1`. Live, Android, FCM, sessão revogável e notification-outbox: `DEFERRED` (não existe `apps/android`). Checklist e verificador de log HIL: [hil-bench-checklist-2026-10-25.md](hil-bench-checklist-2026-10-25.md).
+- **CP6 — segunda auditoria:** encontrou e corrigiu o risco de migração de ACL (device novo + backend novo + ACL antiga = nenhuma confirmação → retry infinito), solucionado com o ACK v1 de compatibilidade (`e49724b`), e um check E2E vazio escrito na mesma rodada. Auditoria de testes com a Assertiva e estudo de mutação manual (22 mutantes, 21 detectados, sobrevivente B2 corrigido em `82bcb8f`): [test-audit-assertiva-2026-10-25.md](test-audit-assertiva-2026-10-25.md).
+
+Contagens atualizadas no fim da rodada: backend 151 testes (146 pass, 5 skipped sem MySQL, executados à parte em MySQL descartável); contratos 9/9; firmware nativo 65/65; FallBench 44 (1 skipped localmente sem binário; 0 skipped no CI); MotionLab 12/12; verificador HIL 4/4; E2E 20/20; broker de referência 19/19; build `esp32dev` 1.204.785 B (91,9%).

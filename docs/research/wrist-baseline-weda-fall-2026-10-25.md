@@ -20,8 +20,8 @@
 - **Timestamps em rajadas:** em "50 Hz", ~4 amostras chegam com poucos ms de diferença, seguidas de um intervalo de ~120 ms. Parecem instantes de entrega do lote, não de conversão. A base de tempo é por isso uma condição explícita (`recorded` × `uniform_index`).
 - **Taxa efetiva depende da classe:** mediana de **39,8 Hz nas quedas** e **49,7 Hz nas ADLs** (estimada pelo número de amostras sobre a duração). É um confundidor para qualquer classificador e reduz o Nyquist observável nas quedas para ~20 Hz.
 - As pastas de 40/25/10/5 Hz foram **derivadas** da de 50 Hz por método não documentado: não foram usadas como condição de amostragem.
-- Saturação: o giroscópio excede a faixa configurada no firmware (500 °/s) em 360 dos 969 trials (`recorded`). O replay satura nessa faixa, como o MPU faria.
-- Composição: 969 trials (350 quedas de 14 jovens; 619 ADLs, das quais 157 de 11 idosos), igual aos totais do README. Nenhum trial excluído.
+- Saturação: o giroscópio excede a faixa configurada no firmware (500 °/s) em 360 dos 969 trials (`recorded`). O replay satura nessa faixa, como o MPU faria. Isso depende da unidade inferida (rad/s): se fosse °/s, o pico de ~11 °/s numa queda seria fisicamente implausível, por isso rad/s foi adotado e declarado.
+- Composição: 969 trials (350 quedas do grupo "jovens" U01–U14, 20–46 anos segundo o README; 619 ADLs, das quais 157 de 11 idosos U21–U31, 77–95 anos), igual aos totais do README. Nenhum trial excluído.
 
 ## 3. Protocolo (declarado antes da execução)
 

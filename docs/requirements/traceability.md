@@ -71,7 +71,7 @@ A trilha é de planejamento; não acrescenta cobertura testada nem métricas val
 
 | Grupo | Requisito / risco | Código/evidência atual | Evidência requerida para aprovação | Status |
 |---|---|---|---|---|
-| P2.1 | F-29 rejeição permanente, SOS e outbox cheia | `critical-event-result-v1`, quarentena, reservas | 13 testes de ingestão, 23 nativos, E2E 13–15 ([evidência](docs/quality/p2-1-implementation-evidence-2026-10-25.md)) | implemented, tested, emulated; HIL pendente |
+| P2.1 | F-29 rejeição permanente, SOS e outbox cheia | `critical-event-result-v1`, quarentena, reservas | 13 testes de ingestão, 23 nativos, E2E 13–15 ([evidência](../quality/p2-1-implementation-evidence-2026-10-25.md)) | implemented, tested, emulated; HIL pendente |
 | P2.1 | F-31 suspeita × confirmada × SOS | `alertPolicy.js` (ADR-029) | matriz de prioridade, E2E 9 | implemented, tested; revisão de produto pendente |
 | Segurança | F-17/27 MQTT TLS/ACL por device | `infra/mqtt/*example*` | broker staging real e testes cruzados de identidade | planned |
 | Firmware | F-28 flash/partições/OTA | `platformio.ini`, build 91% na partição antiga | build/memória/migração/recovery e HIL do modelo escolhido | planned |
